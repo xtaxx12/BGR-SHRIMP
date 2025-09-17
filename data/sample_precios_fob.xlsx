@@ -1,0 +1,9 @@
+# Este es un archivo de ejemplo. Reemplaza con tu archivo Excel real.
+# El archivo debe tener una hoja llamada "PRECIOS FOB" con las siguientes columnas:
+# TALLA, PRECIO_BASE, PRODUCTO, COSTO_FIJO, FACTOR_GLASEO, FLETE
+
+# Ejemplo de estructura:
+# TALLA    | PRECIO_BASE | PRODUCTO | COSTO_FIJO | FACTOR_GLASEO | FLETE
+# 8/12     | 12.50       | HLSO     | 0.25       | 0.7           | 0.20
+# 13/15    | 10.80       | HLSO     | 0.25       | 0.7           | 0.20
+# 16/20    | 8.55        | HLSO     | 0.25       | 0.7           | 0.20
