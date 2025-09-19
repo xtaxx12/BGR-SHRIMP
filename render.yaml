@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: bgr-shrimp-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python start.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: PORT
+        value: 8000
+      - key: DEBUG
+        value: false
+      - key: EXCEL_PATH
+        value: data/CALCULO_DE _PRECIOS-AGUAJE17.xlsx
+    # Variables de entorno que debes configurar en Render Dashboard:
+    # TWILIO_ACCOUNT_SID
+    # TWILIO_AUTH_TOKEN  
+    # TWILIO_WHATSAPP_NUMBER
+    # OPENAI_API_KEY (opcional)

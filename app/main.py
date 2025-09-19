@@ -2,10 +2,12 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import PlainTextResponse
 import uvicorn
 from app.routes import webhook_router
+from app.config import settings
 import logging
 
 # Configurar logging
-logging.basicConfig(level=logging.INFO)
+log_level = logging.DEBUG if settings.DEBUG else logging.INFO
+logging.basicConfig(level=log_level)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
