@@ -12,20 +12,45 @@ def parse_user_message(message: str) -> Optional[Dict]:
     
     # Patrones para extraer información
     size_pattern = r'\b(\d+/\d+)\b'
-    quantity_pattern = r'\b(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*(?:LB|LIBRAS?|POUNDS?)\b'
+    quantity_pattern = r'\b(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*(?:LB|LIBRAS?|POUNDS?|KG|KILOS?)\b'
     destination_pattern = r'(?:DESTINO|PARA|A)\s+([A-Z\s]+?)(?:\s|$)'
     
+    # Patrones para productos
+    product_patterns = {
+        'HOSO': r'\bHOSO\b',
+        'HLSO': r'\bHLSO\b',
+        'P&D IQF': r'\b(?:P&D\s*IQF|PD\s*IQF|PEELED\s*DEVEINED\s*IQF)\b',
+        'P&D BLOQUE': r'\b(?:P&D\s*BLOQUE|PD\s*BLOQUE|PEELED\s*DEVEINED\s*BLOQUE)\b',
+        'PuD-EUROPA': r'\b(?:PUD\s*EUROPA|P&D\s*EUROPA|EUROPA)\b',
+        'EZ PEEL': r'\b(?:EZ\s*PEEL|EZPEEL|EASY\s*PEEL)\b'
+    }
+    
     result = {}
+    
+    # Extraer producto
+    for product, pattern in product_patterns.items():
+        if re.search(pattern, message):
+            result['product'] = product
+            break
+    
+    # Si no se encuentra producto específico, usar HLSO por defecto
+    if 'product' not in result:
+        result['product'] = 'HLSO'
     
     # Extraer talla
     size_match = re.search(size_pattern, message)
     if size_match:
         result['size'] = size_match.group(1)
     
-    # Extraer cantidad
+    # Extraer cantidad y unidad
     quantity_match = re.search(quantity_pattern, message)
     if quantity_match:
         result['quantity'] = quantity_match.group(1)
+        # Determinar unidad
+        if re.search(r'\b(?:KG|KILOS?)\b', message):
+            result['unit'] = 'kg'
+        else:
+            result['unit'] = 'lb'
     
     # Extraer destino
     destination_match = re.search(destination_pattern, message)
@@ -50,29 +75,32 @@ def format_price_response(price_info: Dict) -> str:
         response = f"📦 **BGR EXPORT - Cotización Camarón**\n\n"
         response += f"📏 **Talla:** {price_info['size']}\n"
         response += f"🦐 **Producto:** {price_info['producto']}\n"
-        response += f"💲 **Precio base:** ${price_info['precio_base']:.2f}/lb\n\n"
-        
-        response += f"⚙️ **Ajustes aplicados:**\n"
-        response += f"• Costo fijo: ${price_info['costo_fijo']:.2f}/lb\n"
-        response += f"• Glaseo (factor): {price_info['factor_glaseo']} ({int(price_info['factor_glaseo']*100)}% camarón real)\n"
-        response += f"• Flete: ${price_info['flete']:.2f}/lb\n\n"
-        
-        response += f"💰 **Precio final estimado: ${price_info['precio_final']:.2f}/lb**\n"
+        response += f"💲 **Precio:** ${price_info['precio_kg']:.2f}/kg - ${price_info['precio_lb']:.2f}/lb\n\n"
         
         # Agregar información adicional si está disponible
         if price_info.get('quantity'):
             try:
                 qty = float(price_info['quantity'].replace(',', ''))
-                total = qty * price_info['precio_final']
-                response += f"\n📊 **Para {price_info['quantity']} lb:**\n"
-                response += f"💵 **Total estimado: ${total:,.2f}**"
+                unit = price_info.get('unit', 'lb')
+                
+                if unit == 'kg':
+                    unit_price = price_info['precio_kg']
+                    total = qty * unit_price
+                    response += f"📊 **Para {price_info['quantity']} kg:**\n"
+                    response += f"💵 **Total estimado: ${total:,.2f}**\n\n"
+                else:
+                    unit_price = price_info['precio_lb']
+                    total = qty * unit_price
+                    response += f"📊 **Para {price_info['quantity']} lb:**\n"
+                    response += f"💵 **Total estimado: ${total:,.2f}**\n\n"
             except:
                 pass
         
         if price_info.get('destination'):
-            response += f"\n🌍 **Destino:** {price_info['destination']}"
+            response += f"🌍 **Destino:** {price_info['destination']}\n\n"
         
-        response += f"\n\n_Precios sujetos a confirmación final_"
+        response += f"_Precios FOB sujetos a confirmación final_\n"
+        response += f"📞 Contacto: BGR Export"
         
         return response
         
