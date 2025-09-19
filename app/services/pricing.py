@@ -36,33 +36,30 @@ class PricingService:
         """
         try:
             size = user_input.get('size')
+            product = user_input.get('product', 'HLSO')  # Default a HLSO
+            
             if not size:
                 return None
             
             # Obtener datos del Excel
-            price_data = self.excel_service.get_price_data(size)
+            price_data = self.excel_service.get_price_data(size, product)
             if not price_data:
                 return None
             
-            # Calcular precio final
-            final_price = self.calculate_final_price(
-                price_data['precio_base'],
-                price_data['costo_fijo'],
-                price_data['factor_glaseo'],
-                price_data['flete']
-            )
+            # Usar directamente los precios del Excel (ya están calculados)
+            precio_kg = price_data['precio_kg']
+            precio_lb = price_data['precio_lb']
             
             # Preparar respuesta
             result = {
                 'size': size,
                 'producto': price_data['producto'],
-                'precio_base': price_data['precio_base'],
-                'costo_fijo': price_data['costo_fijo'],
-                'factor_glaseo': price_data['factor_glaseo'],
-                'flete': price_data['flete'],
-                'precio_final': final_price,
+                'precio_kg': precio_kg,
+                'precio_lb': precio_lb,
+                'talla': price_data['talla'],
                 'quantity': user_input.get('quantity', ''),
-                'destination': user_input.get('destination', '')
+                'destination': user_input.get('destination', ''),
+                'unit': user_input.get('unit', 'lb')  # Default a libras
             }
             
             return result
@@ -71,11 +68,17 @@ class PricingService:
             logger.error(f"Error obteniendo precio: {str(e)}")
             return None
     
-    def get_available_sizes(self) -> list:
+    def get_available_sizes(self, product: str = 'HLSO') -> list:
         """
-        Retorna las tallas disponibles
+        Retorna las tallas disponibles para un producto
         """
-        return self.excel_service.get_available_sizes()
+        return self.excel_service.get_available_sizes(product)
+    
+    def get_available_products(self) -> list:
+        """
+        Retorna los productos disponibles
+        """
+        return self.excel_service.get_available_products()
     
     def reload_prices(self) -> bool:
         """
