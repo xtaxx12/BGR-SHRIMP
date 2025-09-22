@@ -33,21 +33,24 @@ async def whatsapp_webhook(
         user_id = From.replace("whatsapp:", "")
         session = session_manager.get_session(user_id)
         
-        # Comandos globales que funcionan desde cualquier estado
+        # Comandos globales que funcionan desde cualquier estado (excepto cuando está esperando selección)
         message_lower = Body.lower().strip()
         
-        if message_lower in ['precios', 'precio', 'prices']:
-            size_message, available_sizes = interactive_service.create_size_selection_message()
-            if size_message:
-                response.message(size_message)
-                session_manager.set_session_state(user_id, 'waiting_for_size_selection', {
-                    'available_sizes': available_sizes
-                })
-            else:
-                response.message("❌ No hay tallas disponibles en este momento.")
-            return PlainTextResponse(str(response), media_type="application/xml")
+        # Solo procesar comandos globales si NO está en un estado de selección
+        if session['state'] not in ['waiting_for_size_selection', 'waiting_for_product_selection']:
+            if message_lower in ['precios', 'precio', 'prices']:
+                size_message, available_sizes = interactive_service.create_size_selection_message()
+                if size_message:
+                    response.message(size_message)
+                    session_manager.set_session_state(user_id, 'waiting_for_size_selection', {
+                        'available_sizes': available_sizes
+                    })
+                else:
+                    response.message("❌ No hay tallas disponibles en este momento.")
+                return PlainTextResponse(str(response), media_type="application/xml")
         
-        elif message_lower in ['menu', 'inicio', 'start', 'hola', 'hello', 'reiniciar', 'reset']:
+        # Comando menu siempre funciona
+        if message_lower in ['menu', 'inicio', 'start', 'hola', 'hello', 'reiniciar', 'reset']:
             # Limpiar sesión y mostrar menú principal
             session_manager.clear_session(user_id)
             welcome_msg = interactive_service.create_welcome_message()
@@ -114,7 +117,7 @@ async def whatsapp_webhook(
                     response.message(f"❌ No hay productos disponibles para la talla {selected_size}")
                     session_manager.clear_session(user_id)
             else:
-                response.message("❌ Selección inválida. Por favor, responde con el número de la opción deseada.")
+                response.message("🤔 Selección inválida. Por favor responde con:\n\n📝 El número de la opción (1-9)\n💡 O escribe 'menu' para volver al inicio")
         
         elif session['state'] == 'waiting_for_product_selection':
             # Usuario está seleccionando un producto
@@ -141,7 +144,7 @@ async def whatsapp_webhook(
                 # Limpiar sesión
                 session_manager.clear_session(user_id)
             else:
-                response.message("❌ Selección inválida. Por favor, responde con el número de la opción deseada.")
+                response.message("🤔 Selección inválida. Por favor responde con:\n\n📝 El número de la opción\n💡 O escribe 'menu' para volver al inicio")
         
         else:
             # Estado inicial - mostrar mensaje de bienvenida y menú principal
