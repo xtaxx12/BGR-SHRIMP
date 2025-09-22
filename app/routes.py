@@ -33,35 +33,67 @@ async def whatsapp_webhook(
         user_id = From.replace("whatsapp:", "")
         session = session_manager.get_session(user_id)
         
+        # Comandos globales que funcionan desde cualquier estado
+        message_lower = Body.lower().strip()
+        
+        if message_lower in ['precios', 'precio', 'prices']:
+            size_message, available_sizes = interactive_service.create_size_selection_message()
+            if size_message:
+                response.message(size_message)
+                session_manager.set_session_state(user_id, 'waiting_for_size_selection', {
+                    'available_sizes': available_sizes
+                })
+            else:
+                response.message("❌ No hay tallas disponibles en este momento.")
+            return PlainTextResponse(str(response), media_type="application/xml")
+        
+        elif message_lower in ['menu', 'inicio', 'start', 'hola', 'hello', 'reiniciar', 'reset']:
+            # Limpiar sesión y mostrar menú principal
+            session_manager.clear_session(user_id)
+            welcome_msg = interactive_service.create_welcome_message()
+            menu_msg, options = interactive_service.create_main_menu()
+            full_message = f"{welcome_msg}\n\n{menu_msg}"
+            response.message(full_message)
+            session_manager.set_session_state(user_id, 'main_menu', {'options': options})
+            return PlainTextResponse(str(response), media_type="application/xml")
+        
         # Procesar según el estado de la sesión
         if session['state'] == 'main_menu':
             # Usuario está en el menú principal
             new_state, message, options = interactive_service.handle_menu_selection(Body, "main")
-            response.message(message)
             
-            if options:
+            if new_state != 'main_menu':  # Solo si cambió de estado
+                response.message(message)
                 session_manager.set_session_state(user_id, new_state, {'options': options})
             else:
-                session_manager.set_session_state(user_id, new_state, {})
+                response.message("❌ Opción no válida. Por favor selecciona 1 o 2.")
         
         elif session['state'] == 'client_menu':
             # Usuario está en el menú de cliente
             new_state, message, options = interactive_service.handle_menu_selection(Body, "client_menu")
-            response.message(message)
-            session_manager.set_session_state(user_id, new_state, {})
+            
+            if new_state != 'client_menu':  # Solo si cambió de estado
+                response.message(message)
+                session_manager.set_session_state(user_id, new_state, {})
+            else:
+                response.message("❌ Opción no válida. Por favor selecciona 1, 2 o 3.")
         
         elif session['state'] == 'non_client_menu':
             # Usuario está en el menú de no cliente
             new_state, message, options = interactive_service.handle_menu_selection(Body, "non_client_menu")
-            response.message(message)
             
-            if new_state == 'pricing':
-                # Si seleccionó precios, configurar para selección de tallas
-                session_manager.set_session_state(user_id, 'waiting_for_size_selection', {
-                    'available_sizes': options
-                })
+            if new_state != 'non_client_menu':  # Solo si cambió de estado
+                response.message(message)
+                
+                if new_state == 'pricing':
+                    # Si seleccionó precios, configurar para selección de tallas
+                    session_manager.set_session_state(user_id, 'waiting_for_size_selection', {
+                        'available_sizes': options
+                    })
+                else:
+                    session_manager.set_session_state(user_id, new_state, {})
             else:
-                session_manager.set_session_state(user_id, new_state, {})
+                response.message("❌ Opción no válida. Por favor selecciona 1, 2 o 3.")
         
         elif session['state'] == 'waiting_for_size_selection':
             # Usuario está seleccionando una talla
@@ -115,18 +147,8 @@ async def whatsapp_webhook(
             # Estado inicial - mostrar mensaje de bienvenida y menú principal
             message_lower = Body.lower().strip()
             
-            # Comandos especiales que funcionan en cualquier momento
-            if message_lower in ['menu', 'inicio', 'start', 'hola', 'hello']:
-                # Mostrar mensaje de bienvenida y menú principal en uno
-                welcome_msg = interactive_service.create_welcome_message()
-                menu_msg, options = interactive_service.create_main_menu()
-                full_message = f"{welcome_msg}\n\n{menu_msg}"
-                response.message(full_message)
-                
-                session_manager.set_session_state(user_id, 'main_menu', {'options': options})
-                return PlainTextResponse(str(response), media_type="application/xml")
-            
-            elif message_lower in ['tallas', 'sizes', 'opciones']:
+            # Otros comandos especiales
+            if message_lower in ['tallas', 'sizes', 'opciones']:
                 size_message, available_sizes = interactive_service.create_size_selection_message()
                 if size_message:
                     response.message(size_message)
