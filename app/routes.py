@@ -34,7 +34,36 @@ async def whatsapp_webhook(
         session = session_manager.get_session(user_id)
         
         # Procesar según el estado de la sesión
-        if session['state'] == 'waiting_for_size_selection':
+        if session['state'] == 'main_menu':
+            # Usuario está en el menú principal
+            new_state, message, options = interactive_service.handle_menu_selection(Body, "main")
+            response.message(message)
+            
+            if options:
+                session_manager.set_session_state(user_id, new_state, {'options': options})
+            else:
+                session_manager.set_session_state(user_id, new_state, {})
+        
+        elif session['state'] == 'client_menu':
+            # Usuario está en el menú de cliente
+            new_state, message, options = interactive_service.handle_menu_selection(Body, "client_menu")
+            response.message(message)
+            session_manager.set_session_state(user_id, new_state, {})
+        
+        elif session['state'] == 'non_client_menu':
+            # Usuario está en el menú de no cliente
+            new_state, message, options = interactive_service.handle_menu_selection(Body, "non_client_menu")
+            response.message(message)
+            
+            if new_state == 'pricing':
+                # Si seleccionó precios, configurar para selección de tallas
+                session_manager.set_session_state(user_id, 'waiting_for_size_selection', {
+                    'available_sizes': options
+                })
+            else:
+                session_manager.set_session_state(user_id, new_state, {})
+        
+        elif session['state'] == 'waiting_for_size_selection':
             # Usuario está seleccionando una talla
             available_sizes = session['data'].get('available_sizes', [])
             selected_size = interactive_service.parse_selection_response(Body, available_sizes)
@@ -83,11 +112,23 @@ async def whatsapp_webhook(
                 response.message("❌ Selección inválida. Por favor, responde con el número de la opción deseada.")
         
         else:
-            # Estado normal - procesar mensaje nuevo
+            # Estado inicial - mostrar mensaje de bienvenida y menú principal
             message_lower = Body.lower().strip()
             
-            # Comandos especiales
-            if message_lower in ['tallas', 'sizes', 'opciones', 'menu']:
+            # Comandos especiales que funcionan en cualquier momento
+            if message_lower in ['menu', 'inicio', 'start', 'hola', 'hello']:
+                # Mostrar mensaje de bienvenida
+                welcome_msg = interactive_service.create_welcome_message()
+                response.message(welcome_msg)
+                
+                # Mostrar menú principal
+                menu_msg, options = interactive_service.create_main_menu()
+                response.message(menu_msg)
+                
+                session_manager.set_session_state(user_id, 'main_menu', {'options': options})
+                return PlainTextResponse(str(response), media_type="application/xml")
+            
+            elif message_lower in ['tallas', 'sizes', 'opciones']:
                 size_message, available_sizes = interactive_service.create_size_selection_message()
                 if size_message:
                     response.message(size_message)
@@ -107,44 +148,37 @@ async def whatsapp_webhook(
             elif message_lower in ['ayuda', 'help', '?']:
                 response.message("🤖 **BGR Export - Bot de Precios**\n\n"
                                "**Comandos disponibles:**\n"
+                               "• `menu` - Mostrar menú principal\n"
                                "• `tallas` - Ver tallas disponibles\n"
                                "• `productos` - Ver productos disponibles\n"
-                               "• `precio HLSO 16/20` - Consulta directa\n"
-                               "• `16/20` - Solo talla (te mostraré opciones)\n\n"
+                               "• `precio HLSO 16/20` - Consulta directa\n\n"
                                "**Ejemplos:**\n"
                                "• Precio HLSO 16/20 para 15000 lb destino China\n"
                                "• P&D IQF 21/25\n"
                                "• EZ PEEL 26/30")
                 return PlainTextResponse(str(response), media_type="application/xml")
             
+            # Intentar parsear como consulta de precio directa
             user_input = parse_user_message(Body)
             
-            if not user_input:
-                response.message("¡Hola! 👋 Soy el bot de BGR Export.\n\n"
-                               "Puedes consultarme precios de camarón enviando:\n"
-                               "• Talla (ej: 16/20, 21/25)\n"
-                               "• Producto y talla (ej: HLSO 16/20)\n"
-                               "• Consulta completa (ej: Precio HLSO 16/20 para 15,000 lb destino China)\n\n"
-                               "💡 Escribe 'ayuda' para ver todos los comandos disponibles")
-            else:
+            if user_input:
                 # Obtener precio del camarón
                 price_info = pricing_service.get_shrimp_price(user_input)
                 
                 if price_info:
                     formatted_response = format_price_response(price_info)
                     response.message(formatted_response)
-                    session_manager.clear_session(user_id)  # Limpiar sesión después de respuesta exitosa
-                else:
-                    # No se encontró la talla, mostrar opciones interactivas
-                    size_message, available_sizes = interactive_service.create_size_selection_message()
-                    
-                    if size_message:
-                        response.message(size_message)
-                        session_manager.set_session_state(user_id, 'waiting_for_size_selection', {
-                            'available_sizes': available_sizes
-                        })
-                    else:
-                        response.message("❌ No hay tallas disponibles en este momento.")
+                    session_manager.clear_session(user_id)
+                    return PlainTextResponse(str(response), media_type="application/xml")
+            
+            # Si no es una consulta válida, mostrar menú de bienvenida
+            welcome_msg = interactive_service.create_welcome_message()
+            response.message(welcome_msg)
+            
+            menu_msg, options = interactive_service.create_main_menu()
+            response.message(menu_msg)
+            
+            session_manager.set_session_state(user_id, 'main_menu', {'options': options})
         
         return PlainTextResponse(str(response), media_type="application/xml")
         

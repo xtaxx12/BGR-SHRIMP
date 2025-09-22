@@ -7,6 +7,36 @@ class InteractiveMessageService:
     def __init__(self):
         self.excel_service = ExcelService()
     
+    def create_welcome_message(self):
+        """
+        Crea el mensaje de bienvenida inicial
+        """
+        return "Hola"
+    
+    def create_main_menu(self):
+        """
+        Crea el menú principal con las opciones iniciales
+        """
+        message = "Por favor, elige una opción:"
+        options = ["Soy cliente", "No soy cliente"]
+        return message, options
+    
+    def create_client_menu(self):
+        """
+        Crea el menú para clientes existentes
+        """
+        message = "¿En qué podemos ayudarte?"
+        options = ["Consulta", "Pedidos", "Reclamación"]
+        return message, options
+    
+    def create_non_client_menu(self):
+        """
+        Crea el menú para no clientes
+        """
+        message = "¿En qué podemos ayudarte?"
+        options = ["Información de productos", "Precios", "Contacto comercial"]
+        return message, options
+    
     def create_size_selection_message(self, product: str = None):
         """
         Crea un mensaje con opciones de tallas
@@ -26,7 +56,7 @@ class InteractiveMessageService:
                 message += f"{i}. {size}\n"
             
             message += f"\n📝 Responde con el número de tu opción (1-{len(sizes)})"
-            message += f"\n💡 O escribe directamente: 'precio [producto] [talla]'"
+            message += f"\n� O sescribe directamente: 'precio [producto] [talla]'"
             
             return message, sizes
             
@@ -88,3 +118,33 @@ class InteractiveMessageService:
         except Exception as e:
             logger.error(f"Error parseando selección: {str(e)}")
             return None
+    
+    def handle_menu_selection(self, user_input: str, current_state: str = "main"):
+        """
+        Maneja la selección del usuario en los diferentes menús
+        """
+        user_input = user_input.strip().lower()
+        
+        if current_state == "main":
+            if "soy cliente" in user_input or user_input == "1":
+                return "client_menu", *self.create_client_menu()
+            elif "no soy cliente" in user_input or user_input == "2":
+                return "non_client_menu", *self.create_non_client_menu()
+        
+        elif current_state == "client_menu":
+            if "consulta" in user_input or user_input == "1":
+                return "consultation", "¿Qué consulta tienes? Puedes preguntarme sobre precios, productos o cualquier información que necesites.", []
+            elif "pedidos" in user_input or user_input == "2":
+                return "orders", "Para realizar un pedido, por favor proporciona:\n• Producto\n• Talla\n• Cantidad\n• Fecha de entrega deseada", []
+            elif "reclamación" in user_input or user_input == "3":
+                return "complaint", "Lamento escuchar que tienes una reclamación. Por favor describe el problema y te ayudaremos a resolverlo.", []
+        
+        elif current_state == "non_client_menu":
+            if "información" in user_input or "informacion" in user_input or user_input == "1":
+                return "product_info", "Ofrecemos camarones de alta calidad en diferentes presentaciones:\n• HLSO (Head Less Shell On)\n• PD (Peeled Deveined)\n• PDTO (Peeled Deveined Tail On)\n\n¿Qué producto te interesa?", []
+            elif "precios" in user_input or user_input == "2":
+                return "pricing", *self.create_size_selection_message()
+            elif "contacto" in user_input or user_input == "3":
+                return "contact", "Para contacto comercial:\n📧 Email: ventas@empresa.com\n📱 WhatsApp: +51 999 999 999\n🏢 Oficina: Lima, Perú", []
+        
+        return current_state, "No entendí tu selección. Por favor elige una opción válida.", []
