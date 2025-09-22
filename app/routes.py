@@ -117,13 +117,11 @@ async def whatsapp_webhook(
             
             # Comandos especiales que funcionan en cualquier momento
             if message_lower in ['menu', 'inicio', 'start', 'hola', 'hello']:
-                # Mostrar mensaje de bienvenida
+                # Mostrar mensaje de bienvenida y menú principal en uno
                 welcome_msg = interactive_service.create_welcome_message()
-                response.message(welcome_msg)
-                
-                # Mostrar menú principal
                 menu_msg, options = interactive_service.create_main_menu()
-                response.message(menu_msg)
+                full_message = f"{welcome_msg}\n\n{menu_msg}"
+                response.message(full_message)
                 
                 session_manager.set_session_state(user_id, 'main_menu', {'options': options})
                 return PlainTextResponse(str(response), media_type="application/xml")
@@ -173,10 +171,9 @@ async def whatsapp_webhook(
             
             # Si no es una consulta válida, mostrar menú de bienvenida
             welcome_msg = interactive_service.create_welcome_message()
-            response.message(welcome_msg)
-            
             menu_msg, options = interactive_service.create_main_menu()
-            response.message(menu_msg)
+            full_message = f"{welcome_msg}\n\n{menu_msg}"
+            response.message(full_message)
             
             session_manager.set_session_state(user_id, 'main_menu', {'options': options})
         

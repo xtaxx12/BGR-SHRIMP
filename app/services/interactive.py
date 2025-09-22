@@ -17,7 +17,7 @@ class InteractiveMessageService:
         """
         Crea el menú principal con las opciones iniciales
         """
-        message = "Por favor, elige una opción:"
+        message = "Por favor, elige una opción:\n\n1️⃣ Soy cliente\n2️⃣ No soy cliente"
         options = ["Soy cliente", "No soy cliente"]
         return message, options
     
@@ -25,7 +25,7 @@ class InteractiveMessageService:
         """
         Crea el menú para clientes existentes
         """
-        message = "¿En qué podemos ayudarte?"
+        message = "¿En qué podemos ayudarte?\n\n1️⃣ Consulta\n2️⃣ Pedidos\n3️⃣ Reclamación"
         options = ["Consulta", "Pedidos", "Reclamación"]
         return message, options
     
@@ -33,7 +33,7 @@ class InteractiveMessageService:
         """
         Crea el menú para no clientes
         """
-        message = "¿En qué podemos ayudarte?"
+        message = "¿En qué podemos ayudarte?\n\n1️⃣ Información de productos\n2️⃣ Precios\n3️⃣ Contacto comercial"
         options = ["Información de productos", "Precios", "Contacto comercial"]
         return message, options
     
