@@ -45,7 +45,9 @@ async def whatsapp_webhook(
                 })
             else:
                 response.message("❌ No hay tallas disponibles en este momento.")
-            return PlainTextResponse(str(response), media_type="application/xml")
+            response_xml = str(response)
+            logger.info(f"Enviando respuesta de precios XML: {response_xml}")
+            return PlainTextResponse(response_xml, media_type="application/xml")
         
         elif message_lower in ['menu', 'inicio', 'start', 'hola', 'hello', 'reiniciar', 'reset']:
             # Limpiar sesión y mostrar menú principal
@@ -55,7 +57,9 @@ async def whatsapp_webhook(
             full_message = f"{welcome_msg}\n\n{menu_msg}"
             response.message(full_message)
             session_manager.set_session_state(user_id, 'main_menu', {'options': options})
-            return PlainTextResponse(str(response), media_type="application/xml")
+            response_xml = str(response)
+            logger.info(f"Enviando respuesta de bienvenida XML: {response_xml}")
+            return PlainTextResponse(response_xml, media_type="application/xml")
         
         # Procesar según el estado de la sesión
         logger.info(f"Estado actual del usuario: {session['state']}")
@@ -222,13 +226,19 @@ async def whatsapp_webhook(
             response.message(full_message)
             session_manager.set_session_state(user_id, 'main_menu', {'options': options})
         
-        return PlainTextResponse(str(response), media_type="application/xml")
+        response_xml = str(response)
+        logger.info(f"Enviando respuesta XML: {response_xml}")
+        return PlainTextResponse(response_xml, media_type="application/xml")
         
     except Exception as e:
         logger.error(f"Error procesando mensaje: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         response = MessagingResponse()
         response.message("❌ Ocurrió un error procesando tu consulta. Intenta nuevamente.")
-        return PlainTextResponse(str(response), media_type="application/xml")
+        response_xml = str(response)
+        logger.info(f"Enviando respuesta de error XML: {response_xml}")
+        return PlainTextResponse(response_xml, media_type="application/xml")
 
 @webhook_router.get("/whatsapp")
 async def whatsapp_webhook_verification(request: Request):
@@ -236,3 +246,34 @@ async def whatsapp_webhook_verification(request: Request):
     Verificación del webhook de Twilio
     """
     return {"status": "webhook_ready"}
+
+@webhook_router.post("/test")
+async def test_webhook():
+    """
+    Endpoint de prueba para verificar respuestas XML
+    """
+    response = MessagingResponse()
+    response.message("Mensaje de prueba desde ShrimpBot")
+    response_xml = str(response)
+    logger.info(f"Respuesta de prueba XML: {response_xml}")
+    return PlainTextResponse(response_xml, media_type="application/xml")
+
+@webhook_router.post("/simple")
+async def simple_webhook(
+    Body: str = Form(...),
+    From: str = Form(...),
+    To: str = Form(...),
+    MessageSid: str = Form(...)
+):
+    """
+    Webhook simplificado para debugging
+    """
+    logger.info(f"SIMPLE: Mensaje de {From}: {Body}")
+    
+    response = MessagingResponse()
+    response.message(f"Recibido: {Body}")
+    
+    response_xml = str(response)
+    logger.info(f"SIMPLE: Enviando XML: {response_xml}")
+    
+    return PlainTextResponse(response_xml, media_type="application/xml")
