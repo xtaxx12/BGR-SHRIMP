@@ -66,7 +66,7 @@ async def whatsapp_webhook(
                 response.message(message)
                 session_manager.set_session_state(user_id, new_state, {'options': options})
             else:
-                response.message("❌ Opción no válida. Por favor selecciona 1 o 2.")
+                response.message("🤔 Opción no válida. Por favor selecciona:\n\n1️⃣ Soy cliente\n2️⃣ No soy cliente\n\n💡 O escribe 'menu' para reiniciar")
         
         elif session['state'] == 'client_menu':
             # Usuario está en el menú de cliente
@@ -76,7 +76,7 @@ async def whatsapp_webhook(
                 response.message(message)
                 session_manager.set_session_state(user_id, new_state, {})
             else:
-                response.message("❌ Opción no válida. Por favor selecciona 1, 2 o 3.")
+                response.message("🤔 Opción no válida. Por favor selecciona:\n\n1️⃣ Consulta\n2️⃣ Pedidos\n3️⃣ Reclamación\n\n💡 O escribe 'menu' para volver al inicio")
         
         elif session['state'] == 'non_client_menu':
             # Usuario está en el menú de no cliente
@@ -93,7 +93,7 @@ async def whatsapp_webhook(
                 else:
                     session_manager.set_session_state(user_id, new_state, {})
             else:
-                response.message("❌ Opción no válida. Por favor selecciona 1, 2 o 3.")
+                response.message("🤔 Opción no válida. Por favor selecciona:\n\n1️⃣ Información de productos\n2️⃣ Precios\n3️⃣ Contacto comercial\n\n💡 O escribe 'menu' para volver al inicio")
         
         elif session['state'] == 'waiting_for_size_selection':
             # Usuario está seleccionando una talla
@@ -166,16 +166,18 @@ async def whatsapp_webhook(
                 return PlainTextResponse(str(response), media_type="application/xml")
             
             elif message_lower in ['ayuda', 'help', '?']:
-                response.message("🤖 **BGR Export - Bot de Precios**\n\n"
-                               "**Comandos disponibles:**\n"
-                               "• `menu` - Mostrar menú principal\n"
-                               "• `tallas` - Ver tallas disponibles\n"
-                               "• `productos` - Ver productos disponibles\n"
-                               "• `precio HLSO 16/20` - Consulta directa\n\n"
-                               "**Ejemplos:**\n"
+                response.message("🦐 **ShrimpBot - BGR Export** 🤖\n\n"
+                               "📋 **Comandos disponibles:**\n"
+                               "• `menu` - 🏠 Mostrar menú principal\n"
+                               "• `precios` - 💰 Consultar precios directamente\n"
+                               "• `tallas` - 📏 Ver tallas disponibles\n"
+                               "• `productos` - 🏷️ Ver productos disponibles\n"
+                               "• `precio HLSO 16/20` - 🔍 Consulta directa\n\n"
+                               "💡 **Ejemplos de consultas:**\n"
                                "• Precio HLSO 16/20 para 15000 lb destino China\n"
                                "• P&D IQF 21/25\n"
-                               "• EZ PEEL 26/30")
+                               "• EZ PEEL 26/30\n\n"
+                               "🌊 ¡Estoy aquí para ayudarte!")
                 return PlainTextResponse(str(response), media_type="application/xml")
             
             # Intentar parsear como consulta de precio directa

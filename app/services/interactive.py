@@ -11,13 +11,13 @@ class InteractiveMessageService:
         """
         Crea el mensaje de bienvenida inicial
         """
-        return "Hola"
+        return "🦐 ¡Hola! Bienvenido a *ShrimpBot* 🤖\n\n✨ Tu asistente virtual especializado en precios de camarón de BGR Export\n\n🌊 Estoy aquí para ayudarte con consultas de precios, productos y más información sobre nuestros camarones de alta calidad."
     
     def create_main_menu(self):
         """
         Crea el menú principal con las opciones iniciales
         """
-        message = "Por favor, elige una opción:\n\n1️⃣ Soy cliente\n2️⃣ No soy cliente"
+        message = "🎯 Por favor, elige una opción:\n\n1️⃣ 👤 Soy cliente\n2️⃣ 🆕 No soy cliente"
         options = ["Soy cliente", "No soy cliente"]
         return message, options
     
@@ -25,7 +25,7 @@ class InteractiveMessageService:
         """
         Crea el menú para clientes existentes
         """
-        message = "¿En qué podemos ayudarte?\n\n1️⃣ Consulta\n2️⃣ Pedidos\n3️⃣ Reclamación"
+        message = "🤝 ¿En qué podemos ayudarte?\n\n1️⃣ 💬 Consulta\n2️⃣ 📦 Pedidos\n3️⃣ ⚠️ Reclamación"
         options = ["Consulta", "Pedidos", "Reclamación"]
         return message, options
     
@@ -33,7 +33,7 @@ class InteractiveMessageService:
         """
         Crea el menú para no clientes
         """
-        message = "¿En qué podemos ayudarte?\n\n1️⃣ Información de productos\n2️⃣ Precios\n3️⃣ Contacto comercial"
+        message = "🌟 ¿En qué podemos ayudarte?\n\n1️⃣ 📋 Información de productos\n2️⃣ 💰 Precios\n3️⃣ 📞 Contacto comercial"
         options = ["Información de productos", "Precios", "Contacto comercial"]
         return message, options
     
@@ -133,18 +133,18 @@ class InteractiveMessageService:
         
         elif current_state == "client_menu":
             if "consulta" in user_input or user_input == "1":
-                return "consultation", "¿Qué consulta tienes? Puedes preguntarme sobre precios, productos o cualquier información que necesites.", []
+                return "consultation", "💬 ¡Perfecto! ¿Qué consulta tienes?\n\n🔍 Puedes preguntarme sobre:\n• 💰 Precios actualizados\n• 🦐 Productos disponibles\n• 📦 Stock y disponibilidad\n• 🚚 Tiempos de entrega\n• 📋 Cualquier información que necesites\n\n✨ ¡Estoy aquí para ayudarte!", []
             elif "pedidos" in user_input or user_input == "2":
-                return "orders", "Para realizar un pedido, por favor proporciona:\n• Producto\n• Talla\n• Cantidad\n• Fecha de entrega deseada", []
+                return "orders", "📦 ¡Excelente! Para procesar tu pedido necesito:\n\n🦐 **Producto:** (HLSO, P&D, PDTO, etc.)\n📏 **Talla:** (16/20, 21/25, etc.)\n📊 **Cantidad:** (en libras o kilos)\n📅 **Fecha de entrega deseada**\n🌍 **Destino**\n\n💡 Ejemplo: *HLSO 16/20, 15,000 lb, entrega 15 enero, destino Miami*", []
             elif "reclamación" in user_input or user_input == "3":
-                return "complaint", "Lamento escuchar que tienes una reclamación. Por favor describe el problema y te ayudaremos a resolverlo.", []
+                return "complaint", "⚠️ Lamento escuchar que tienes una reclamación.\n\n🤝 En BGR Export valoramos mucho tu satisfacción. Por favor describe detalladamente:\n\n📋 **El problema:**\n📅 **Fecha del pedido:**\n📦 **Número de orden (si lo tienes):**\n📸 **Fotos (si aplica):**\n\n🚀 Te ayudaremos a resolverlo lo más pronto posible.", []
         
         elif current_state == "non_client_menu":
             if "información" in user_input or "informacion" in user_input or user_input == "1":
-                return "product_info", "Ofrecemos camarones de alta calidad en diferentes presentaciones:\n• HLSO (Head Less Shell On)\n• PD (Peeled Deveined)\n• PDTO (Peeled Deveined Tail On)\n\n¿Qué producto te interesa?", []
+                return "product_info", "🦐 **BGR Export - Productos Premium**\n\n🌟 Ofrecemos camarones de la más alta calidad en diferentes presentaciones:\n\n🔸 **HLSO** (Head Less Shell On) - Sin cabeza, con cáscara\n🔸 **P&D** (Peeled Deveined) - Pelado y desvenado\n🔸 **PDTO** (Peeled Deveined Tail On) - Pelado, desvenado, con cola\n🔸 **EZ PEEL** - Fácil pelado\n🔸 **IQF** - Congelado individualmente\n\n🌊 Todos nuestros productos cumplen con los más altos estándares de calidad internacional.\n\n💡 ¿Qué producto específico te interesa conocer más?", []
             elif "precios" in user_input or user_input == "2":
                 return "pricing", *self.create_size_selection_message()
             elif "contacto" in user_input or user_input == "3":
-                return "contact", "Para contacto comercial:\n📧 Email: ventas@empresa.com\n📱 WhatsApp: +51 999 999 999\n🏢 Oficina: Lima, Perú", []
+                return "contact", "📞 **Contacto Comercial BGR Export**\n\n🏢 **Oficina Principal:**\nLima, Perú\n\n📧 **Email:**\nventas@bgrexport.com\n\n📱 **WhatsApp Comercial:**\n+51 999 999 999\n\n🌐 **Horarios de Atención:**\nLunes a Viernes: 8:00 AM - 6:00 PM (GMT-5)\nSábados: 9:00 AM - 1:00 PM\n\n🚀 ¡Nuestro equipo comercial está listo para atenderte!", []
         
-        return current_state, "No entendí tu selección. Por favor elige una opción válida.", []
+        return current_state, "🤔 No entendí tu selección. Por favor elige una opción válida usando el número o escribiendo la opción completa.\n\n💡 Tip: Escribe 'menu' para volver al inicio.", []
