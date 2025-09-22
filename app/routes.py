@@ -1,11 +1,14 @@
 from fastapi import APIRouter, Request, Form, HTTPException
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, JSONResponse
 from twilio.twiml.messaging_response import MessagingResponse
 from app.services.pricing import PricingService
 from app.services.utils import parse_user_message, format_price_response
 from app.services.interactive import InteractiveMessageService
 from app.services.session import session_manager
 import logging
+import json
+import requests
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -13,28 +16,128 @@ webhook_router = APIRouter()
 pricing_service = PricingService()
 interactive_service = InteractiveMessageService()
 
+def send_interactive_message(to_number: str, interactive_data: dict):
+    """
+    Envía un mensaje interactivo usando la API de WhatsApp Business
+    """
+    try:
+        # Configuración de WhatsApp Business API (necesitarás configurar estas variables)
+        access_token = os.getenv("WHATSAPP_ACCESS_TOKEN")
+        phone_number_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
+        
+        if not access_token or not phone_number_id:
+            logger.warning("WhatsApp Business API no configurada, enviando mensaje de texto simple")
+            return False
+        
+        url = f"https://graph.facebook.com/v17.0/{phone_number_id}/messages"
+        
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": to_number.replace("whatsapp:", ""),
+            **interactive_data
+        }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        
+        if response.status_code == 200:
+            logger.info(f"Mensaje interactivo enviado exitosamente a {to_number}")
+            return True
+        else:
+            logger.error(f"Error enviando mensaje interactivo: {response.text}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error en send_interactive_message: {str(e)}")
+        return False
+
 @webhook_router.post("/whatsapp")
 async def whatsapp_webhook(
-    Body: str = Form(...),
-    From: str = Form(...),
-    To: str = Form(...),
-    MessageSid: str = Form(...)
+    request: Request,
+    Body: str = Form(None),
+    From: str = Form(None),
+    To: str = Form(None),
+    MessageSid: str = Form(None),
+    ButtonPayload: str = Form(None)
 ):
     """
     Endpoint para recibir mensajes de WhatsApp desde Twilio
     """
     try:
-        logger.info(f"Mensaje recibido de {From}: {Body}")
+        # Manejar tanto mensajes de texto como respuestas de botones
+        if ButtonPayload:
+            # Es una respuesta de botón interactivo
+            logger.info(f"Botón presionado de {From}: {ButtonPayload}")
+            button_id = ButtonPayload
+            user_message = f"button:{button_id}"
+        else:
+            # Es un mensaje de texto normal
+            logger.info(f"Mensaje recibido de {From}: {Body}")
+            user_message = Body
         
         # Crear respuesta de Twilio
         response = MessagingResponse()
         
         # Obtener sesión del usuario
-        user_id = From.replace("whatsapp:", "")
+        user_id = From.replace("whatsapp:", "") if From else ""
         session = session_manager.get_session(user_id)
         
+        # Manejar respuestas de botones interactivos
+        if user_message.startswith("button:"):
+            button_id = user_message.replace("button:", "")
+            action, value = interactive_service.parse_interactive_response(button_id)
+            
+            if action == "client_menu":
+                # Enviar menú de cliente con botones
+                interactive_menu = interactive_service.create_interactive_client_menu()
+                if send_interactive_message(From, interactive_menu):
+                    session_manager.set_session_state(user_id, 'client_menu', {})
+                    return PlainTextResponse("", media_type="application/xml")
+                else:
+                    # Fallback a mensaje de texto
+                    menu_msg, options = interactive_service.create_client_menu()
+                    response.message(menu_msg)
+                    session_manager.set_session_state(user_id, 'client_menu', {'options': options})
+            
+            elif action == "non_client_menu":
+                # Enviar menú de no cliente con botones
+                interactive_menu = interactive_service.create_interactive_non_client_menu()
+                if send_interactive_message(From, interactive_menu):
+                    session_manager.set_session_state(user_id, 'non_client_menu', {})
+                    return PlainTextResponse("", media_type="application/xml")
+                else:
+                    # Fallback a mensaje de texto
+                    menu_msg, options = interactive_service.create_non_client_menu()
+                    response.message(menu_msg)
+                    session_manager.set_session_state(user_id, 'non_client_menu', {'options': options})
+            
+            elif action == "pricing":
+                # Mostrar opciones de tallas
+                size_message, available_sizes = interactive_service.create_size_selection_message()
+                if size_message:
+                    response.message(size_message)
+                    session_manager.set_session_state(user_id, 'waiting_for_size_selection', {
+                        'available_sizes': available_sizes
+                    })
+                else:
+                    response.message("❌ No hay tallas disponibles en este momento.")
+            
+            # Manejar otras acciones de botones...
+            elif action in ["consultation", "orders", "complaint", "product_info", "contact"]:
+                # Usar las respuestas existentes del sistema
+                new_state, message, options = interactive_service.handle_menu_selection(value, 
+                    "client_menu" if action in ["consultation", "orders", "complaint"] else "non_client_menu")
+                response.message(message)
+                session_manager.set_session_state(user_id, new_state, {})
+            
+            return PlainTextResponse(str(response), media_type="application/xml")
+        
         # Comandos globales que funcionan desde cualquier estado (excepto cuando está esperando selección)
-        message_lower = Body.lower().strip()
+        message_lower = user_message.lower().strip()
         
         # Solo procesar comandos globales si NO está en un estado de selección
         if session['state'] not in ['waiting_for_size_selection', 'waiting_for_product_selection']:
@@ -51,14 +154,22 @@ async def whatsapp_webhook(
         
         # Comando menu siempre funciona
         if message_lower in ['menu', 'inicio', 'start', 'hola', 'hello', 'reiniciar', 'reset']:
-            # Limpiar sesión y mostrar menú principal
+            # Limpiar sesión y mostrar menú principal con botones interactivos
             session_manager.clear_session(user_id)
-            welcome_msg = interactive_service.create_welcome_message()
-            menu_msg, options = interactive_service.create_main_menu()
-            full_message = f"{welcome_msg}\n\n{menu_msg}"
-            response.message(full_message)
-            session_manager.set_session_state(user_id, 'main_menu', {'options': options})
-            return PlainTextResponse(str(response), media_type="application/xml")
+            
+            # Intentar enviar menú interactivo
+            interactive_menu = interactive_service.create_interactive_main_menu()
+            if send_interactive_message(From, interactive_menu):
+                session_manager.set_session_state(user_id, 'main_menu', {})
+                return PlainTextResponse("", media_type="application/xml")
+            else:
+                # Fallback a mensaje de texto tradicional
+                welcome_msg = interactive_service.create_welcome_message()
+                menu_msg, options = interactive_service.create_main_menu()
+                full_message = f"{welcome_msg}\n\n{menu_msg}"
+                response.message(full_message)
+                session_manager.set_session_state(user_id, 'main_menu', {'options': options})
+                return PlainTextResponse(str(response), media_type="application/xml")
         
         # Procesar según el estado de la sesión
         if session['state'] == 'main_menu':
@@ -196,13 +307,17 @@ async def whatsapp_webhook(
                     session_manager.clear_session(user_id)
                     return PlainTextResponse(str(response), media_type="application/xml")
             
-            # Si no es una consulta válida, mostrar menú de bienvenida
-            welcome_msg = interactive_service.create_welcome_message()
-            menu_msg, options = interactive_service.create_main_menu()
-            full_message = f"{welcome_msg}\n\n{menu_msg}"
-            response.message(full_message)
-            
-            session_manager.set_session_state(user_id, 'main_menu', {'options': options})
+            # Si no es una consulta válida, mostrar menú de bienvenida con botones interactivos
+            interactive_menu = interactive_service.create_interactive_main_menu()
+            if send_interactive_message(From, interactive_menu):
+                session_manager.set_session_state(user_id, 'main_menu', {})
+            else:
+                # Fallback a mensaje de texto tradicional
+                welcome_msg = interactive_service.create_welcome_message()
+                menu_msg, options = interactive_service.create_main_menu()
+                full_message = f"{welcome_msg}\n\n{menu_msg}"
+                response.message(full_message)
+                session_manager.set_session_state(user_id, 'main_menu', {'options': options})
         
         return PlainTextResponse(str(response), media_type="application/xml")
         
