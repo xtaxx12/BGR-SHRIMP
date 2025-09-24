@@ -6,7 +6,9 @@ from app.services.utils import parse_user_message, format_price_response
 from app.services.interactive import InteractiveMessageService
 from app.services.session import session_manager
 from app.services.pdf_generator import PDFGenerator
+from app.services.whatsapp_sender import WhatsAppSender
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +16,7 @@ webhook_router = APIRouter()
 pricing_service = PricingService()
 interactive_service = InteractiveMessageService()
 pdf_generator = PDFGenerator()
+whatsapp_sender = WhatsAppSender()
 
 @webhook_router.post("/whatsapp")
 async def whatsapp_webhook(
@@ -52,7 +55,7 @@ async def whatsapp_webhook(
             return PlainTextResponse(response_xml, media_type="application/xml")
         
         elif message_lower in ['confirmar', 'confirm', 'generar pdf', 'pdf']:
-            # Generar PDF con la última cotización
+            # Generar y enviar PDF con la última cotización
             last_quote = session_manager.get_last_quote(user_id)
             
             if last_quote:
@@ -60,12 +63,31 @@ async def whatsapp_webhook(
                 pdf_path = pdf_generator.generate_quote_pdf(last_quote, From)
                 
                 if pdf_path:
-                    response.message("✅ ¡Cotización confirmada!\n\n📄 Se ha generado tu cotización en PDF.\n\n📧 El documento será enviado a tu email registrado.\n\n💡 Escribe 'menu' para realizar otra consulta.")
+                    # Enviar mensaje de confirmación primero
+                    response.message("✅ ¡Cotización confirmada!\n\n📄 Generando tu cotización en PDF...")
+                    
+                    # Intentar enviar el PDF por WhatsApp
+                    pdf_sent = whatsapp_sender.send_pdf_document(
+                        From, 
+                        pdf_path, 
+                        "📄 Aquí tienes tu cotización oficial de BGR Export.\n\n💼 Documento válido para procesos comerciales.\n\n📞 Para cualquier consulta, contáctanos."
+                    )
+                    
+                    if pdf_sent:
+                        logger.info(f"✅ PDF enviado exitosamente por WhatsApp: {pdf_path}")
+                        # No agregamos mensaje adicional aquí porque el PDF se envía por separado
+                    else:
+                        # Si no se puede enviar por WhatsApp, ofrecer descarga
+                        filename = os.path.basename(pdf_path)
+                        base_url = os.getenv('BASE_URL', 'http://localhost:8000')
+                        download_url = f"{base_url}/webhook/download-pdf/{filename}"
+                        
+                        additional_msg = f"\n\n📎 También puedes descargar el PDF desde:\n{download_url}"
+                        response.message(additional_msg)
+                        logger.info(f"⚠️ PDF no enviado por WhatsApp, ofreciendo descarga: {download_url}")
                     
                     # Limpiar la cotización después de confirmar
                     session_manager.clear_session(user_id)
-                    
-                    logger.info(f"✅ PDF generado exitosamente: {pdf_path}")
                 else:
                     response.message("❌ Error generando el PDF. Por favor intenta nuevamente o contacta soporte.")
             else:
