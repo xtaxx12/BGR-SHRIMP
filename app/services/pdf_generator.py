@@ -76,8 +76,39 @@ class PDFGenerator:
                 spaceAfter=6
             )
             
-            # Encabezado
-            story.append(Paragraph("🦐 BGR EXPORT", title_style))
+            # Encabezado con logo
+            logo_path = os.path.join("data", "logoBGR.jpg")
+            
+            if os.path.exists(logo_path):
+                try:
+                    # Crear imagen del logo con tamaño optimizado
+                    logo_img = Image(logo_path, width=4*inch, height=2*inch)
+                    
+                    # Crear tabla para centrar el logo
+                    header_data = [[logo_img]]
+                    header_table = Table(header_data, colWidths=[6*inch])
+                    header_table.setStyle(TableStyle([
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('TOPPADDING', (0, 0), (-1, -1), 0),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+                    ]))
+                    
+                    story.append(header_table)
+                    story.append(Spacer(1, 15))
+                    
+                except Exception as logo_error:
+                    logger.warning(f"⚠️ Error cargando logo: {logo_error}")
+                    # Fallback al título de texto si no se puede cargar el logo
+                    story.append(Paragraph("🦐 BGR EXPORT", title_style))
+                    story.append(Spacer(1, 20))
+            else:
+                logger.warning(f"⚠️ Logo no encontrado en: {logo_path}")
+                # Fallback al título de texto
+                story.append(Paragraph("🦐 BGR EXPORT", title_style))
+                story.append(Spacer(1, 20))
+            
+            # Subtítulo
             story.append(Paragraph("Cotización de Camarón", subtitle_style))
             story.append(Spacer(1, 20))
             
@@ -87,8 +118,8 @@ class PDFGenerator:
             info_data = [
                 ["Fecha de Cotización:", fecha_actual],
                 ["Producto:", price_info.get('producto', 'N/A')],
-                ["Talla:", price_info.get('talla', 'N/A')],
-                ["Calculado con:", price_info.get('calculado_con', 'Sistema BGR')]
+                ["Talla:", price_info.get('talla', 'N/A')]
+               
             ]
             
             if price_info.get('destination'):

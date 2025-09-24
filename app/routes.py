@@ -63,10 +63,12 @@ async def whatsapp_webhook(
                 pdf_path = pdf_generator.generate_quote_pdf(last_quote, From)
                 
                 if pdf_path:
-                    # Enviar mensaje de confirmación primero
-                    response.message("✅ ¡Cotización confirmada!\n\n📄 Generando tu cotización en PDF...")
+                    # Crear URL pública del PDF para envío
+                    filename = os.path.basename(pdf_path)
+                    base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
+                    download_url = f"{base_url}/webhook/download-pdf/{filename}"
                     
-                    # Intentar enviar el PDF por WhatsApp
+                    # Intentar enviar el PDF por WhatsApp usando el servicio
                     pdf_sent = whatsapp_sender.send_pdf_document(
                         From, 
                         pdf_path, 
@@ -74,17 +76,20 @@ async def whatsapp_webhook(
                     )
                     
                     if pdf_sent:
+                        # Si se envió exitosamente por WhatsApp, solo confirmar
+                        response.message("✅ ¡Cotización confirmada!\n\n📄 Tu PDF ha sido enviado por WhatsApp.")
                         logger.info(f"✅ PDF enviado exitosamente por WhatsApp: {pdf_path}")
-                        # No agregamos mensaje adicional aquí porque el PDF se envía por separado
                     else:
-                        # Si no se puede enviar por WhatsApp, ofrecer descarga
-                        filename = os.path.basename(pdf_path)
-                        base_url = os.getenv('BASE_URL', 'http://localhost:8000')
-                        download_url = f"{base_url}/webhook/download-pdf/{filename}"
+                        # Si no se pudo enviar por WhatsApp, usar TwiML como respaldo
+                        logger.info(f"⚠️ Enviando PDF via TwiML como respaldo: {download_url}")
                         
-                        additional_msg = f"\n\n📎 También puedes descargar el PDF desde:\n{download_url}"
-                        response.message(additional_msg)
-                        logger.info(f"⚠️ PDF no enviado por WhatsApp, ofreciendo descarga: {download_url}")
+                        # Enviar mensaje con el PDF como archivo adjunto usando TwiML
+                        pdf_message = response.message()
+                        pdf_message.body("📄 Aquí tienes tu cotización oficial de BGR Export.\n\n💼 Documento válido para procesos comerciales.\n\n📞 Para cualquier consulta, contáctanos.")
+                        pdf_message.media(download_url)
+                        
+                        # También enviar enlace de descarga como respaldo
+                        response.message(f"📎 También puedes descargar el PDF desde:\n{download_url}")
                     
                     # Limpiar la cotización después de confirmar
                     session_manager.clear_session(user_id)
@@ -335,13 +340,102 @@ async def reload_data():
         logger.error(f"Error recargando datos: {str(e)}")
         return {"status": "error", "message": str(e)}
 
+@webhook_router.get("/test-twilio")
+async def test_twilio():
+    """
+    Endpoint para probar las credenciales de Twilio
+    """
+    try:
+        from twilio.rest import Client
+        
+        account_sid = os.getenv('TWILIO_ACCOUNT_SID')
+        auth_token = os.getenv('TWILIO_AUTH_TOKEN')
+        whatsapp_number = os.getenv('TWILIO_WHATSAPP_NUMBER')
+        
+        if not all([account_sid, auth_token, whatsapp_number]):
+            return {
+                "status": "error", 
+                "message": "Credenciales de Twilio no configuradas",
+                "config": {
+                    "account_sid": bool(account_sid),
+                    "auth_token": bool(auth_token),
+                    "whatsapp_number": bool(whatsapp_number)
+                }
+            }
+        
+        client = Client(account_sid, auth_token)
+        
+        # Probar conexión obteniendo información de la cuenta
+        account = client.api.accounts(account_sid).fetch()
+        
+        return {
+            "status": "success",
+            "message": "Credenciales de Twilio válidas",
+            "account_name": account.friendly_name,
+            "account_status": account.status,
+            "whatsapp_number": whatsapp_number
+        }
+        
+    except Exception as e:
+        logger.error(f"Error probando Twilio: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+@webhook_router.post("/test-pdf-send")
+async def test_pdf_send(phone_number: str = Form(...)):
+    """
+    Endpoint para probar el envío de PDFs
+    """
+    try:
+        # Crear una cotización de prueba
+        test_quote = {
+            'size': '16/20',
+            'product': 'HLSO',
+            'quantity': 15000,
+            'destination': 'China',
+            'fob_price': 5.50,
+            'glaseo_price': 6.05,
+            'final_price': 6.85,
+            'freight_cost': 0.80,
+            'total_value': 102750.00
+        }
+        
+        # Generar PDF de prueba
+        pdf_path = pdf_generator.generate_quote_pdf(test_quote, f"whatsapp:{phone_number}")
+        
+        if pdf_path:
+            # Intentar enviar por WhatsApp
+            pdf_sent = whatsapp_sender.send_pdf_document(
+                f"whatsapp:{phone_number}",
+                pdf_path,
+                "📄 PDF de prueba - BGR Export"
+            )
+            
+            filename = os.path.basename(pdf_path)
+            download_url = f"https://bgr-shrimp.onrender.com/webhook/download-pdf/{filename}"
+            
+            return {
+                "status": "success" if pdf_sent else "partial",
+                "message": "PDF enviado por WhatsApp" if pdf_sent else "PDF generado, pero no enviado por WhatsApp",
+                "pdf_generated": True,
+                "pdf_sent_whatsapp": pdf_sent,
+                "download_url": download_url
+            }
+        else:
+            return {
+                "status": "error",
+                "message": "Error generando PDF de prueba"
+            }
+            
+    except Exception as e:
+        logger.error(f"Error en test de PDF: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
 @webhook_router.get("/download-pdf/{filename}")
 async def download_pdf(filename: str):
     """
     Endpoint para descargar PDFs generados
     """
     try:
-        import os
         from fastapi.responses import FileResponse
         
         pdf_path = os.path.join("generated_pdfs", filename)
@@ -350,7 +444,13 @@ async def download_pdf(filename: str):
             return FileResponse(
                 path=pdf_path,
                 filename=filename,
-                media_type='application/pdf'
+                media_type='application/pdf',
+                headers={
+                    "Content-Disposition": f"attachment; filename={filename}",
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET",
+                    "Access-Control-Allow-Headers": "*"
+                }
             )
         else:
             raise HTTPException(status_code=404, detail="PDF no encontrado")
