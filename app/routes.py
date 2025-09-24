@@ -5,6 +5,7 @@ from app.services.pricing import PricingService
 from app.services.utils import parse_user_message, format_price_response
 from app.services.interactive import InteractiveMessageService
 from app.services.session import session_manager
+from app.services.pdf_generator import PDFGenerator
 import logging
 
 logger = logging.getLogger(__name__)
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 webhook_router = APIRouter()
 pricing_service = PricingService()
 interactive_service = InteractiveMessageService()
+pdf_generator = PDFGenerator()
 
 @webhook_router.post("/whatsapp")
 async def whatsapp_webhook(
@@ -46,7 +48,31 @@ async def whatsapp_webhook(
             else:
                 response.message("❌ No hay tallas disponibles en este momento.")
             response_xml = str(response)
-            logger.info(f"Enviando respuesta de precios XML: {response_xml}")
+           
+            return PlainTextResponse(response_xml, media_type="application/xml")
+        
+        elif message_lower in ['confirmar', 'confirm', 'generar pdf', 'pdf']:
+            # Generar PDF con la última cotización
+            last_quote = session_manager.get_last_quote(user_id)
+            
+            if last_quote:
+                logger.info(f"Generando PDF para usuario {user_id}")
+                pdf_path = pdf_generator.generate_quote_pdf(last_quote, From)
+                
+                if pdf_path:
+                    response.message("✅ ¡Cotización confirmada!\n\n📄 Se ha generado tu cotización en PDF.\n\n📧 El documento será enviado a tu email registrado.\n\n💡 Escribe 'menu' para realizar otra consulta.")
+                    
+                    # Limpiar la cotización después de confirmar
+                    session_manager.clear_session(user_id)
+                    
+                    logger.info(f"✅ PDF generado exitosamente: {pdf_path}")
+                else:
+                    response.message("❌ Error generando el PDF. Por favor intenta nuevamente o contacta soporte.")
+            else:
+                response.message("❌ No hay cotización pendiente para confirmar.\n\n💡 Primero solicita una cotización de precios y luego escribe 'confirmar'.")
+            
+            response_xml = str(response)
+            logger.info(f"Enviando respuesta de confirmación XML: {response_xml}")
             return PlainTextResponse(response_xml, media_type="application/xml")
         
         elif message_lower in ['menu', 'inicio', 'start', 'hola', 'hello', 'reiniciar', 'reset']:
@@ -58,7 +84,7 @@ async def whatsapp_webhook(
             response.message(full_message)
             session_manager.set_session_state(user_id, 'main_menu', {'options': options})
             response_xml = str(response)
-            logger.info(f"Enviando respuesta de bienvenida XML: {response_xml}")
+            
             return PlainTextResponse(response_xml, media_type="application/xml")
         
         # Procesar según el estado de la sesión
@@ -66,36 +92,11 @@ async def whatsapp_webhook(
         logger.info(f"Datos de sesión: {session['data']}")
         
         if session['state'] == 'main_menu':
-            # Usuario está en el menú principal
+            # Usuario está en el menú principal simplificado
             new_state, message, options = interactive_service.handle_menu_selection(Body, "main")
             logger.info(f"Transición de main_menu: {session['state']} -> {new_state}")
             
             if new_state != 'main_menu':  # Solo si cambió de estado
-                response.message(message)
-                session_manager.set_session_state(user_id, new_state, {'options': options})
-                logger.info(f"Mensaje enviado: {message[:50]}...")
-            else:
-                error_msg = "🤔 Opción no válida. Por favor selecciona:\n\n1️⃣ Soy cliente\n2️⃣ No soy cliente\n\n💡 O escribe 'menu' para reiniciar"
-                response.message(error_msg)
-                logger.info(f"Opción inválida en main_menu: {Body}")
-            return PlainTextResponse(str(response), media_type="application/xml")
-        
-        elif session['state'] == 'client_menu':
-            # Usuario está en el menú de cliente
-            new_state, message, options = interactive_service.handle_menu_selection(Body, "client_menu")
-            
-            if new_state != 'client_menu':  # Solo si cambió de estado
-                response.message(message)
-                session_manager.set_session_state(user_id, new_state, {})
-            else:
-                response.message("🤔 Opción no válida. Por favor selecciona:\n\n1️⃣ Consulta\n2️⃣ Pedidos\n3️⃣ Reclamación\n\n💡 O escribe 'menu' para volver al inicio")
-            return PlainTextResponse(str(response), media_type="application/xml")
-        
-        elif session['state'] == 'non_client_menu':
-            # Usuario está en el menú de no cliente
-            new_state, message, options = interactive_service.handle_menu_selection(Body, "non_client_menu")
-            
-            if new_state != 'non_client_menu':  # Solo si cambió de estado
                 response.message(message)
                 
                 if new_state == 'pricing':
@@ -106,7 +107,8 @@ async def whatsapp_webhook(
                 else:
                     session_manager.set_session_state(user_id, new_state, {})
             else:
-                response.message("🤔 Opción no válida. Por favor selecciona:\n\n1️⃣ Información de productos\n2️⃣ Precios\n3️⃣ Contacto comercial\n\n💡 O escribe 'menu' para volver al inicio")
+                error_msg = "🤔 Opción no válida. Por favor selecciona:\n\n1️⃣ Consultar Precios\n2️⃣ Información de Productos\n3️⃣ Contacto Comercial\n\n💡 O escribe 'menu' para reiniciar"
+                response.message(error_msg)
             return PlainTextResponse(str(response), media_type="application/xml")
         
         elif session['state'] == 'waiting_for_size_selection':
@@ -154,15 +156,21 @@ async def whatsapp_webhook(
                 
                 if price_info:
                     formatted_response = format_price_response(price_info)
+                    
+                    # Agregar instrucción para confirmar
+                    formatted_response += "\n\n✅ **Para generar PDF:** Escribe 'confirmar'"
+                    
                     response.message(formatted_response)
                     logger.info(f"Precio encontrado y enviado: {formatted_response[:100]}...")
+                    
+                    # Almacenar cotización para posible confirmación
+                    session_manager.set_last_quote(user_id, price_info)
+                    session_manager.set_session_state(user_id, 'quote_ready', {})
                 else:
                     error_msg = f"❌ No encontré información para {selected_product} talla {selected_size}"
                     response.message(error_msg)
                     logger.info(f"Precio no encontrado: {error_msg}")
-                
-                # Limpiar sesión
-                session_manager.clear_session(user_id)
+                    session_manager.clear_session(user_id)
             else:
                 error_msg = "🤔 Selección inválida. Por favor responde con:\n\n📝 El número de la opción\n💡 O escribe 'menu' para volver al inicio"
                 response.message(error_msg)
@@ -196,6 +204,7 @@ async def whatsapp_webhook(
                                "📋 **Comandos disponibles:**\n"
                                "• `menu` - 🏠 Mostrar menú principal\n"
                                "• `precios` - 💰 Consultar precios directamente\n"
+                               "• `confirmar` - 📄 Generar PDF de cotización\n"
                                "• `tallas` - 📏 Ver tallas disponibles\n"
                                "• `productos` - 🏷️ Ver productos disponibles\n"
                                "• `precio HLSO 16/20` - 🔍 Consulta directa\n\n"
@@ -203,6 +212,10 @@ async def whatsapp_webhook(
                                "• Precio HLSO 16/20 para 15000 lb destino China\n"
                                "• P&D IQF 21/25\n"
                                "• EZ PEEL 26/30\n\n"
+                               "📄 **Flujo completo:**\n"
+                               "1. Solicita una cotización\n"
+                               "2. Revisa los precios calculados\n"
+                               "3. Escribe 'confirmar' para generar PDF\n\n"
                                "🌊 ¡Estoy aquí para ayudarte!")
                 return PlainTextResponse(str(response), media_type="application/xml")
             
@@ -215,8 +228,15 @@ async def whatsapp_webhook(
                 
                 if price_info:
                     formatted_response = format_price_response(price_info)
+                    
+                    # Agregar instrucción para confirmar
+                    formatted_response += "\n\n✅ **Para generar PDF:** Escribe 'confirmar'"
+                    
                     response.message(formatted_response)
-                    session_manager.clear_session(user_id)
+                    
+                    # Almacenar cotización para posible confirmación
+                    session_manager.set_last_quote(user_id, price_info)
+                    session_manager.set_session_state(user_id, 'quote_ready', {})
                     return PlainTextResponse(str(response), media_type="application/xml")
             
             # Si no es una consulta válida, mostrar menú de bienvenida
@@ -292,3 +312,27 @@ async def reload_data():
     except Exception as e:
         logger.error(f"Error recargando datos: {str(e)}")
         return {"status": "error", "message": str(e)}
+
+@webhook_router.get("/download-pdf/{filename}")
+async def download_pdf(filename: str):
+    """
+    Endpoint para descargar PDFs generados
+    """
+    try:
+        import os
+        from fastapi.responses import FileResponse
+        
+        pdf_path = os.path.join("generated_pdfs", filename)
+        
+        if os.path.exists(pdf_path):
+            return FileResponse(
+                path=pdf_path,
+                filename=filename,
+                media_type='application/pdf'
+            )
+        else:
+            raise HTTPException(status_code=404, detail="PDF no encontrado")
+            
+    except Exception as e:
+        logger.error(f"Error descargando PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error interno del servidor")

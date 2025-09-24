@@ -40,6 +40,21 @@ class SessionManager:
         
         logger.info(f"Usuario {user_id} - Estado: {state}, Datos: {session['data']}")
     
+    def set_last_quote(self, user_id: str, quote_data: Dict):
+        """
+        Almacena la última cotización para poder generar PDF
+        """
+        session = self.get_session(user_id)
+        session['last_quote'] = quote_data
+        logger.info(f"Cotización almacenada para usuario {user_id}")
+    
+    def get_last_quote(self, user_id: str) -> Optional[Dict]:
+        """
+        Obtiene la última cotización del usuario
+        """
+        session = self.get_session(user_id)
+        return session.get('last_quote')
+    
     def clear_session(self, user_id: str):
         """
         Limpia la sesión del usuario

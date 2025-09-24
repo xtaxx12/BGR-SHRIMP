@@ -58,3 +58,7 @@ logs/
 # Cache
 .cache/
 .pytest_cache/
+
+# Generated PDFs
+generated_pdfs/
+*.pdf

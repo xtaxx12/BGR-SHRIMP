@@ -145,6 +145,6 @@ class InteractiveMessageService:
             elif "precios" in user_input or user_input == "2":
                 return "pricing", *self.create_size_selection_message()
             elif "contacto" in user_input or user_input == "3":
-                return "contact", "📞 **Contacto Comercial BGR Export**\n\n🏢 **Oficina Principal:**\nLima, Perú\n\n📧 **Email:**\nventas@bgrexport.com\n\n📱 **WhatsApp Comercial:**\n+51 999 999 999\n\n🌐 **Horarios de Atención:**\nLunes a Viernes: 8:00 AM - 6:00 PM (GMT-5)\nSábados: 9:00 AM - 1:00 PM\n\n🚀 ¡Nuestro equipo comercial está listo para atenderte!", []
+                return "contact", "📞 **Contacto Comercial BGR Export**\n\n🏢 **Oficina Principal:**\nPuerto Jelí, Santa Rosa\n\n📧 **Email:**\nventas@bgrexport.com\n\n📱 **WhatsApp Comercial:**\n+51 999 999 999\n\n🌐 **Horarios de Atención:**\nLunes a Viernes: 8:00 AM - 6:00 PM (GMT-5)\nSábados: 9:00 AM - 1:00 PM\n\n🚀 ¡Nuestro equipo comercial está listo para atenderte!", []
         
         return current_state, "🤔 No entendí tu selección. Por favor elige una opción válida usando el número o escribiendo la opción completa.\n\n💡 Tip: Escribe 'menu' para volver al inicio.", []
