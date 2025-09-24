@@ -69,13 +69,47 @@ def parse_user_message(message: str) -> Optional[Dict]:
 
 def format_price_response(price_info: Dict) -> str:
     """
-    Formatea la respuesta con la información de precios
+    Formatea la respuesta con la información de precios calculados
     """
     try:
-        response = f"📦 **BGR EXPORT - Cotización Camarón**\n\n"
-        response += f"📏 **Talla:** {price_info['size']}\n"
-        response += f"🦐 **Producto:** {price_info['producto']}\n"
-        response += f"💲 **Precio:** ${price_info['precio_kg']:.2f}/kg - ${price_info['precio_lb']:.2f}/lb\n\n"
+        response = f"🦐 **BGR EXPORT - Cotización Camarón** 🦐\n\n"
+        response += f"📏 **Talla:** {price_info['talla']}\n"
+        response += f"🏷️ **Producto:** {price_info['producto']}\n\n"
+        
+        # Si tenemos precios calculados con fórmulas del Excel
+        if 'precio_fob_kg' in price_info:
+            response += f"💰 **PRECIOS CALCULADOS:**\n\n"
+            
+            # Precio base
+            response += f"📊 **Precio Base:**\n"
+            response += f"   • ${price_info['precio_base_kg']:.2f}/kg - ${price_info['precio_base_lb']:.2f}/lb\n\n"
+            
+            # Precio FOB
+            response += f"🚢 **Precio FOB:**\n"
+            response += f"   • ${price_info['precio_fob_kg']:.2f}/kg - ${price_info['precio_fob_lb']:.2f}/lb\n\n"
+            
+            # Precio con glaseo
+            response += f"❄️ **Precio con Glaseo:**\n"
+            response += f"   • ${price_info['precio_glaseo_kg']:.2f}/kg - ${price_info['precio_glaseo_lb']:.2f}/lb\n\n"
+            
+            # Precio final con flete
+            response += f"✈️ **Precio Final (Glaseo + Flete):**\n"
+            response += f"   • ${price_info['precio_flete_kg']:.2f}/kg - ${price_info['precio_flete_lb']:.2f}/lb\n\n"
+            
+            # Mostrar factores utilizados
+            if 'factores' in price_info:
+                factores = price_info['factores']
+                response += f"⚙️ **Factores aplicados:**\n"
+                response += f"   • Costo fijo: ${factores['costo_fijo']:.2f}\n"
+                response += f"   • Factor glaseo: {factores['factor_glaseo']:.1f}\n"
+                response += f"   • Flete: ${factores['flete']:.2f}\n\n"
+            
+            # Indicar método de cálculo
+            response += f"🧮 **Calculado con:** {price_info.get('calculado_con', 'Excel')}\n\n"
+            
+        else:
+            # Formato original para compatibilidad
+            response += f"💲 **Precio:** ${price_info.get('precio_kg', 0):.2f}/kg - ${price_info.get('precio_lb', 0):.2f}/lb\n\n"
         
         # Agregar información adicional si está disponible
         if price_info.get('quantity'):
@@ -83,24 +117,39 @@ def format_price_response(price_info: Dict) -> str:
                 qty = float(price_info['quantity'].replace(',', ''))
                 unit = price_info.get('unit', 'lb')
                 
-                if unit == 'kg':
-                    unit_price = price_info['precio_kg']
-                    total = qty * unit_price
-                    response += f"📊 **Para {price_info['quantity']} kg:**\n"
-                    response += f"💵 **Total estimado: ${total:,.2f}**\n\n"
+                # Usar precio final si está disponible, sino precio base
+                if 'precio_flete_kg' in price_info:
+                    if unit == 'kg':
+                        unit_price = price_info['precio_flete_kg']
+                        total = qty * unit_price
+                        response += f"📊 **Para {price_info['quantity']} kg (precio final):**\n"
+                        response += f"💵 **Total estimado: ${total:,.2f}**\n\n"
+                    else:
+                        unit_price = price_info['precio_flete_lb']
+                        total = qty * unit_price
+                        response += f"📊 **Para {price_info['quantity']} lb (precio final):**\n"
+                        response += f"💵 **Total estimado: ${total:,.2f}**\n\n"
                 else:
-                    unit_price = price_info['precio_lb']
-                    total = qty * unit_price
-                    response += f"📊 **Para {price_info['quantity']} lb:**\n"
-                    response += f"💵 **Total estimado: ${total:,.2f}**\n\n"
+                    # Usar precio original
+                    if unit == 'kg':
+                        unit_price = price_info.get('precio_kg', 0)
+                        total = qty * unit_price
+                        response += f"📊 **Para {price_info['quantity']} kg:**\n"
+                        response += f"💵 **Total estimado: ${total:,.2f}**\n\n"
+                    else:
+                        unit_price = price_info.get('precio_lb', 0)
+                        total = qty * unit_price
+                        response += f"📊 **Para {price_info['quantity']} lb:**\n"
+                        response += f"💵 **Total estimado: ${total:,.2f}**\n\n"
             except:
                 pass
         
         if price_info.get('destination'):
             response += f"🌍 **Destino:** {price_info['destination']}\n\n"
         
-        response += f"_Precios FOB sujetos a confirmación final_\n"
-        response += f"📞 Contacto: BGR Export"
+        response += f"📋 _Precios FOB sujetos a confirmación final_\n"
+        response += f"📞 **Contacto:** BGR Export\n"
+        response += f"💡 _Escribe 'menu' para más opciones_"
         
         return response
         

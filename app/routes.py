@@ -277,3 +277,18 @@ async def simple_webhook(
     logger.info(f"SIMPLE: Enviando XML: {response_xml}")
     
     return PlainTextResponse(response_xml, media_type="application/xml")
+
+@webhook_router.post("/reload-data")
+async def reload_data():
+    """
+    Endpoint para recargar datos desde Google Sheets
+    """
+    try:
+        success = pricing_service.excel_service.reload_data()
+        if success:
+            return {"status": "success", "message": "Datos recargados desde Google Sheets"}
+        else:
+            return {"status": "error", "message": "Error recargando datos"}
+    except Exception as e:
+        logger.error(f"Error recargando datos: {str(e)}")
+        return {"status": "error", "message": str(e)}

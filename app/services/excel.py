@@ -2,6 +2,7 @@ import pandas as pd
 import os
 from typing import Dict, Optional
 import logging
+from app.services.google_sheets import GoogleSheetsService
 
 logger = logging.getLogger(__name__)
 
@@ -9,7 +10,35 @@ class ExcelService:
     def __init__(self, excel_path: str = "data/CALCULO_DE _PRECIOS-AGUAJE17.xlsx"):
         self.excel_path = excel_path
         self.prices_data = None
-        self.load_excel_data()
+        # Usar Google Sheets como fuente principal
+        self.google_sheets_service = GoogleSheetsService()
+        self.load_data()
+    
+    def load_data(self) -> bool:
+        """
+        Carga los datos desde Google Sheets (preferido) o Excel local (fallback)
+        """
+        try:
+            # Verificar si Google Sheets está configurado
+            google_sheets_id = os.getenv("GOOGLE_SHEETS_ID")
+            google_credentials = os.getenv("GOOGLE_SHEETS_CREDENTIALS")
+            
+            if google_sheets_id and google_credentials:
+                # Intentar cargar desde Google Sheets
+                if self.google_sheets_service.prices_data:
+                    self.prices_data = self.google_sheets_service.prices_data
+                    logger.info("✅ Datos cargados desde Google Sheets")
+                    return True
+                else:
+                    logger.warning("⚠️ Google Sheets configurado pero sin datos, usando Excel local...")
+                    return self.load_excel_data()
+            else:
+                # Usar Excel local directamente
+                logger.info("📁 Google Sheets no configurado, usando Excel local...")
+                return self.load_excel_data()
+        except Exception as e:
+            logger.error(f"❌ Error cargando datos: {str(e)}")
+            return self.load_excel_data()
     
     def load_excel_data(self) -> bool:
         """
@@ -175,7 +204,7 @@ class ExcelService:
         Obtiene los datos de precio para una talla específica y producto
         """
         if not self.prices_data:
-            self.load_excel_data()
+            self.load_data()
         
         if product in self.prices_data:
             return self.prices_data[product].get(size)
@@ -186,7 +215,7 @@ class ExcelService:
         Retorna las tallas disponibles para un producto específico
         """
         if not self.prices_data:
-            self.load_excel_data()
+            self.load_data()
         
         if product in self.prices_data:
             return list(self.prices_data[product].keys())
@@ -197,21 +226,27 @@ class ExcelService:
         Retorna los productos disponibles
         """
         if not self.prices_data:
-            self.load_excel_data()
+            self.load_data()
         
-        return list(self.prices_data.keys())
+        return [product for product in self.prices_data.keys() if self.prices_data[product]]
     
     def get_all_prices(self) -> Dict:
         """
         Retorna todos los precios organizados por producto
         """
         if not self.prices_data:
-            self.load_excel_data()
+            self.load_data()
         
         return self.prices_data
     
     def reload_data(self) -> bool:
         """
-        Recarga los datos del Excel
+        Recarga los datos desde Google Sheets o Excel
         """
-        return self.load_excel_data()
+        # Recargar desde Google Sheets primero
+        if self.google_sheets_service.reload_data():
+            self.prices_data = self.google_sheets_service.prices_data
+            return True
+        else:
+            # Fallback a Excel local
+            return self.load_excel_data()
