@@ -1,125 +1,110 @@
-# 📦 Bot de WhatsApp para Consulta de Precios de Camarón  
+# 🦐 ShrimpBot - BGR Export WhatsApp Bot
 
-Este proyecto implementa un **bot de WhatsApp** para **BGR EXPORT** que automatiza la consulta de precios de camarón, cálculo de costos de flete y glaseo.  
+Bot de WhatsApp para consultas de precios de camarón de BGR Export con cálculos automáticos usando fórmulas de Excel.
 
-El sistema utiliza **Python con FastAPI**, se conecta a **Twilio WhatsApp API** y obtiene la información desde un archivo **Excel (hoja PRECIOS FOB)** que se actualiza periódicamente.  
+## ✨ Características
 
----
+- 🤖 **Interfaz conversacional inteligente** con menús interactivos
+- 📊 **Consultas de precios en tiempo real** desde Excel local
+- 🧮 **Cálculos automáticos** usando fórmulas del Excel (FOB, Glaseo, Flete)
+- 🦐 **Múltiples productos**: HLSO, P&D IQF, P&D BLOQUE, PuD-EUROPA, EZ PEEL
+- 📏 **Todas las tallas**: 16/20, 21/25, 26/30, 31/35, 36/40, 41/50, 51/60, 61/70, 71/90
+- 💰 **Cálculos de totales** para cantidades específicas
+- 🌍 **Soporte para destinos** internacionales
+- 📱 **Integración completa** con WhatsApp Business API
 
-## 🚀 Funcionalidades  
-- Consulta de precios de camarón según talla ingresada por el usuario.  
-- Cálculo automático de costos adicionales:  
-  - **Costo Fijo**  
-  - **Glaseo (factor de rendimiento)**  
-  - **Flete**  
-- Generación de respuestas claras en formato tabla o imagen.  
-- Lectura dinámica del archivo Excel como base de datos.  
-- Escenarios flexibles:  
-  - Bot con reglas predefinidas.  
-  - Bot con IA (procesamiento de lenguaje natural).  
+## 🚀 Instalación
 
----
+### Prerrequisitos
+- Python 3.8+
+- Cuenta de Twilio con WhatsApp Business API
+- Archivo Excel con precios en `data/`
 
-## 📊 Calculadora de Precios  
+### Pasos
+1. **Clona el repositorio**
+   ```bash
+   git clone https://github.com/xtaxx12/BGR-SHRIMP.git
+   cd BGR-SHRIMP
+   ```
 
-El sistema replica la lógica de la **calculadora del Excel (sección derecha de la hoja PRECIOS FOB)**.  
+2. **Crea entorno virtual**
+   ```bash
+   python -m venv venv
+   venv\Scripts\activate  # Windows
+   ```
 
-**Ejemplo de cálculo:**  
-- Producto: Camarón **talla 16/20**  
-- Precio base: **$8.55 por libra**  
+3. **Instala dependencias**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-**Ajustes aplicados:**  
-1. **Costo Fijo:** $0.25 por libra  
-2. **Glaseo (factor de rendimiento):** 0.7 → (70% camarón real, 30% hielo)  
-3. **Flete:** $0.20 por libra  
+4. **Configura variables de entorno**
+   ```bash
+   cp .env.example .env
+   # Edita .env con tus credenciales reales
+   ```
 
-**Resultado:**  
-- Precio final de venta ≈ **$12.22 por libra**  
+5. **Ejecuta el bot**
+   ```bash
+   python start.py
+   ```
 
----
+## ⚙️ Configuración
 
-## 🏗️ Arquitectura del Sistema  
+### Variables de Entorno Requeridas
 
-**Flujo general:**  
+Copia `.env.example` a `.env` y configura:
 
-Usuario WhatsApp → Twilio WhatsApp API → FastAPI (Railway) → Lectura Excel → Respuesta al usuario  
+```bash
+# Twilio WhatsApp (REQUERIDO)
+TWILIO_ACCOUNT_SID=tu_account_sid
+TWILIO_AUTH_TOKEN=tu_auth_token
+TWILIO_WHATSAPP_NUMBER=whatsapp:+tu_numero
 
----
+# Servidor
+PORT=8000
+DEBUG=True
 
-**Componentes principales:**  
-- **Lenguaje backend:** Python (FastAPI)  
-- **Hosting:** Railway (escalable y económico)  
-- **Mensajería:** Twilio WhatsApp API  
-- **Datos:** Excel (hoja PRECIOS FOB)  
-- **Opcional:** OpenAI GPT-4o-mini para IA conversacional  
+# Excel (REQUERIDO)
+EXCEL_PATH=data/CALCULO_DE_PRECIOS-AGUAJE17.xlsx
+```
 
----
+## 📱 Uso del Bot
 
-## ⚙️ Tecnologías Recomendadas  
+### Comandos Disponibles
 
-- **Backend:** Python 3.11+, FastAPI  
-- **Excel:** `pandas`, `openpyxl`  
-- **WhatsApp API:** Twilio  
-- **Generación de imágenes/tablas:** Pillow  
-- **Hosting:** Railway  
-- **Opcional IA:** OpenAI GPT-4o-mini  
+- `hola` - Mostrar menú principal
+- `precios` - Ir directamente a consulta de precios
+- `menu` - Volver al menú principal
+- `ayuda` - Mostrar ayuda
 
----
+### Ejemplos de Consultas
 
-## 💰 Escenarios de Costos  
+```
+Usuario: "precio HLSO 16/20"
+Usuario: "21/25 para 15000 lb destino China"
+Usuario: "P&D IQF 26/30"
+```
 
-### Escenario 1: Bot con IA  
-- Twilio WhatsApp API: $0.005 por mensaje  
-- OpenAI GPT-4o-mini: $0.00015 por mensaje  
-- Railway hosting: $5–$10/mes  
-- **Total estimado: $15–$20/mes**  
+## 🧮 Cálculos Automáticos
 
-### Escenario 2: Bot sin IA (basado en reglas)  
-- Twilio WhatsApp API: $0.005 por mensaje  
-- Railway hosting: $5–$10/mes  
-- **Total estimado: $10–$15/mes**  
+El bot usa las **fórmulas exactas** de tu Excel:
 
----
+1. **PRECIO FOB** = `Precio Base - Costo Fijo`
+2. **PRECIO GLASEO** = `Precio FOB × Factor Glaseo`
+3. **PRECIO FINAL** = `Precio Glaseo + Costo Fijo + Flete`
 
-## 📂 Estructura esperada del proyecto  
+### Factores (leídos automáticamente del Excel):
+- **Costo Fijo**: $0.29
+- **Factor Glaseo**: 0.7
+- **Flete**: $0.20
 
-bot-whatsapp/
-│── app/
-│ ├── main.py # Backend FastAPI
-│ ├── routes.py # Endpoints para Twilio
-│ ├── services/
-│ │ ├── excel.py # Lógica de lectura de Excel
-│ │ ├── pricing.py # Calculadora de precios
-│ │ └── utils.py
-│── data/
-│ └── precios_fob.xlsx # Base de datos Excel
-│── tests/
-│── requirements.txt
-│── README.md
+## 🔒 Seguridad
 
----
+- ❌ **NUNCA** subas el archivo `.env` al repositorio
+- ✅ Usa `.env.example` como plantilla
+- ✅ Configura las variables de entorno en tu servidor de producción
 
-## ▶️ Ejemplo de Flujo  
+## � Sopor:te
 
-**Usuario:**  
-Precio HLSO 16/20 para 15,000 lb destino China
-
-**Bot responde:**  
-📦 Producto: HLSO
-📏 Talla: 16/20
-💲 Precio base: $8.55/lb
-⚙️ Costo fijo: $0.25/lb
-🧊 Glaseo (factor): 0.7
-🚚 Flete: $0.20/lb
-
-💲 Precio final estimado: $12.22/lb
-
-
----
-
-## 📌 Notas  
-- El Excel es la **fuente de verdad**.  
-- El cliente puede actualizar los precios y tallas sin tocar el código.  
-- El bot reflejará automáticamente los cambios.  
-
-
+Para soporte técnico o preguntas sobre el bot, contacta al equipo de desarrollo.
