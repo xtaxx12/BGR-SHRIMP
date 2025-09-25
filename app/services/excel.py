@@ -203,10 +203,16 @@ class ExcelService:
         """
         Obtiene los datos de precio para una talla específica y producto
         """
+        # Primero intentar con datos locales
         if not self.prices_data:
             self.load_data()
         
-        if product in self.prices_data:
+        # Si aún no hay datos locales, verificar Google Sheets directamente
+        if not self.prices_data and self.google_sheets_service.prices_data:
+            self.prices_data = self.google_sheets_service.prices_data
+            logger.info("✅ Datos sincronizados desde Google Sheets")
+        
+        if self.prices_data and product in self.prices_data:
             return self.prices_data[product].get(size)
         return None
     
@@ -214,11 +220,21 @@ class ExcelService:
         """
         Retorna las tallas disponibles para un producto específico
         """
+        # Primero intentar con datos locales
         if not self.prices_data:
             self.load_data()
         
-        if product in self.prices_data:
-            return list(self.prices_data[product].keys())
+        # Si aún no hay datos locales, verificar Google Sheets directamente
+        if not self.prices_data and self.google_sheets_service.prices_data:
+            self.prices_data = self.google_sheets_service.prices_data
+            logger.info("✅ Datos sincronizados desde Google Sheets")
+        
+        if self.prices_data and product in self.prices_data:
+            sizes = list(self.prices_data[product].keys())
+            logger.info(f"Tallas encontradas para {product}: {sizes}")
+            return sizes
+        
+        logger.warning(f"No se encontraron tallas para {product}")
         return []
     
     def get_available_products(self) -> list:

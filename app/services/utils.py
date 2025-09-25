@@ -76,8 +76,23 @@ def format_price_response(price_info: Dict) -> str:
         response += f"📏 **Talla:** {price_info['talla']}\n"
         response += f"🏷️ **Producto:** {price_info['producto']}\n\n"
         
+        # Verificar si el producto no tiene precio establecido
+        # Si tenemos precios calculados válidos, no mostrar "sin precio"
+        has_calculated_prices = (
+            'precio_fob_kg' in price_info and 
+            price_info.get('precio_fob_kg', 0) > 0
+        )
+        
+        if not has_calculated_prices and (price_info.get('sin_precio', False) or price_info.get('precio_kg', 0) == 0):
+            response += "⚠️ **SIN PRECIO ESTABLECIDO**\n\n"
+            response += "📞 Para obtener cotización de este producto, contacta directamente con BGR Export.\n\n"
+            response += "🏢 **Información de contacto:**\n"
+            response += "   • Email: ventas@bgrexport.com\n"
+            response += "   • WhatsApp: +593 XXX XXXX\n\n"
+            return response
+        
         # Si tenemos precios calculados con fórmulas del Excel
-        if 'precio_fob_kg' in price_info:
+        elif 'precio_fob_kg' in price_info:
             response += f"💰 **PRECIOS CALCULADOS:**\n\n"
             
             # Precio base

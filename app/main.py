@@ -1,6 +1,12 @@
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import PlainTextResponse
 import uvicorn
+from dotenv import load_dotenv
+import os
+
+# Cargar variables de entorno ANTES de importar servicios
+load_dotenv()
+
 from app.routes import webhook_router
 from app.config import settings
 import logging

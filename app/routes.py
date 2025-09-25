@@ -13,10 +13,28 @@ import os
 logger = logging.getLogger(__name__)
 
 webhook_router = APIRouter()
-pricing_service = PricingService()
-interactive_service = InteractiveMessageService()
-pdf_generator = PDFGenerator()
-whatsapp_sender = WhatsAppSender()
+
+# Servicios se inicializarán de manera lazy
+pricing_service = None
+interactive_service = None
+pdf_generator = None
+whatsapp_sender = None
+
+def get_services():
+    """
+    Inicializa los servicios de manera lazy
+    """
+    global pricing_service, interactive_service, pdf_generator, whatsapp_sender
+    
+    if pricing_service is None:
+        pricing_service = PricingService()
+        # Pasar el servicio de Excel al servicio interactivo para compartir datos
+        interactive_service = InteractiveMessageService(pricing_service.excel_service)
+        pdf_generator = PDFGenerator()
+        whatsapp_sender = WhatsAppSender()
+        logger.info("✅ Servicios inicializados")
+    
+    return pricing_service, interactive_service, pdf_generator, whatsapp_sender
 
 @webhook_router.post("/whatsapp")
 async def whatsapp_webhook(
@@ -31,6 +49,9 @@ async def whatsapp_webhook(
     try:
         logger.info(f"Mensaje recibido de {From}: {Body}")
         
+        # Inicializar servicios si no están inicializados
+        pricing_service, interactive_service, pdf_generator, whatsapp_sender = get_services()
+        
         # Crear respuesta de Twilio
         response = MessagingResponse()
         
@@ -38,10 +59,12 @@ async def whatsapp_webhook(
         user_id = From.replace("whatsapp:", "")
         session = session_manager.get_session(user_id)
         
+
+        
         # Comandos globales que funcionan desde cualquier estado
         message_lower = Body.lower().strip()
         
-        if message_lower in ['precios', 'precio', 'prices']:
+        if message_lower in ['precios', 'precio', 'prices', 'Precios']:
             size_message, available_sizes = interactive_service.create_size_selection_message()
             if size_message:
                 response.message(size_message)
@@ -89,7 +112,7 @@ async def whatsapp_webhook(
                         pdf_message.media(download_url)
                         
                         # También enviar enlace de descarga como respaldo
-                        response.message(f"📎 También puedes descargar el PDF desde:\n{download_url}")
+                        #response.message(f"📎 También puedes descargar el PDF desde:\n{download_url}")
                     
                     # Limpiar la cotización después de confirmar
                     session_manager.clear_session(user_id)
@@ -105,23 +128,20 @@ async def whatsapp_webhook(
         elif message_lower in ['menu', 'inicio', 'start', 'hola', 'hello', 'reiniciar', 'reset']:
             # Limpiar sesión y mostrar menú principal
             session_manager.clear_session(user_id)
-            welcome_msg = interactive_service.create_welcome_message()
-            menu_msg, options = interactive_service.create_main_menu()
-            full_message = f"{welcome_msg}\n\n{menu_msg}"
-            response.message(full_message)
-            session_manager.set_session_state(user_id, 'main_menu', {'options': options})
+            
+            # Mensaje simple para probar
+            simple_message = "🦐 Hola! Soy ShrimpBot de BGR Export\n\n¿En qué puedo ayudarte?\n\n1. Precios\n2. Productos\n3. Contacto"
+            
+            response.message(simple_message)
+            session_manager.set_session_state(user_id, 'main_menu', {'options': ['Precios', 'Productos', 'Contacto']})
             response_xml = str(response)
             
             return PlainTextResponse(response_xml, media_type="application/xml")
         
         # Procesar según el estado de la sesión
-        logger.info(f"Estado actual del usuario: {session['state']}")
-        logger.info(f"Datos de sesión: {session['data']}")
-        
         if session['state'] == 'main_menu':
             # Usuario está en el menú principal simplificado
             new_state, message, options = interactive_service.handle_menu_selection(Body, "main")
-            logger.info(f"Transición de main_menu: {session['state']} -> {new_state}")
             
             if new_state != 'main_menu':  # Solo si cambió de estado
                 response.message(message)
@@ -163,16 +183,11 @@ async def whatsapp_webhook(
         elif session['state'] == 'waiting_for_product_selection':
             # Usuario está seleccionando un producto
             available_products = session['data'].get('available_products', [])
-            logger.info(f"Productos disponibles: {available_products}")
-            logger.info(f"Usuario seleccionó: {Body}")
-            
             selected_product = interactive_service.parse_selection_response(Body, available_products)
-            logger.info(f"Producto parseado: {selected_product}")
             
             if selected_product:
                 # Producto seleccionado, obtener precio
                 selected_size = session['data'].get('selected_size')
-                logger.info(f"Consultando precio para {selected_product} talla {selected_size}")
                 
                 user_input = {
                     'size': selected_size,
@@ -188,7 +203,6 @@ async def whatsapp_webhook(
                     formatted_response += "\n\n✅ **Para generar PDF:** Escribe 'confirmar'"
                     
                     response.message(formatted_response)
-                    logger.info(f"Precio encontrado y enviado: {formatted_response[:100]}...")
                     
                     # Almacenar cotización para posible confirmación
                     session_manager.set_last_quote(user_id, price_info)
@@ -196,12 +210,10 @@ async def whatsapp_webhook(
                 else:
                     error_msg = f"❌ No encontré información para {selected_product} talla {selected_size}"
                     response.message(error_msg)
-                    logger.info(f"Precio no encontrado: {error_msg}")
                     session_manager.clear_session(user_id)
             else:
                 error_msg = "🤔 Selección inválida. Por favor responde con:\n\n📝 El número de la opción\n💡 O escribe 'menu' para volver al inicio"
                 response.message(error_msg)
-                logger.info(f"Selección inválida, enviando: {error_msg}")
             return PlainTextResponse(str(response), media_type="application/xml")
         
         else:
@@ -318,10 +330,23 @@ async def simple_webhook(
     logger.info(f"SIMPLE: Mensaje de {From}: {Body}")
     
     response = MessagingResponse()
-    response.message(f"Recibido: {Body}")
+    response.message("✅ Mensaje recibido correctamente!")
     
     response_xml = str(response)
     logger.info(f"SIMPLE: Enviando XML: {response_xml}")
+    
+    return PlainTextResponse(response_xml, media_type="application/xml")
+
+@webhook_router.post("/test-response")
+async def test_response():
+    """
+    Endpoint para probar respuestas TwiML
+    """
+    response = MessagingResponse()
+    response.message("🦐 Mensaje de prueba desde BGR Export Bot")
+    
+    response_xml = str(response)
+    logger.info(f"TEST: XML generado: {response_xml}")
     
     return PlainTextResponse(response_xml, media_type="application/xml")
 
@@ -331,13 +356,71 @@ async def reload_data():
     Endpoint para recargar datos desde Google Sheets
     """
     try:
-        success = pricing_service.excel_service.reload_data()
-        if success:
-            return {"status": "success", "message": "Datos recargados desde Google Sheets"}
-        else:
-            return {"status": "error", "message": "Error recargando datos"}
+        # Reinicializar servicios con variables de entorno actuales
+        global pricing_service, interactive_service, pdf_generator, whatsapp_sender
+        
+        # Forzar reinicialización
+        pricing_service = None
+        interactive_service = None
+        pdf_generator = None
+        whatsapp_sender = None
+        
+        # Inicializar servicios
+        pricing_service, interactive_service, pdf_generator, whatsapp_sender = get_services()
+        
+        # Contar datos cargados
+        total_prices = sum(len(product_data) for product_data in pricing_service.excel_service.prices_data.values())
+        products = [p for p in pricing_service.excel_service.prices_data.keys() if pricing_service.excel_service.prices_data[p]]
+        
+        return {
+            "status": "success", 
+            "message": "Servicios reinicializados y datos recargados",
+            "total_prices": total_prices,
+            "products": products,
+            "google_sheets_id": os.getenv('GOOGLE_SHEETS_ID', 'No configurado')[:20] + "..."
+        }
     except Exception as e:
         logger.error(f"Error recargando datos: {str(e)}")
+        import traceback
+        return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
+
+@webhook_router.get("/data-status")
+async def data_status():
+    """
+    Endpoint para verificar el estado de los datos
+    """
+    try:
+        # Inicializar servicios si no están inicializados
+        pricing_service, interactive_service, pdf_generator, whatsapp_sender = get_services()
+        
+        # Verificar datos actuales
+        total_prices = sum(len(product_data) for product_data in pricing_service.excel_service.prices_data.values())
+        products = [p for p in pricing_service.excel_service.prices_data.keys() if pricing_service.excel_service.prices_data[p]]
+        
+        # Verificar configuración de Google Sheets
+        sheets_id = os.getenv('GOOGLE_SHEETS_ID')
+        sheets_credentials = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
+        
+        # Verificar si el servicio de Google Sheets está funcionando
+        sheets_service_status = "No inicializado"
+        if hasattr(pricing_service.excel_service, 'google_sheets_service'):
+            if pricing_service.excel_service.google_sheets_service.sheet:
+                sheets_service_status = "Conectado"
+            else:
+                sheets_service_status = "Error de conexión"
+        
+        return {
+            "status": "success",
+            "data_source": "Google Sheets" if sheets_id and sheets_credentials else "Local Excel",
+            "total_prices": total_prices,
+            "products": products,
+            "google_sheets_configured": bool(sheets_id and sheets_credentials),
+            "google_sheets_id": sheets_id[:20] + "..." if sheets_id else None,
+            "sheets_service_status": sheets_service_status,
+            "env_loaded": bool(sheets_id)
+        }
+    except Exception as e:
+        logger.error(f"Error verificando estado: {str(e)}")
         return {"status": "error", "message": str(e)}
 
 @webhook_router.get("/test-twilio")
@@ -399,6 +482,9 @@ async def test_pdf_send(phone_number: str = Form(...)):
             'total_value': 102750.00
         }
         
+        # Inicializar servicios si no están inicializados
+        pricing_service, interactive_service, pdf_generator, whatsapp_sender = get_services()
+        
         # Generar PDF de prueba
         pdf_path = pdf_generator.generate_quote_pdf(test_quote, f"whatsapp:{phone_number}")
         
@@ -411,7 +497,7 @@ async def test_pdf_send(phone_number: str = Form(...)):
             )
             
             filename = os.path.basename(pdf_path)
-            download_url = f"https://bgr-shrimp.onrender.com/webhook/download-pdf/{filename}"
+            download_url = f" https://e28980114917.ngrok-free.app/webhook/download-pdf/{filename}"
             
             return {
                 "status": "success" if pdf_sent else "partial",

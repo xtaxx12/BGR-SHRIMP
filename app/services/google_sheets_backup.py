@@ -181,31 +181,26 @@ class GoogleSheetsService:
                         logger.info(f"Leyendo {product} fila {i+1}: talla='{talla}', kg='{precio_kg}', lb='{precio_lb}'")
                         
                         # Verificar que la talla tenga formato válido (ej: 16/20)
-                        if (('/' in talla or talla.startswith('U') or talla.endswith('/100')) and talla != 'nan' and talla and talla != '' and talla != 'TALLA'):
+                        if '/' in talla and talla != 'nan' and talla and talla != '':
                             # Convertir precios a float si es posible
                             try:
-                                precio_kg = self._clean_price(precio_kg)
-                                precio_lb = self._clean_price(precio_lb)
+                                precio_kg = float(precio_kg) if self._is_number(precio_kg) else 0
+                                precio_lb = float(precio_lb) if self._is_number(precio_lb) else 0
                             except:
                                 precio_kg = 0
                                 precio_lb = 0
                             
-                            # Agregar todas las tallas, incluso sin precio
-                            self.prices_data[product][talla] = {
-                                'precio_kg': precio_kg,
-                                'precio_lb': precio_lb,
-                                'producto': product,
-                                'talla': talla,
-                                'costo_fijo': costo_fijo,
-                                'factor_glaseo': factor_glaseo,
-                                'flete': flete,
-                                'sin_precio': precio_kg == 0
-                            }
-                            
-                            if precio_kg > 0:
+                            if precio_kg > 0:  # Solo agregar si tiene precio válido
+                                self.prices_data[product][talla] = {
+                                    'precio_kg': precio_kg,
+                                    'precio_lb': precio_lb,
+                                    'producto': product,
+                                    'talla': talla,
+                                    'costo_fijo': costo_fijo,
+                                    'factor_glaseo': factor_glaseo,
+                                    'flete': flete
+                                }
                                 logger.info(f"✅ Agregado {product} {talla}: ${precio_kg}/kg")
-                            else:
-                                logger.info(f"⚠️ Agregado {product} {talla}: Sin precio establecido")
                     except Exception as e:
                         logger.error(f"Error procesando {product} fila {i+1}: {e}")
                         continue
@@ -225,31 +220,26 @@ class GoogleSheetsService:
                         logger.info(f"Leyendo {product} fila {i+1}: talla='{talla}', kg='{precio_kg}', lb='{precio_lb}'")
                         
                         # Verificar que la talla tenga formato válido (ej: 16/20)
-                        if (('/' in talla or talla.startswith('U') or talla.endswith('/100')) and talla != 'nan' and talla and talla != '' and talla != 'TALLA'):
+                        if '/' in talla and talla != 'nan' and talla and talla != '':
                             # Convertir precios a float si es posible
                             try:
-                                precio_kg = self._clean_price(precio_kg)
-                                precio_lb = self._clean_price(precio_lb)
+                                precio_kg = float(precio_kg) if self._is_number(precio_kg) else 0
+                                precio_lb = float(precio_lb) if self._is_number(precio_lb) else 0
                             except:
                                 precio_kg = 0
                                 precio_lb = 0
                             
-                            # Agregar todas las tallas, incluso sin precio
-                            self.prices_data[product][talla] = {
-                                'precio_kg': precio_kg,
-                                'precio_lb': precio_lb,
-                                'producto': product,
-                                'talla': talla,
-                                'costo_fijo': costo_fijo,
-                                'factor_glaseo': factor_glaseo,
-                                'flete': flete,
-                                'sin_precio': precio_kg == 0
-                            }
-                            
-                            if precio_kg > 0:
+                            if precio_kg > 0:  # Solo agregar si tiene precio válido
+                                self.prices_data[product][talla] = {
+                                    'precio_kg': precio_kg,
+                                    'precio_lb': precio_lb,
+                                    'producto': product,
+                                    'talla': talla,
+                                    'costo_fijo': costo_fijo,
+                                    'factor_glaseo': factor_glaseo,
+                                    'flete': flete
+                                }
                                 logger.info(f"✅ Agregado {product} {talla}: ${precio_kg}/kg")
-                            else:
-                                logger.info(f"⚠️ Agregado {product} {talla}: Sin precio establecido")
                     except Exception as e:
                         logger.error(f"Error procesando {product} fila {i+1}: {e}")
                         continue
@@ -257,10 +247,6 @@ class GoogleSheetsService:
             # Contar total de tallas cargadas
             total_sizes = sum(len(product_data) for product_data in self.prices_data.values())
             logger.info(f"Datos cargados desde Google Sheets: {total_sizes} tallas en {len(self.prices_data)} productos")
-            
-            # Debug: mostrar algunos productos para verificar
-            for product, tallas in self.prices_data.items():
-                logger.info(f"  {product}: {len(tallas)} tallas")
             
             return True
             

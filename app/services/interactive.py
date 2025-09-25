@@ -4,8 +4,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 class InteractiveMessageService:
-    def __init__(self):
-        self.excel_service = ExcelService()
+    def __init__(self, excel_service=None):
+        if excel_service:
+            self.excel_service = excel_service
+        else:
+            self.excel_service = ExcelService()
     
     def create_welcome_message(self):
         """
@@ -34,7 +37,21 @@ class InteractiveMessageService:
             else:
                 # Usar HLSO como default para mostrar tallas comunes
                 sizes = self.excel_service.get_available_sizes('HLSO')
+                
+                # Si no hay tallas, intentar directamente desde Google Sheets
+                if not sizes and hasattr(self.excel_service, 'google_sheets_service'):
+                    gs_service = self.excel_service.google_sheets_service
+                    if gs_service and gs_service.prices_data:
+                        sizes = gs_service.get_available_sizes('HLSO')
+                        logger.info(f"Tallas obtenidas directamente de Google Sheets: {sizes}")
+                
                 title = "🦐 Selecciona la talla del camarón:\n\n"
+            
+            logger.info(f"Tallas obtenidas para {product or 'HLSO'}: {sizes}")
+            
+            if not sizes:
+                logger.warning("No se encontraron tallas disponibles")
+                return "❌ No hay tallas disponibles en este momento.", []
             
             # Crear mensaje con opciones numeradas
             message = title
@@ -48,6 +65,9 @@ class InteractiveMessageService:
             
         except Exception as e:
             logger.error(f"Error creando mensaje de tallas: {str(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return "❌ Error obteniendo tallas disponibles.", []
             return None, []
     
     def create_product_selection_message(self, size: str):
