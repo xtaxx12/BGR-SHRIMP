@@ -187,5 +187,5 @@ Este proyecto es privado y pertenece a BGR Export.
 ## 📞 Soporte
 
 Para soporte técnico o preguntas sobre el bot:
-- Email: soporte@bgrexport.com
-- WhatsApp: +593 XXX XXXX
+- Email: rojassebas765@gmail.com
+- WhatsApp: +593 968058769
