@@ -8,7 +8,18 @@ def parse_user_message(message: str) -> Optional[Dict]:
     if not message:
         return None
     
-    message = message.strip().upper()
+    message_original = message.strip()
+    message = message_original.upper()
+    
+    # Excluir saludos simples y mensajes conversacionales
+    simple_messages = [
+        'HOLA', 'HELLO', 'HI', 'BUENOS DIAS', 'BUENAS TARDES', 'BUENAS NOCHES',
+        'COMO ESTAS', 'QUE TAL', 'Q HACES', 'COMO ANDAS', 'AYUDA', 'HELP',
+        'MENU', 'GRACIAS', 'THANKS', 'OK', 'SI', 'NO', 'BIEN', 'MAL'
+    ]
+    
+    if message.strip() in simple_messages:
+        return None
     
     # Patrones para extraer información
     size_pattern = r'\b(\d+/\d+)\b'
