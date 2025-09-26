@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import PlainTextResponse
 from twilio.twiml.messaging_response import MessagingResponse
 from app.services.pricing import PricingService
-from app.services.utils import parse_user_message, format_price_response
+from app.services.utils import parse_user_message, parse_ai_analysis_to_query, format_price_response
 from app.services.interactive import InteractiveMessageService
 from app.services.session import session_manager
 from app.services.pdf_generator import PDFGenerator
@@ -325,8 +325,38 @@ async def whatsapp_webhook(
                     session_manager.set_session_state(user_id, 'quote_ready', {})
                     return PlainTextResponse(str(response), media_type="application/xml")
             
-            # Si no es una consulta válida, intentar respuesta inteligente
+            # Si no es una consulta válida, verificar si el análisis de IA puede generar una proforma automática
             logger.info(f"🔍 Llegando a lógica de respuesta inteligente para mensaje: '{Body}'")
+            
+            # Intentar generar proforma automática si el análisis de IA es suficientemente específico
+            if ai_analysis and ai_analysis.get('confidence', 0) > 0.8:
+                ai_query = parse_ai_analysis_to_query(ai_analysis)
+                logger.info(f"🤖 Consulta generada por IA: {ai_query}")
+                
+                if ai_query:
+                    # Intentar generar cotización automática
+                    price_info = pricing_service.get_shrimp_price(ai_query)
+                    
+                    if price_info:
+                        logger.info(f"✅ Proforma automática generada para: {ai_query}")
+                        formatted_response = format_price_response(price_info)
+                        
+                        # Agregar contexto de que fue procesado desde audio/IA
+                        if NumMedia > 0:
+                            formatted_response = f"🎤 **Procesado desde audio:**\n\n{formatted_response}"
+                        else:
+                            formatted_response = f"🤖 **Procesado automáticamente:**\n\n{formatted_response}"
+                        
+                        # Agregar instrucción para confirmar
+                        formatted_response += "\n\n✅ **Para generar PDF:** Escribe 'confirmar'"
+                        
+                        response.message(formatted_response)
+                        
+                        # Almacenar cotización para posible confirmación
+                        session_manager.set_last_quote(user_id, price_info)
+                        session_manager.set_session_state(user_id, 'quote_ready', {})
+                        return PlainTextResponse(str(response), media_type="application/xml")
+            
             smart_response = None
             
             # Intentar respuesta con OpenAI primero

@@ -72,20 +72,32 @@ class OpenAIService:
             system_prompt = """
 Eres un asistente especializado en análisis de intenciones para un bot de WhatsApp de BGR Export (empresa de camarones).
 
-Analiza el mensaje del usuario y determina:
-1. La intención principal (pricing, product_info, greeting, help, etc.)
-2. Si menciona productos específicos (HOSO, HLSO, P&D IQF, etc.)
-3. Si menciona tallas (16/20, 21/25, etc.)
-4. Si menciona cantidades o destinos
-5. Nivel de confianza (0-1)
+Analiza el mensaje del usuario y extrae TODA la información específica:
+
+PRODUCTOS: HOSO, HLSO, P&D IQF, P&D BLOQUE, PuD-EUROPA, EZ PEEL, PuD-EEUU, COOKED, PRE-COCIDO, COCIDO SIN TRATAR
+TALLAS: U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60, 60/70, 61/70, 70/80, 71/90
+DESTINOS: Houston, Miami, Los Angeles, New York, Europa, China, etc.
+
+Extrae:
+1. Intención principal (pricing, proforma, greeting, help, etc.)
+2. Producto específico mencionado
+3. Talla específica mencionada
+4. Cantidad (libras, kilos, toneladas)
+5. Destino o ciudad
+6. Factor de glaseo si se menciona (ej: "10 de glaseo", "glaseo 10%")
+7. Información de flete si se menciona
+8. Si solicita proforma específicamente
 
 Responde SOLO en formato JSON válido:
 {
-    "intent": "pricing|product_info|greeting|help|contact|other",
-    "product": "producto mencionado o null",
-    "size": "talla mencionada o null", 
-    "quantity": "cantidad mencionada o null",
-    "destination": "destino mencionado o null",
+    "intent": "pricing|proforma|product_info|greeting|help|contact|other",
+    "product": "producto exacto mencionado o null",
+    "size": "talla exacta mencionada o null", 
+    "quantity": "cantidad con unidad o null",
+    "destination": "destino específico o null",
+    "glaseo": "factor de glaseo mencionado o null",
+    "flete": "información de flete o null",
+    "wants_proforma": true/false,
     "confidence": 0.95,
     "suggested_response": "sugerencia de respuesta breve"
 }

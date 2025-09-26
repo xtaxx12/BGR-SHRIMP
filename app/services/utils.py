@@ -20,6 +20,45 @@ def parse_user_message(message: str) -> Optional[Dict]:
     
     if message.strip() in simple_messages:
         return None
+
+def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
+    """
+    Convierte el análisis de IA en una consulta de precio válida
+    """
+    if not ai_analysis or ai_analysis.get('intent') not in ['pricing', 'proforma']:
+        return None
+    
+    # Extraer información del análisis de IA
+    product = ai_analysis.get('product')
+    size = ai_analysis.get('size')
+    quantity = ai_analysis.get('quantity')
+    destination = ai_analysis.get('destination')
+    glaseo = ai_analysis.get('glaseo')
+    flete = ai_analysis.get('flete')
+    
+    # Validar que tengamos al menos producto y talla
+    if not product or not size:
+        return None
+    
+    # Crear consulta estructurada
+    query = {
+        'product': product,
+        'size': size,
+        'quantity': quantity,
+        'destination': destination,
+        'glaseo': glaseo,
+        'flete': flete,
+        'unit': 'lb'  # Default
+    }
+    
+    # Determinar unidad si hay cantidad
+    if quantity:
+        if any(unit in quantity.upper() for unit in ['KG', 'KILO']):
+            query['unit'] = 'kg'
+        else:
+            query['unit'] = 'lb'
+    
+    return query
     
     # Patrones para extraer información
     size_pattern = r'\b(\d+/\d+)\b'
