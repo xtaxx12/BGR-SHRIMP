@@ -1,6 +1,7 @@
-from openai import OpenAI
+import requests
 import os
 import logging
+import json
 from typing import Optional, Dict, List
 
 logger = logging.getLogger(__name__)
@@ -9,37 +10,62 @@ class OpenAIService:
     def __init__(self):
         self.api_key = os.getenv("OPENAI_API_KEY")
         self.model = "gpt-4o-mini"
-        self.client = None
+        self.base_url = "https://api.openai.com/v1"
         
         if self.api_key:
-            try:
-                # Intentar inicializar con diferentes métodos para compatibilidad
-                try:
-                    self.client = OpenAI(api_key=self.api_key)
-                except TypeError as te:
-                    # Fallback para versiones más antiguas
-                    logger.warning(f"Intentando método alternativo de inicialización: {te}")
-                    import openai
-                    openai.api_key = self.api_key
-                    self.client = openai
-                
-                logger.info("✅ OpenAI API configurada correctamente")
-            except Exception as e:
-                logger.error(f"❌ Error inicializando OpenAI: {str(e)}")
-                self.client = None
+            logger.info("✅ OpenAI API configurada correctamente")
         else:
             logger.warning("⚠️ OpenAI API Key no configurada")
     
     def is_available(self) -> bool:
         """Verifica si OpenAI está disponible"""
-        return bool(self.client)
+        return bool(self.api_key)
+    
+    def _make_request(self, messages: List[Dict], max_tokens: int = 300, temperature: float = 0.3) -> Optional[str]:
+        """
+        Hace una petición directa a la API de OpenAI usando requests
+        """
+        if not self.is_available():
+            return None
+        
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            data = {
+                "model": self.model,
+                "messages": messages,
+                "max_tokens": max_tokens,
+                "temperature": temperature
+            }
+            
+            response = requests.post(
+                f"{self.base_url}/chat/completions",
+                headers=headers,
+                json=data,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                return result["choices"][0]["message"]["content"].strip()
+            else:
+                logger.error(f"❌ Error API OpenAI: {response.status_code} - {response.text}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"❌ Error en petición OpenAI: {str(e)}")
+            return None
     
     def analyze_user_intent(self, message: str, context: Dict = None) -> Dict:
         """
         Analiza la intención del usuario usando GPT-4o mini
         """
         if not self.is_available():
-            return {"intent": "unknown", "confidence": 0}
+            # Fallback con análisis básico de patrones
+            return self._basic_intent_analysis(message)
         
         try:
             system_prompt = """
@@ -64,39 +90,24 @@ Responde SOLO en formato JSON válido:
 }
 """
 
-            # Manejar diferentes tipos de cliente OpenAI
-            if hasattr(self.client, 'chat'):
-                # Cliente nuevo
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": f"Mensaje: '{message}'"}
-                    ],
-                    max_tokens=300,
-                    temperature=0.3
-                )
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Mensaje: '{message}'"}
+            ]
+            
+            result = self._make_request(messages, max_tokens=300, temperature=0.3)
+            
+            if result:
+                # Intentar parsear como JSON
+                try:
+                    parsed_result = json.loads(result)
+                    logger.info(f"🤖 Análisis OpenAI: {parsed_result}")
+                    return parsed_result
+                except json.JSONDecodeError:
+                    logger.error(f"❌ Error parseando JSON de OpenAI: {result}")
+                    return {"intent": "unknown", "confidence": 0}
             else:
-                # Cliente legacy
-                import openai
-                response = openai.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": f"Mensaje: '{message}'"}
-                    ],
-                    max_tokens=300,
-                    temperature=0.3
-                )
-            
-            result = response.choices[0].message.content.strip()
-            
-            # Intentar parsear como JSON
-            import json
-            parsed_result = json.loads(result)
-            
-            logger.info(f"🤖 Análisis OpenAI: {parsed_result}")
-            return parsed_result
+                return {"intent": "unknown", "confidence": 0}
             
         except Exception as e:
             logger.error(f"❌ Error en análisis OpenAI: {str(e)}")
@@ -154,34 +165,18 @@ INSTRUCCIONES:
 Genera una respuesta apropiada y útil.
 """
 
-            # Manejar diferentes tipos de cliente OpenAI
-            if hasattr(self.client, 'chat'):
-                # Cliente nuevo
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": context_info}
-                    ],
-                    max_tokens=200,
-                    temperature=0.7
-                )
-            else:
-                # Cliente legacy
-                import openai
-                response = openai.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": context_info}
-                    ],
-                    max_tokens=200,
-                    temperature=0.7
-                )
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": context_info}
+            ]
             
-            result = response.choices[0].message.content.strip()
-            logger.info(f"🤖 Respuesta generada por OpenAI: {result}")
-            return result
+            result = self._make_request(messages, max_tokens=200, temperature=0.7)
+            
+            if result:
+                logger.info(f"🤖 Respuesta generada por OpenAI: {result}")
+                return result
+            else:
+                return None
             
         except Exception as e:
             logger.error(f"❌ Error generando respuesta OpenAI: {str(e)}")
@@ -208,34 +203,114 @@ Toma los datos de precio y genera una explicación breve y clara que incluya:
 Formato de respuesta: texto directo sin JSON.
 """
 
-            # Manejar diferentes tipos de cliente OpenAI
-            if hasattr(self.client, 'chat'):
-                # Cliente nuevo
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": f"Datos de precio: {price_data}"}
-                    ],
-                    max_tokens=100,
-                    temperature=0.5
-                )
-            else:
-                # Cliente legacy
-                import openai
-                response = openai.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": f"Datos de precio: {price_data}"}
-                    ],
-                    max_tokens=100,
-                    temperature=0.5
-                )
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Datos de precio: {price_data}"}
+            ]
             
-            result = response.choices[0].message.content.strip()
-            return result
+            result = self._make_request(messages, max_tokens=100, temperature=0.5)
+            
+            if result:
+                return result
+            else:
+                return None
             
         except Exception as e:
             logger.error(f"❌ Error mejorando explicación de precio: {str(e)}")
             return None
+    
+    def _basic_intent_analysis(self, message: str) -> Dict:
+        """
+        Análisis básico de intenciones sin IA como fallback
+        """
+        message_lower = message.lower().strip()
+        
+        # Patrones de saludo
+        greeting_patterns = ['hola', 'hello', 'hi', 'buenos', 'buenas', 'como estas', 'que tal', 'q haces']
+        if any(pattern in message_lower for pattern in greeting_patterns):
+            return {
+                "intent": "greeting",
+                "product": None,
+                "size": None,
+                "quantity": None,
+                "destination": None,
+                "confidence": 0.8,
+                "suggested_response": "Responder con saludo amigable y mostrar opciones"
+            }
+        
+        # Patrones de precios
+        price_patterns = ['precio', 'precios', 'cotizar', 'cotizacion', 'cuanto', 'cuesta', 'cost']
+        if any(pattern in message_lower for pattern in price_patterns):
+            return {
+                "intent": "pricing",
+                "product": None,
+                "size": None,
+                "quantity": None,
+                "destination": None,
+                "confidence": 0.9,
+                "suggested_response": "Dirigir al menú de precios"
+            }
+        
+        # Patrones de productos
+        product_patterns = ['producto', 'productos', 'camaron', 'camarones', 'hlso', 'hoso', 'p&d']
+        if any(pattern in message_lower for pattern in product_patterns):
+            return {
+                "intent": "product_info",
+                "product": None,
+                "size": None,
+                "quantity": None,
+                "destination": None,
+                "confidence": 0.7,
+                "suggested_response": "Mostrar información de productos"
+            }
+        
+        # Patrones de ayuda
+        help_patterns = ['ayuda', 'help', 'como', 'que puedes', 'opciones', '?']
+        if any(pattern in message_lower for pattern in help_patterns):
+            return {
+                "intent": "help",
+                "product": None,
+                "size": None,
+                "quantity": None,
+                "destination": None,
+                "confidence": 0.8,
+                "suggested_response": "Mostrar menú de ayuda"
+            }
+        
+        return {
+            "intent": "unknown",
+            "product": None,
+            "size": None,
+            "quantity": None,
+            "destination": None,
+            "confidence": 0.3,
+            "suggested_response": "Mostrar menú principal"
+        }
+    
+    def get_smart_fallback_response(self, user_message: str, intent_data: Dict) -> Optional[str]:
+        """
+        Genera respuestas inteligentes sin IA basadas en patrones
+        """
+        intent = intent_data.get('intent', 'unknown')
+        message_lower = user_message.lower().strip()
+        
+        if intent == 'greeting':
+            responses = [
+                "¡Hola! 🦐 Soy ShrimpBot de BGR Export. ¿Te ayudo con precios de camarón? Escribe 'precios' para empezar.",
+                "¡Buen día! 🤖 Estoy aquí para ayudarte con cotizaciones de camarón premium. ¿Qué necesitas?",
+                "¡Hola! 👋 Soy tu asistente para precios de camarón BGR Export. Escribe 'menu' para ver opciones."
+            ]
+            # Seleccionar respuesta basada en el hash del mensaje para consistencia
+            return responses[hash(message_lower) % len(responses)]
+        
+        elif intent == 'pricing':
+            return "💰 Perfecto! Te ayudo con precios de camarón. Escribe 'precios' para ver todas las tallas disponibles."
+        
+        elif intent == 'product_info':
+            return "🦐 Tenemos camarones premium: HLSO, P&D IQF, HOSO y más. Escribe 'productos' para ver la lista completa."
+        
+        elif intent == 'help':
+            return "🤖 Puedo ayudarte con:\n• Precios de camarón\n• Información de productos\n• Contacto comercial\n\nEscribe 'menu' para empezar."
+        
+        else:
+            return "🦐 ¡Hola! Soy ShrimpBot de BGR Export. ¿Te ayudo con precios de camarón? Escribe 'menu' para ver opciones."
