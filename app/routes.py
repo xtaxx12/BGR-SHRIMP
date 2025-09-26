@@ -267,6 +267,7 @@ async def whatsapp_webhook(
             
             # Intentar parsear como consulta de precio directa
             user_input = parse_user_message(Body)
+            logger.info(f"🔍 Parse result para '{Body}': {user_input}")
             
             if user_input:
                 # Obtener precio del camarón
@@ -286,6 +287,7 @@ async def whatsapp_webhook(
                     return PlainTextResponse(str(response), media_type="application/xml")
             
             # Si no es una consulta válida, intentar respuesta inteligente
+            logger.info(f"🔍 Llegando a lógica de respuesta inteligente para mensaje: '{Body}'")
             smart_response = None
             
             # Intentar respuesta con OpenAI primero
@@ -304,9 +306,11 @@ async def whatsapp_webhook(
                 # Usar respuesta inteligente (IA o fallback)
                 logger.info(f"✅ Usando respuesta inteligente: {smart_response}")
                 response.message(smart_response)
+                logger.info(f"📤 Respuesta configurada en objeto response")
                 # Mantener en menú principal para seguir la conversación
                 menu_msg, options = interactive_service.create_main_menu()
                 session_manager.set_session_state(user_id, 'main_menu', {'options': options})
+                logger.info(f"🔄 Estado actualizado a main_menu")
             else:
                 # Fallback final al menú de bienvenida tradicional
                 logger.info("⚠️ No hay respuesta inteligente, usando menú tradicional")
