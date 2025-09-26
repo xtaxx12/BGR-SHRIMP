@@ -132,7 +132,7 @@ async def whatsapp_webhook(
             logger.info(f"Enviando respuesta de confirmación XML: {response_xml}")
             return PlainTextResponse(response_xml, media_type="application/xml")
         
-        elif message_lower in ['menu', 'inicio', 'start', 'hola', 'hello', 'reiniciar', 'reset']:
+        elif message_lower in ['menu', 'inicio', 'start', 'reiniciar', 'reset']:
             # Limpiar sesión y mostrar menú principal
             session_manager.clear_session(user_id)
             
