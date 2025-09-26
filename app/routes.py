@@ -290,20 +290,26 @@ async def whatsapp_webhook(
             
             # Intentar respuesta con OpenAI primero
             if openai_service.is_available() and ai_analysis and ai_analysis.get('confidence', 0) > 0.7:
+                logger.info(f"🤖 Intentando respuesta OpenAI para confianza: {ai_analysis.get('confidence', 0)}")
                 smart_response = openai_service.generate_smart_response(Body, session)
+                logger.info(f"🤖 Respuesta OpenAI obtenida: {smart_response}")
             
             # Si OpenAI no está disponible o falló, usar fallback inteligente
             if not smart_response and ai_analysis and ai_analysis.get('confidence', 0) > 0.5:
+                logger.info(f"🧠 Usando fallback inteligente para confianza: {ai_analysis.get('confidence', 0)}")
                 smart_response = openai_service.get_smart_fallback_response(Body, ai_analysis)
+                logger.info(f"🧠 Respuesta fallback obtenida: {smart_response}")
             
             if smart_response:
                 # Usar respuesta inteligente (IA o fallback)
+                logger.info(f"✅ Usando respuesta inteligente: {smart_response}")
                 response.message(smart_response)
                 # Mantener en menú principal para seguir la conversación
                 menu_msg, options = interactive_service.create_main_menu()
                 session_manager.set_session_state(user_id, 'main_menu', {'options': options})
             else:
                 # Fallback final al menú de bienvenida tradicional
+                logger.info("⚠️ No hay respuesta inteligente, usando menú tradicional")
                 welcome_msg = interactive_service.create_welcome_message()
                 menu_msg, options = interactive_service.create_main_menu()
                 full_message = f"{welcome_msg}\n\n{menu_msg}"
