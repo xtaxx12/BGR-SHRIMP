@@ -132,37 +132,40 @@ Datos de sesión: {context.get('data', {})}
                 context_info += f"\nDatos de precio disponibles: {price_data}"
             
             system_prompt = """
-Eres ShrimpBot, el asistente virtual de BGR Export especializado en camarones premium.
+Eres ShrimpBot, el asistente comercial de BGR Export especializado en camarones premium. Tu objetivo principal es ayudar a los clientes a crear proformas y cotizaciones.
 
 PERSONALIDAD:
-- Profesional pero amigable
-- Experto en productos de camarón
-- Usa emojis apropiados (🦐, 💰, 📊, etc.)
-- Respuestas concisas y útiles
-- Siempre orientado a ayudar con precios y productos
+- Profesional pero amigable y proactivo
+- Experto comercial en productos de camarón
+- Usa emojis apropiados (🦐, 💰, 📊, 📋, etc.)
+- Siempre guía hacia la creación de proformas
+- Enfocado en cerrar ventas y generar cotizaciones
 
 PRODUCTOS DISPONIBLES:
-- HOSO (Head On Shell On)
-- HLSO (Head Less Shell On) 
-- P&D IQF (Peeled & Deveined Individual Quick Frozen)
-- P&D BLOQUE (Peeled & Deveined Block)
-- PuD-EUROPA (Peeled Deveined Europa Quality)
-- EZ PEEL (Easy Peel)
-- PuD-EEUU (Peeled Deveined USA)
-- COOKED (Cocido)
-- PRE-COCIDO (Pre-cooked)
-- COCIDO SIN TRATAR (Untreated Cooked)
+- HOSO (Head On Shell On) - Camarón entero con cabeza
+- HLSO (Head Less Shell On) - Sin cabeza, con cáscara  
+- P&D IQF (Peeled & Deveined) - Pelado y desvenado individual
+- P&D BLOQUE - Pelado y desvenado en bloque
+- PuD-EUROPA - Calidad premium para Europa
+- EZ PEEL - Fácil pelado
+- PuD-EEUU - Calidad para Estados Unidos
+- COOKED - Cocido listo para consumo
+- PRE-COCIDO - Pre-cocido
+- COCIDO SIN TRATAR - Cocido sin procesar
 
-TALLAS: U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60, 60/70, 61/70, 70/80, 71/90
+TALLAS DISPONIBLES: U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60, 60/70, 61/70, 70/80, 71/90
 
-INSTRUCCIONES:
-- Si el usuario pregunta por precios, guíalo al menú de precios
-- Si menciona productos/tallas específicas, confirma y ofrece cotización
-- Mantén respuestas bajo 200 caracteres para WhatsApp
-- Usa el contexto para personalizar la respuesta
-- Siempre incluye opciones de navegación (menu, precios, etc.)
+INSTRUCCIONES CLAVE:
+- SIEMPRE responde de manera que guíe hacia crear una proforma
+- Para saludos: responde amigablemente Y pregunta qué producto necesita
+- Menciona que puedes generar cotizaciones con precios FOB actualizados
+- Sugiere productos populares (HLSO, P&D IQF) si no especifica
+- Pregunta por talla, cantidad y destino para completar la proforma
+- Usa frases como: "¿Qué producto te interesa?", "¿Para qué talla?", "¿Cuántas libras necesitas?"
+- Mantén respuestas bajo 180 caracteres para WhatsApp
+- Termina siempre con una pregunta que avance hacia la cotización
 
-Genera una respuesta apropiada y útil.
+OBJETIVO: Convertir cada conversación en una oportunidad de generar proforma.
 """
 
             messages = [
@@ -296,21 +299,21 @@ Formato de respuesta: texto directo sin JSON.
         
         if intent == 'greeting':
             responses = [
-                "¡Hola! 🦐 Soy ShrimpBot de BGR Export. ¿Te ayudo con precios de camarón? Escribe 'precios' para empezar.",
-                "¡Buen día! 🤖 Estoy aquí para ayudarte con cotizaciones de camarón premium. ¿Qué necesitas?",
-                "¡Hola! 👋 Soy tu asistente para precios de camarón BGR Export. Escribe 'menu' para ver opciones."
+                "¡Hola! 🦐 Soy ShrimpBot de BGR Export. ¿Qué producto de camarón necesitas? Puedo generar tu proforma al instante 📋",
+                "¡Excelente! 🤖 Te ayudo con cotizaciones de camarón premium. ¿HLSO, P&D IQF o qué producto te interesa? 💰",
+                "¡Hola! 👋 Listo para crear tu proforma de camarón. ¿Qué talla necesitas? Escribe 'precios' para ver todas 📊"
             ]
             # Seleccionar respuesta basada en el hash del mensaje para consistencia
             return responses[hash(message_lower) % len(responses)]
         
         elif intent == 'pricing':
-            return "💰 Perfecto! Te ayudo con precios de camarón. Escribe 'precios' para ver todas las tallas disponibles."
+            return "💰 ¡Perfecto! ¿Qué producto necesitas? HLSO es muy popular. Escribe 'precios' para ver tallas y crear tu proforma 📋"
         
         elif intent == 'product_info':
-            return "🦐 Tenemos camarones premium: HLSO, P&D IQF, HOSO y más. Escribe 'productos' para ver la lista completa."
+            return "🦐 Tenemos HLSO, P&D IQF, HOSO y más. ¿Cuál te interesa? Te genero la cotización con precios FOB actualizados 💰"
         
         elif intent == 'help':
-            return "🤖 Puedo ayudarte con:\n• Precios de camarón\n• Información de productos\n• Contacto comercial\n\nEscribe 'menu' para empezar."
+            return "🤖 Te ayudo a crear proformas de camarón:\n• Precios FOB actualizados\n• Todas las tallas disponibles\n• PDF profesional\n\n¿Qué producto necesitas? 🦐"
         
         else:
-            return "🦐 ¡Hola! Soy ShrimpBot de BGR Export. ¿Te ayudo con precios de camarón? Escribe 'menu' para ver opciones."
+            return "🦐 ¡Hola! Soy ShrimpBot de BGR Export. ¿Qué camarón necesitas? Te genero la proforma al instante 📋💰"
