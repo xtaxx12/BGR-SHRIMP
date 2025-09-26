@@ -35,16 +35,28 @@ class InteractiveMessageService:
                 sizes = self.excel_service.get_available_sizes(product)
                 title = f"🦐 Selecciona la talla para {product}:\n\n"
             else:
-                # Usar HLSO como default para mostrar tallas comunes
-                sizes = self.excel_service.get_available_sizes('HLSO')
+                # Obtener TODAS las tallas únicas de todos los productos
+                all_sizes = set()
+                
+                # Obtener productos disponibles
+                products = self.excel_service.get_available_products()
+                
+                # Recopilar todas las tallas de todos los productos
+                for prod in products:
+                    prod_sizes = self.excel_service.get_available_sizes(prod)
+                    all_sizes.update(prod_sizes)
                 
                 # Si no hay tallas, intentar directamente desde Google Sheets
-                if not sizes and hasattr(self.excel_service, 'google_sheets_service'):
+                if not all_sizes and hasattr(self.excel_service, 'google_sheets_service'):
                     gs_service = self.excel_service.google_sheets_service
                     if gs_service and gs_service.prices_data:
-                        sizes = gs_service.get_available_sizes('HLSO')
-                        logger.info(f"Tallas obtenidas directamente de Google Sheets: {sizes}")
+                        for prod in gs_service.prices_data.keys():
+                            prod_sizes = gs_service.get_available_sizes(prod)
+                            all_sizes.update(prod_sizes)
+                        logger.info(f"Tallas obtenidas directamente de Google Sheets: {all_sizes}")
                 
+                # Convertir a lista y ordenar las tallas
+                sizes = self._sort_sizes(list(all_sizes))
                 title = "🦐 Selecciona la talla del camarón:\n\n"
             
             logger.info(f"Tallas obtenidas para {product or 'HLSO'}: {sizes}")
@@ -68,7 +80,30 @@ class InteractiveMessageService:
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             return "❌ Error obteniendo tallas disponibles.", []
-            return None, []
+    
+    def _sort_sizes(self, sizes):
+        """
+        Ordena las tallas de camarón de mayor a menor (más pequeño a más grande)
+        """
+        def size_key(size):
+            try:
+                if size.startswith('U'):
+                    # Para tallas como U15, usar el número después de U
+                    return (0, int(size[1:]))
+                elif '/' in size:
+                    # Para tallas como 16/20, usar el primer número
+                    return (1, int(size.split('/')[0]))
+                elif size.endswith('/100'):
+                    # Para tallas como 91/100
+                    return (1, int(size.split('/')[0]))
+                else:
+                    # Para otros casos, intentar convertir a número
+                    return (2, int(size))
+            except:
+                # Si no se puede parsear, poner al final
+                return (3, 999)
+        
+        return sorted(sizes, key=size_key)
     
     def create_product_selection_message(self, size: str):
         """
