@@ -1,4 +1,4 @@
-import openai
+from openai import OpenAI
 import os
 import logging
 from typing import Optional, Dict, List
@@ -9,16 +9,21 @@ class OpenAIService:
     def __init__(self):
         self.api_key = os.getenv("OPENAI_API_KEY")
         self.model = "gpt-4o-mini"
+        self.client = None
         
         if self.api_key:
-            openai.api_key = self.api_key
-            logger.info("✅ OpenAI API configurada correctamente")
+            try:
+                self.client = OpenAI(api_key=self.api_key)
+                logger.info("✅ OpenAI API configurada correctamente")
+            except Exception as e:
+                logger.error(f"❌ Error inicializando OpenAI: {str(e)}")
+                self.client = None
         else:
             logger.warning("⚠️ OpenAI API Key no configurada")
     
     def is_available(self) -> bool:
         """Verifica si OpenAI está disponible"""
-        return bool(self.api_key)
+        return bool(self.client)
     
     def analyze_user_intent(self, message: str, context: Dict = None) -> Dict:
         """
@@ -50,7 +55,7 @@ Responde SOLO en formato JSON válido:
 }
 """
 
-            response = openai.chat.completions.create(
+            response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -125,7 +130,7 @@ INSTRUCCIONES:
 Genera una respuesta apropiada y útil.
 """
 
-            response = openai.chat.completions.create(
+            response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -164,7 +169,7 @@ Toma los datos de precio y genera una explicación breve y clara que incluya:
 Formato de respuesta: texto directo sin JSON.
 """
 
-            response = openai.chat.completions.create(
+            response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system_prompt},
