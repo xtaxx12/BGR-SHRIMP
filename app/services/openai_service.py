@@ -13,7 +13,16 @@ class OpenAIService:
         
         if self.api_key:
             try:
-                self.client = OpenAI(api_key=self.api_key)
+                # Intentar inicializar con diferentes métodos para compatibilidad
+                try:
+                    self.client = OpenAI(api_key=self.api_key)
+                except TypeError as te:
+                    # Fallback para versiones más antiguas
+                    logger.warning(f"Intentando método alternativo de inicialización: {te}")
+                    import openai
+                    openai.api_key = self.api_key
+                    self.client = openai
+                
                 logger.info("✅ OpenAI API configurada correctamente")
             except Exception as e:
                 logger.error(f"❌ Error inicializando OpenAI: {str(e)}")
@@ -55,15 +64,30 @@ Responde SOLO en formato JSON válido:
 }
 """
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"Mensaje: '{message}'"}
-                ],
-                max_tokens=300,
-                temperature=0.3
-            )
+            # Manejar diferentes tipos de cliente OpenAI
+            if hasattr(self.client, 'chat'):
+                # Cliente nuevo
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": f"Mensaje: '{message}'"}
+                    ],
+                    max_tokens=300,
+                    temperature=0.3
+                )
+            else:
+                # Cliente legacy
+                import openai
+                response = openai.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": f"Mensaje: '{message}'"}
+                    ],
+                    max_tokens=300,
+                    temperature=0.3
+                )
             
             result = response.choices[0].message.content.strip()
             
@@ -130,15 +154,30 @@ INSTRUCCIONES:
 Genera una respuesta apropiada y útil.
 """
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": context_info}
-                ],
-                max_tokens=200,
-                temperature=0.7
-            )
+            # Manejar diferentes tipos de cliente OpenAI
+            if hasattr(self.client, 'chat'):
+                # Cliente nuevo
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": context_info}
+                    ],
+                    max_tokens=200,
+                    temperature=0.7
+                )
+            else:
+                # Cliente legacy
+                import openai
+                response = openai.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": context_info}
+                    ],
+                    max_tokens=200,
+                    temperature=0.7
+                )
             
             result = response.choices[0].message.content.strip()
             logger.info(f"🤖 Respuesta generada por OpenAI: {result}")
@@ -169,15 +208,30 @@ Toma los datos de precio y genera una explicación breve y clara que incluya:
 Formato de respuesta: texto directo sin JSON.
 """
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"Datos de precio: {price_data}"}
-                ],
-                max_tokens=100,
-                temperature=0.5
-            )
+            # Manejar diferentes tipos de cliente OpenAI
+            if hasattr(self.client, 'chat'):
+                # Cliente nuevo
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": f"Datos de precio: {price_data}"}
+                    ],
+                    max_tokens=100,
+                    temperature=0.5
+                )
+            else:
+                # Cliente legacy
+                import openai
+                response = openai.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": f"Datos de precio: {price_data}"}
+                    ],
+                    max_tokens=100,
+                    temperature=0.5
+                )
             
             result = response.choices[0].message.content.strip()
             return result
