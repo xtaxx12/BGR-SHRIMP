@@ -7,6 +7,7 @@ from app.services.interactive import InteractiveMessageService
 from app.services.session import session_manager
 from app.services.pdf_generator import PDFGenerator
 from app.services.whatsapp_sender import WhatsAppSender
+from app.services.openai_service import OpenAIService
 import logging
 import os
 
@@ -18,13 +19,14 @@ webhook_router = APIRouter()
 pricing_service = None
 interactive_service = None
 pdf_generator = None
+openai_service = None
 whatsapp_sender = None
 
 def get_services():
     """
     Inicializa los servicios de manera lazy
     """
-    global pricing_service, interactive_service, pdf_generator, whatsapp_sender
+    global pricing_service, interactive_service, pdf_generator, whatsapp_sender, openai_service
     
     if pricing_service is None:
         pricing_service = PricingService()
@@ -32,9 +34,10 @@ def get_services():
         interactive_service = InteractiveMessageService(pricing_service.excel_service)
         pdf_generator = PDFGenerator()
         whatsapp_sender = WhatsAppSender()
+        openai_service = OpenAIService()
         logger.info("✅ Servicios inicializados")
     
-    return pricing_service, interactive_service, pdf_generator, whatsapp_sender
+    return pricing_service, interactive_service, pdf_generator, whatsapp_sender, openai_service
 
 @webhook_router.post("/whatsapp")
 async def whatsapp_webhook(
@@ -50,7 +53,7 @@ async def whatsapp_webhook(
         logger.info(f"Mensaje recibido de {From}: {Body}")
         
         # Inicializar servicios si no están inicializados
-        pricing_service, interactive_service, pdf_generator, whatsapp_sender = get_services()
+        pricing_service, interactive_service, pdf_generator, whatsapp_sender, openai_service = get_services()
         
         # Crear respuesta de Twilio
         response = MessagingResponse()
@@ -59,7 +62,11 @@ async def whatsapp_webhook(
         user_id = From.replace("whatsapp:", "")
         session = session_manager.get_session(user_id)
         
-
+        # Análisis de intención con OpenAI (si está disponible)
+        ai_analysis = None
+        if openai_service.is_available():
+            ai_analysis = openai_service.analyze_user_intent(Body, session)
+            logger.info(f"🤖 Análisis IA para {user_id}: {ai_analysis}")
         
         # Comandos globales que funcionan desde cualquier estado
         message_lower = Body.lower().strip()
@@ -278,12 +285,24 @@ async def whatsapp_webhook(
                     session_manager.set_session_state(user_id, 'quote_ready', {})
                     return PlainTextResponse(str(response), media_type="application/xml")
             
-            # Si no es una consulta válida, mostrar menú de bienvenida
-            welcome_msg = interactive_service.create_welcome_message()
-            menu_msg, options = interactive_service.create_main_menu()
-            full_message = f"{welcome_msg}\n\n{menu_msg}"
-            response.message(full_message)
-            session_manager.set_session_state(user_id, 'main_menu', {'options': options})
+            # Si no es una consulta válida, intentar respuesta inteligente con OpenAI
+            smart_response = None
+            if openai_service.is_available() and ai_analysis and ai_analysis.get('confidence', 0) > 0.7:
+                smart_response = openai_service.generate_smart_response(Body, session)
+            
+            if smart_response:
+                # Usar respuesta generada por IA
+                response.message(smart_response)
+                # Mantener en menú principal para seguir la conversación
+                menu_msg, options = interactive_service.create_main_menu()
+                session_manager.set_session_state(user_id, 'main_menu', {'options': options})
+            else:
+                # Fallback al menú de bienvenida tradicional
+                welcome_msg = interactive_service.create_welcome_message()
+                menu_msg, options = interactive_service.create_main_menu()
+                full_message = f"{welcome_msg}\n\n{menu_msg}"
+                response.message(full_message)
+                session_manager.set_session_state(user_id, 'main_menu', {'options': options})
         
         response_xml = str(response)
         logger.info(f"Enviando respuesta XML: {response_xml}")
@@ -357,16 +376,17 @@ async def reload_data():
     """
     try:
         # Reinicializar servicios con variables de entorno actuales
-        global pricing_service, interactive_service, pdf_generator, whatsapp_sender
+        global pricing_service, interactive_service, pdf_generator, whatsapp_sender, openai_service
         
         # Forzar reinicialización
         pricing_service = None
         interactive_service = None
         pdf_generator = None
         whatsapp_sender = None
+        openai_service = None
         
         # Inicializar servicios
-        pricing_service, interactive_service, pdf_generator, whatsapp_sender = get_services()
+        pricing_service, interactive_service, pdf_generator, whatsapp_sender, openai_service = get_services()
         
         # Contar datos cargados
         total_prices = sum(len(product_data) for product_data in pricing_service.excel_service.prices_data.values())
@@ -391,7 +411,7 @@ async def data_status():
     """
     try:
         # Inicializar servicios si no están inicializados
-        pricing_service, interactive_service, pdf_generator, whatsapp_sender = get_services()
+        pricing_service, interactive_service, pdf_generator, whatsapp_sender, openai_service = get_services()
         
         # Verificar datos actuales
         total_prices = sum(len(product_data) for product_data in pricing_service.excel_service.prices_data.values())
@@ -483,7 +503,7 @@ async def test_pdf_send(phone_number: str = Form(...)):
         }
         
         # Inicializar servicios si no están inicializados
-        pricing_service, interactive_service, pdf_generator, whatsapp_sender = get_services()
+        pricing_service, interactive_service, pdf_generator, whatsapp_sender, openai_service = get_services()
         
         # Generar PDF de prueba
         pdf_path = pdf_generator.generate_quote_pdf(test_quote, f"whatsapp:{phone_number}")
