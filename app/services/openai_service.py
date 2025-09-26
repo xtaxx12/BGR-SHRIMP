@@ -10,6 +10,7 @@ class OpenAIService:
     def __init__(self):
         self.api_key = os.getenv("OPENAI_API_KEY")
         self.model = "gpt-4o-mini"
+        self.whisper_model = "whisper-1"
         self.base_url = "https://api.openai.com/v1"
         
         if self.api_key:
@@ -220,6 +221,45 @@ Formato de respuesta: texto directo sin JSON.
             
         except Exception as e:
             logger.error(f"❌ Error mejorando explicación de precio: {str(e)}")
+            return None
+    
+    def transcribe_audio(self, audio_file_path: str) -> Optional[str]:
+        """
+        Transcribe audio usando OpenAI Whisper
+        """
+        if not self.is_available():
+            return None
+        
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}"
+            }
+            
+            with open(audio_file_path, 'rb') as audio_file:
+                files = {
+                    'file': audio_file,
+                    'model': (None, self.whisper_model),
+                    'language': (None, 'es')  # Español
+                }
+                
+                response = requests.post(
+                    f"{self.base_url}/audio/transcriptions",
+                    headers=headers,
+                    files=files,
+                    timeout=30
+                )
+            
+            if response.status_code == 200:
+                result = response.json()
+                transcription = result.get('text', '').strip()
+                logger.info(f"🎤 Audio transcrito: '{transcription}'")
+                return transcription
+            else:
+                logger.error(f"❌ Error transcribiendo audio: {response.status_code} - {response.text}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"❌ Error en transcripción de audio: {str(e)}")
             return None
     
     def _basic_intent_analysis(self, message: str) -> Dict:

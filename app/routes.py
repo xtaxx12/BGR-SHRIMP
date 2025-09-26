@@ -8,6 +8,7 @@ from app.services.session import session_manager
 from app.services.pdf_generator import PDFGenerator
 from app.services.whatsapp_sender import WhatsAppSender
 from app.services.openai_service import OpenAIService
+from app.services.audio_handler import AudioHandler
 import logging
 import os
 
@@ -41,22 +42,60 @@ def get_services():
 
 @webhook_router.post("/whatsapp")
 async def whatsapp_webhook(
-    Body: str = Form(...),
+    Body: str = Form(""),
     From: str = Form(...),
     To: str = Form(...),
-    MessageSid: str = Form(...)
+    MessageSid: str = Form(...),
+    NumMedia: int = Form(0),
+    MediaUrl0: str = Form(""),
+    MediaContentType0: str = Form("")
 ):
     """
     Endpoint para recibir mensajes de WhatsApp desde Twilio
     """
     try:
         logger.info(f"Mensaje recibido de {From}: {Body}")
+        logger.info(f"Multimedia: NumMedia={NumMedia}, MediaUrl={MediaUrl0}, ContentType={MediaContentType0}")
         
         # Inicializar servicios si no están inicializados
         pricing_service, interactive_service, pdf_generator, whatsapp_sender, openai_service = get_services()
         
         # Crear respuesta de Twilio
         response = MessagingResponse()
+        
+        # Procesar audio si está presente
+        if NumMedia > 0 and MediaUrl0 and "audio" in MediaContentType0.lower():
+            logger.info(f"🎤 Procesando mensaje de audio...")
+            audio_handler = AudioHandler()
+            
+            # Descargar audio
+            audio_path = audio_handler.download_audio_from_twilio(MediaUrl0)
+            
+            if audio_path:
+                # Transcribir audio
+                transcription = openai_service.transcribe_audio(audio_path)
+                
+                # Limpiar archivo temporal
+                audio_handler.cleanup_temp_file(audio_path)
+                
+                if transcription:
+                    # Usar la transcripción como el mensaje de texto
+                    Body = transcription
+                    logger.info(f"🎤 Transcripción procesada: '{Body}'")
+                    
+                    # Confirmar al usuario que se procesó el audio
+                    response.message(f"🎤 Audio recibido: \"{transcription}\"")
+                else:
+                    response.message("❌ No pude procesar el audio. Por favor, envía un mensaje de texto.")
+                    return PlainTextResponse(str(response), media_type="application/xml")
+            else:
+                response.message("❌ Error descargando el audio. Intenta nuevamente.")
+                return PlainTextResponse(str(response), media_type="application/xml")
+        
+        # Si no hay mensaje de texto (ni transcripción), salir
+        if not Body or Body.strip() == "":
+            response.message("👋 ¡Hola! Envíame un mensaje de texto o audio para ayudarte con precios de camarón.")
+            return PlainTextResponse(str(response), media_type="application/xml")
         
         # Obtener sesión del usuario
         user_id = From.replace("whatsapp:", "")
