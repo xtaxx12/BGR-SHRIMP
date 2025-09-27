@@ -186,16 +186,17 @@ PRODUCTOS DISPONIBLES:
 TALLAS DISPONIBLES: U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60, 60/70, 61/70, 70/80, 71/90
 
 INSTRUCCIONES CLAVE:
-- SIEMPRE responde de manera que guíe hacia crear una proforma
+- Si el usuario ya especificó PRODUCTO y TALLA: NO pidas más información, confirma que generas la proforma
 - Para saludos: responde amigablemente Y pregunta qué producto necesita
+- Solo pregunta información faltante si es absolutamente necesaria
+- Si tienes producto y talla, di: "¡Perfecto! Generando tu proforma de [producto] [talla]..."
 - Menciona que puedes generar cotizaciones con precios FOB actualizados
-- Sugiere productos populares (HLSO, P&D IQF) si no especifica
-- Pregunta por talla, cantidad y destino para completar la proforma
-- Usa frases como: "¿Qué producto te interesa?", "¿Para qué talla?", "¿Cuántas libras necesitas?"
-- Mantén respuestas bajo 180 caracteres para WhatsApp
-- Termina siempre con una pregunta que avance hacia la cotización
+- Mantén respuestas bajo 150 caracteres para WhatsApp
+- NO pidas cantidad si ya tienes producto y talla - genera la proforma directamente
 
-OBJETIVO: Convertir cada conversación en una oportunidad de generar proforma.
+REGLA CRÍTICA: Si detectas producto + talla en el mensaje, NUNCA pidas más información.
+
+OBJETIVO: Generar proformas inmediatamente cuando tengas datos suficientes.
 """
 
             messages = [

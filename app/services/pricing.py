@@ -124,10 +124,12 @@ class PricingService:
                 flete_value = 0.20  # Valor por defecto
                 logger.info(f"📊 Usando flete por defecto: ${flete_value} (debería venir de Sheets)")
             
-            # Validar que se especifique glaseo
+            # Usar glaseo especificado o valor por defecto
             if glaseo_factor is None:
-                logger.error("❌ No se especificó factor de glaseo")
-                return None
+                glaseo_factor = 0.70  # Valor por defecto (70%)
+                logger.info(f"📊 Usando glaseo por defecto: {glaseo_factor:.1%}")
+            else:
+                logger.info(f"🎯 Usando glaseo especificado: {glaseo_factor:.1%}")
             
             logger.info(f"🧮 Cálculo dinámico: glaseo={glaseo_factor}, flete={flete_value}, libras={usar_libras}")
             
@@ -169,7 +171,7 @@ class PricingService:
                 'costo_fijo': costo_fijo,
                 'factor_glaseo': glaseo_factor,
                 'flete': flete_value,
-                'flete_base': flete_base,
+                'flete_base': 0.29 if not usar_libras else 0.13,
                 'usar_libras': usar_libras,
                 'destination': destination,
                 'quantity': user_params.get('quantity', ''),
