@@ -2,6 +2,7 @@ import requests
 import os
 import logging
 import json
+import re
 from typing import Optional, Dict, List
 
 logger = logging.getLogger(__name__)
@@ -309,13 +310,29 @@ Formato de respuesta: texto directo sin JSON.
                 "suggested_response": "Responder con saludo amigable y mostrar opciones"
             }
         
-        # Patrones de proforma/cotización (más específicos)
+        # Patrones de proforma/cotización (lenguaje natural amplio)
         proforma_patterns = [
-            'proforma', 'cotizacion', 'cotizar', 'cotizacion', 'quote', 
-            'creame', 'crear', 'generar', 'necesito precio', 'precio de',
-            'precio del', 'cuanto cuesta', 'cuanto vale', 'cost'
+            # Palabras clave directas
+            'proforma', 'cotizacion', 'cotizar', 'quote', 'precio', 'precios',
+            # Verbos de acción
+            'creame', 'crear', 'generar', 'hazme', 'dame', 'quiero', 'necesito',
+            # Consultas de precio
+            'precio de', 'precio del', 'precio por', 'cuanto cuesta', 'cuanto vale', 
+            'cuanto es', 'cual es el precio', 'saber el precio', 'conocer el precio',
+            # Variaciones comunes
+            'cost', 'value', 'rate', 'tarifa', 'valor', 'costo',
+            # Frases específicas
+            'envio a', 'con envio', 'para enviar', 'destino', 'shipping'
         ]
-        if any(pattern in message_lower for pattern in proforma_patterns):
+        
+        # Detectar si es una consulta de precio/proforma
+        is_price_query = any(pattern in message_lower for pattern in proforma_patterns)
+        
+        # También detectar si menciona tallas específicas (fuerte indicador)
+        has_size = bool(re.search(r'\b\d+/\d+\b', message_lower))
+        
+        # Si es consulta de precio O menciona tallas, procesar como proforma
+        if is_price_query or has_size:
             # Extraer información básica
             product = None
             size = None
@@ -323,43 +340,100 @@ Formato de respuesta: texto directo sin JSON.
             destination = None
             usar_libras = False
             
-            # Detectar productos (más patrones)
-            if any(p in message_lower for p in ['sin cabeza', 'hlso', 'head less', 'headless']):
-                product = 'HLSO'
-            elif any(p in message_lower for p in ['con cabeza', 'hoso', 'head on', 'entero']):
-                product = 'HOSO'
-            elif any(p in message_lower for p in ['p&d', 'pelado', 'peeled', 'deveined']):
-                product = 'P&D IQF'
-            elif 'tipo' in message_lower and not product:
-                # Si dice "tipo" pero no especifica, asumir HLSO (más común)
-                product = 'HLSO'
+            # Detectar productos con patrones más amplios
+            product_patterns = {
+                'HLSO': [
+                    'sin cabeza', 'hlso', 'head less', 'headless', 'descabezado',
+                    'sin cabezas', 'decapitado', 'tipo sin cabeza'
+                ],
+                'HOSO': [
+                    'con cabeza', 'hoso', 'head on', 'entero', 'completo',
+                    'con cabezas', 'tipo con cabeza'
+                ],
+                'P&D IQF': [
+                    'p&d', 'pelado', 'peeled', 'deveined', 'limpio', 'procesado',
+                    'pd', 'p d', 'pelado y desvenado'
+                ]
+            }
+            
+            # Buscar coincidencias de productos
+            for prod_name, patterns in product_patterns.items():
+                if any(pattern in message_lower for pattern in patterns):
+                    product = prod_name
+                    break
+            
+            # Si no se detectó producto específico pero menciona "producto" o "tipo", usar HLSO por defecto
+            if not product and any(word in message_lower for word in ['producto', 'tipo', 'camaron', 'camarones']):
+                product = 'HLSO'  # Más común
             
             # Detectar tallas
-            import re
             size_match = re.search(r'(\d+/\d+)', message_lower)
             if size_match:
                 size = size_match.group(1)
             
-            # Detectar glaseo
-            glaseo_match = re.search(r'(\d+)\s*(?:de\s*)?glaseo', message_lower)
-            if glaseo_match:
-                glaseo_factor = float(glaseo_match.group(1)) / 100
+            # Detectar glaseo con patrones más amplios
+            glaseo_patterns = [
+                r'(\d+)\s*(?:de\s*)?glaseo',
+                r'glaseo\s*(?:de\s*)?(\d+)',
+                r'(\d+)\s*%\s*glaseo',
+                r'glaseo\s*(\d+)\s*%',
+                r'con\s*(\d+)\s*glaseo',
+                r'(\d+)\s*porciento\s*glaseo'
+            ]
             
-            # Detectar destino USA (todas las ciudades USA usan libras)
-            usa_cities = ['houston', 'miami', 'new york', 'los angeles', 'chicago', 'dallas']
-            
-            for city in usa_cities:
-                if city in message_lower:
-                    usar_libras = True  # Todas las ciudades USA usan libras
-                    destination = city.title()
+            for pattern in glaseo_patterns:
+                match = re.search(pattern, message_lower)
+                if match:
+                    glaseo_factor = float(match.group(1)) / 100
                     break
             
-            # Detectar nombre del cliente
+            # Detectar destinos con patrones más amplios
+            destination_patterns = {
+                'Houston': ['houston', 'houton', 'huston'],
+                'Miami': ['miami', 'maiami', 'florida'],
+                'New York': ['new york', 'nueva york', 'ny', 'newyork'],
+                'Los Angeles': ['los angeles', 'la', 'california'],
+                'Chicago': ['chicago', 'chicaco'],
+                'Dallas': ['dallas', 'dalas']
+            }
+            
+            # Buscar destinos USA
+            for dest_name, patterns in destination_patterns.items():
+                if any(pattern in message_lower for pattern in patterns):
+                    usar_libras = True  # Todas las ciudades USA usan libras
+                    destination = dest_name
+                    break
+            
+            # También detectar patrones de envío
+            envio_patterns = [
+                r'envio a (\w+)', r'enviar a (\w+)', r'destino (\w+)', 
+                r'para (\w+)', r'shipping to (\w+)', r'con envio a (\w+)'
+            ]
+            
+            if not destination:
+                for pattern in envio_patterns:
+                    match = re.search(pattern, message_lower)
+                    if match:
+                        dest_word = match.group(1).lower()
+                        # Verificar si es una ciudad USA conocida
+                        for dest_name, patterns in destination_patterns.items():
+                            if dest_word in patterns:
+                                usar_libras = True
+                                destination = dest_name
+                                break
+                        if not destination:
+                            destination = dest_word.title()
+                        break
+            
+            # Detectar nombre del cliente con patrones más amplios
             cliente_nombre = None
             cliente_patterns = [
-                r'cliente\s+([a-záéíóúñ\w\s]+?)(?:\s+con|\s+de|\s+para|$)',
-                r'para\s+(?:el\s+cliente\s+)?([a-záéíóúñ\w\s]+?)(?:\s+con|\s+de|\s+para|$)',
-                r'proforma\s+para\s+(?:el\s+cliente\s+)?([a-záéíóúñ\w\s]+?)(?:\s+con|\s+de|\s+para|$)'
+                r'cliente\s+([a-záéíóúñ\w\s]+?)(?:\s+con|\s+de|\s+para|\s+precio|$)',
+                r'para\s+(?:el\s+cliente\s+)?([a-záéíóúñ\w\s]+?)(?:\s+con|\s+de|\s+precio|$)',
+                r'proforma\s+para\s+(?:el\s+cliente\s+)?([a-záéíóúñ\w\s]+?)(?:\s+con|\s+de|\s+precio|$)',
+                r'cotizacion\s+para\s+([a-záéíóúñ\w\s]+?)(?:\s+con|\s+de|\s+precio|$)',
+                r'señor\s+([a-záéíóúñ\w\s]+?)(?:\s+con|\s+de|\s+precio|$)',
+                r'sr\s+([a-záéíóúñ\w\s]+?)(?:\s+con|\s+de|\s+precio|$)'
             ]
             
             for pattern in cliente_patterns:
@@ -367,23 +441,49 @@ Formato de respuesta: texto directo sin JSON.
                 if match:
                     cliente_nombre = match.group(1).strip()
                     # Limpiar palabras comunes que no son nombres
-                    stop_words = ['el', 'la', 'con', 'de', 'para', 'precio', 'tipo', 'glaseo', 'flete']
+                    stop_words = [
+                        'el', 'la', 'con', 'de', 'para', 'precio', 'tipo', 'glaseo', 
+                        'flete', 'producto', 'talla', 'envio', 'destino', 'kilo', 'kilos'
+                    ]
                     cliente_words = [word for word in cliente_nombre.split() if word not in stop_words]
-                    if cliente_words:
+                    if cliente_words and len(' '.join(cliente_words)) > 2:
                         cliente_nombre = ' '.join(cliente_words)
                         break
+            
+            # Detectar cantidad
+            quantity = None
+            quantity_patterns = [
+                r'(\d+(?:,\d{3})*)\s*(?:libras?|lb|lbs)',
+                r'(\d+(?:,\d{3})*)\s*(?:kilos?|kg|kgs)',
+                r'(\d+(?:,\d{3})*)\s*(?:toneladas?|tons?)',
+                r'(\d+(?:\.\d+)?)\s*(?:mil|thousand)',
+                r'(\d+(?:,\d{3})*)\s*(?:pounds?)'
+            ]
+            
+            for pattern in quantity_patterns:
+                match = re.search(pattern, message_lower)
+                if match:
+                    quantity = match.group(1)
+                    break
+            
+            # Determinar confianza basada en información extraída
+            confidence = 0.6  # Base
+            if size: confidence += 0.2
+            if product: confidence += 0.1
+            if destination: confidence += 0.1
+            if glaseo_factor: confidence += 0.1
             
             return {
                 "intent": "proforma",
                 "product": product,
                 "size": size,
-                "quantity": None,
+                "quantity": quantity,
                 "destination": destination,
                 "glaseo_factor": glaseo_factor,
                 "usar_libras": usar_libras,
                 "cliente_nombre": cliente_nombre,
                 "wants_proforma": True,
-                "confidence": 0.9,
+                "confidence": min(confidence, 0.95),  # Máximo 0.95
                 "suggested_response": "Procesar proforma con datos extraídos"
             }
         
