@@ -382,3 +382,57 @@ class GoogleSheetsService:
         Recarga los datos desde Google Sheets
         """
         return self.load_sheets_data()
+    
+    def get_flete_value(self) -> float:
+        """
+        Obtiene el valor del flete desde la celda AE28 de Google Sheets
+        """
+        try:
+            if not self.sheet:
+                logger.warning("Google Sheets no configurado, usando flete por defecto")
+                return 0.22  # Valor por defecto
+            
+            # Obtener la primera hoja de trabajo
+            worksheet = self.sheet.worksheets()[0]
+            
+            # Leer celda AE28 (columna 31, fila 28)
+            flete_value = worksheet.cell(28, 31).value
+            
+            if flete_value and self._is_number(flete_value):
+                flete = self._clean_price(flete_value)
+                logger.info(f"📊 Flete obtenido de AE28: ${flete}")
+                return flete
+            else:
+                logger.warning(f"⚠️ Valor de flete inválido en AE28: {flete_value}, usando por defecto")
+                return 0.22
+                
+        except Exception as e:
+            logger.error(f"❌ Error obteniendo flete de AE28: {str(e)}")
+            return 0.22  # Valor por defecto
+    
+    def get_costo_fijo_value(self) -> float:
+        """
+        Obtiene el valor del costo fijo desde la celda AA28 de Google Sheets
+        """
+        try:
+            if not self.sheet:
+                logger.warning("Google Sheets no configurado, usando costo fijo por defecto")
+                return 0.29  # Valor por defecto
+            
+            # Obtener la primera hoja de trabajo
+            worksheet = self.sheet.worksheets()[0]
+            
+            # Leer celda AA28 (columna 27, fila 28)
+            costo_fijo_value = worksheet.cell(28, 27).value
+            
+            if costo_fijo_value and self._is_number(costo_fijo_value):
+                costo_fijo = self._clean_price(costo_fijo_value)
+                logger.info(f"📊 Costo fijo obtenido de AA28: ${costo_fijo}")
+                return costo_fijo
+            else:
+                logger.warning(f"⚠️ Valor de costo fijo inválido en AA28: {costo_fijo_value}, usando por defecto")
+                return 0.29
+                
+        except Exception as e:
+            logger.error(f"❌ Error obteniendo costo fijo de AA28: {str(e)}")
+            return 0.29  # Valor por defecto

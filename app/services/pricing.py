@@ -1,5 +1,6 @@
 from app.services.excel import ExcelService
 from app.services.excel_local_calculator import ExcelLocalCalculatorService
+from app.services.google_sheets import GoogleSheetsService
 from typing import Dict, Optional
 import logging
 
@@ -8,6 +9,7 @@ logger = logging.getLogger(__name__)
 class PricingService:
     def __init__(self):
         self.excel_service = ExcelService()
+        self.sheets_service = GoogleSheetsService()
         self.calculator_service = ExcelLocalCalculatorService()
     
     def calculate_final_price(self, base_price: float, fixed_cost: float, 
@@ -105,24 +107,31 @@ class PricingService:
             usar_libras = user_params.get('usar_libras', False)
             destination = user_params.get('destination', '')
             
-            # Determinar costo fijo según si usa libras o kilos
-            if usar_libras:
-                costo_fijo = 0.13  # 0.29 / 2.2 para destinos USA en libras
-                logger.info(f"🇺🇸 Destino USA (libras) - Costo fijo: ${costo_fijo}")
-            else:
-                costo_fijo = 0.29  # Para destinos en kilos
-                logger.info(f"🌍 Destino en kilos - Costo fijo: ${costo_fijo}")
+            # Obtener costo fijo desde Google Sheets
+            costo_fijo_sheets = self.sheets_service.get_costo_fijo_value()
             
-            # Para el flete, usar valor personalizado del usuario o buscar en Google Sheets
-            # NO cambiar automáticamente el flete por destino
+            # Determinar costo fijo según destino
+            if destination.lower() == 'houston':
+                # Houston: USA pero usa el costo fijo de Sheets (no cambiar)
+                costo_fijo = costo_fijo_sheets
+                logger.info(f"🏢 Houston - Costo fijo desde Sheets: ${costo_fijo}")
+            elif usar_libras:
+                # Otras ciudades USA: convertir a libras
+                costo_fijo = costo_fijo_sheets / 2.2
+                logger.info(f"🇺🇸 Destino USA (libras) - Costo fijo: ${costo_fijo} (${costo_fijo_sheets}/2.2)")
+            else:
+                # Destinos internacionales: usar valor de Sheets
+                costo_fijo = costo_fijo_sheets
+                logger.info(f"🌍 Destino internacional - Costo fijo desde Sheets: ${costo_fijo}")
+            
+            # Para el flete, usar valor personalizado del usuario o desde Google Sheets
             if flete_custom is not None:
                 flete_value = flete_custom
                 logger.info(f"💰 Usando flete personalizado: ${flete_value}")
             else:
-                # TODO: Obtener flete desde Google Sheets según destino
-                # Por ahora usar un valor por defecto
-                flete_value = 0.20  # Valor por defecto
-                logger.info(f"📊 Usando flete por defecto: ${flete_value} (debería venir de Sheets)")
+                # Obtener flete desde Google Sheets celda AE28
+                flete_value = self.sheets_service.get_flete_value()
+                logger.info(f"📊 Flete obtenido desde Sheets AE28: ${flete_value}")
             
             # Usar glaseo especificado o valor por defecto
             if glaseo_factor is None:

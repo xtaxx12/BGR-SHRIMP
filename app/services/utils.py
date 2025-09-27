@@ -253,10 +253,12 @@ def format_price_response(price_info: Dict) -> str:
         
         if flete_especificado:
             response += f"• Flete: ${flete_value:.2f} (especificado por usuario)\n"
+        elif destination.lower() == 'houston':
+            response += f"• Flete: ${flete_value:.2f} (Houston - desde Sheets)\n"
         elif usar_libras:
-            response += f"• Flete: ${flete_value:.2f} (USA - libras)\n"
+            response += f"• Flete: ${flete_value:.2f} (USA - desde Sheets)\n"
         else:
-            response += f"• Flete: ${flete_value:.2f} (internacional - kilos)\n"
+            response += f"• Flete: ${flete_value:.2f} (desde Sheets)\n"
         
         response += "\n📋 _Precios FOB sujetos a confirmación final_\n"
         response += "📞 **Contacto:** BGR Export\n"
