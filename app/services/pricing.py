@@ -143,19 +143,16 @@ class PricingService:
             logger.info(f"🧮 Cálculo dinámico: glaseo={glaseo_factor}, flete={flete_value}, libras={usar_libras}")
             
             # Aplicar fórmulas según la hoja de Google Sheets
-            # Fórmula: Precio Final = (Precio Base + Costo Fijo) / Factor Glaseo + Flete
+            # Fórmula: Precio Final = Precio Glaseo (AC33) + Costo Fijo (AA28) + Flete (AE28)
             
-            # 1. Precio con Costo = Precio Base + Costo Fijo
-            precio_con_costo_kg = base_price_kg + costo_fijo
+            # 1. Precio FOB = Precio Base - Costo Fijo (para mostrar)
+            precio_fob_kg = base_price_kg - costo_fijo
             
-            # 2. Precio con Glaseo = (Precio Base + Costo Fijo) / Factor Glaseo
-            precio_glaseo_kg = precio_con_costo_kg / glaseo_factor
+            # 2. Precio con Glaseo = Precio FOB × Factor Glaseo (AC33)
+            precio_glaseo_kg = precio_fob_kg * glaseo_factor
             
-            # 3. Precio Final = Precio Glaseo + Flete
-            precio_final_kg = precio_glaseo_kg + flete_value
-            
-            # Para mostrar pasos intermedios
-            precio_fob_kg = base_price_kg  # Solo para mostrar en la respuesta
+            # 3. Precio Final = Precio Glaseo + Costo Fijo + Flete
+            precio_final_kg = precio_glaseo_kg + costo_fijo + flete_value
             
             # Convertir a libras (siempre dividir por 2.2 para obtener precio por libra)
             precio_fob_lb = precio_fob_kg / 2.2
