@@ -105,11 +105,18 @@ class PricingService:
             usar_libras = user_params.get('usar_libras', False)
             destination = user_params.get('destination', '')
             
-            # Determinar flete base según destino
-            if usar_libras:
-                flete_base = 0.13  # 0.29 / 2.2 para destinos USA
-                logger.info(f"🇺🇸 Destino USA detectado - Flete base: ${flete_base}")
+            # Determinar flete base según destino específico
+            if destination.lower() == 'houston':
+                # Houston es excepción: USA pero se vende en kilos
+                flete_base = 0.29  # Mantener costo fijo normal
+                usar_libras = False  # Asegurar que use kilos
+                logger.info(f"🏢 Houston detectado - Flete base: ${flete_base} (kilos)")
+            elif usar_libras:
+                # Otras ciudades USA usan libras
+                flete_base = 0.13  # 0.29 / 2.2 para destinos USA en libras
+                logger.info(f"🇺🇸 Destino USA (libras) detectado - Flete base: ${flete_base}")
             else:
+                # Destinos internacionales
                 flete_base = 0.29  # Para otros destinos
                 logger.info(f"🌍 Destino internacional - Flete base: ${flete_base}")
             

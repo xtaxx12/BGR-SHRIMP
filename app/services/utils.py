@@ -38,14 +38,18 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
     usar_libras = ai_analysis.get('usar_libras', False)
     cliente_nombre = ai_analysis.get('cliente_nombre')
     
-    # Validar que tengamos al menos producto y talla
-    if not product or not size:
+    # Validar que tengamos al menos talla (producto puede ser inferido)
+    if not size:
         return None
+    
+    # Si no hay producto específico, usar HLSO por defecto
+    if not product:
+        product = 'HLSO'
     
     # Determinar unidad base según destino
     unit = 'lb' if usar_libras else 'kg'
     
-    # Calcular flete según destino (regla específica para USA)
+    # Calcular flete según destino específico
     flete_value = None
     if flete_custom:
         try:
@@ -54,12 +58,17 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
             pass
     
     if not flete_value:
-        if usar_libras:
-            # Para destinos en libras (USA): 0.29 / 2.2 = 0.13
+        if destination and destination.lower() == 'houston':
+            # Houston: USA pero se vende en kilos
+            flete_value = 0.29  # Mantener costo fijo normal
+            usar_libras = False  # Forzar kilos para Houston
+            unit = 'kg'
+        elif usar_libras:
+            # Otras ciudades USA en libras: 0.29 / 2.2 = 0.13
             flete_value = 0.29 / 2.2  # ≈ 0.13
         else:
-            # Para destinos en kilos: usar default
-            flete_value = 0.20
+            # Destinos internacionales en kilos
+            flete_value = 0.29
     
     # Procesar factor de glaseo
     glaseo_value = None
@@ -248,12 +257,16 @@ def format_price_response(price_info: Dict) -> str:
         
         flete_value = price_info.get('flete', 0)
         flete_especificado = valores_usuario.get('flete_especificado')
+        destination = price_info.get('destination', '')
+        
         if flete_especificado:
             response += f"• Flete: ${flete_value:.2f} (especificado por usuario)\n"
+        elif destination.lower() == 'houston':
+            response += f"• Flete: ${flete_value:.2f} (Houston - kilos)\n"
         elif usar_libras:
-            response += f"• Flete: ${flete_value:.2f} (USA - automático)\n"
+            response += f"• Flete: ${flete_value:.2f} (USA - libras)\n"
         else:
-            response += f"• Flete: ${flete_value:.2f} (internacional - automático)\n"
+            response += f"• Flete: ${flete_value:.2f} (internacional - kilos)\n"
         
         response += "\n📋 _Precios FOB sujetos a confirmación final_\n"
         response += "📞 **Contacto:** BGR Export\n"

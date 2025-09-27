@@ -219,7 +219,7 @@ class PDFGenerator:
                         ["Factor", "Valor", "Descripción"],
                         ["Costo Fijo", f"${price_info.get('costo_fijo', 0.29):.2f}", "Costo operativo por kg"],
                         ["Factor Glaseo", f"{price_info.get('factor_glaseo', 0):.1%}", "Rendimiento especificado por usuario"],
-                        ["Flete", f"${price_info.get('flete', 0):.2f}", f"Costo de transporte ({'USA' if price_info.get('usar_libras') else 'Internacional'})"]
+                        ["Flete", f"${price_info.get('flete', 0):.2f}", f"Costo de transporte ({self._get_flete_description(price_info)})"]
                     ]
                 else:
                     # Usar factores tradicionales
@@ -329,6 +329,20 @@ class PDFGenerator:
         except Exception as e:
             logger.error(f"❌ Error generando PDF: {str(e)}")
             return None
+    
+    def _get_flete_description(self, price_info: Dict) -> str:
+        """
+        Obtiene la descripción correcta del flete según el destino
+        """
+        destination = price_info.get('destination', '').lower()
+        usar_libras = price_info.get('usar_libras', False)
+        
+        if destination == 'houston':
+            return 'Houston - kilos'
+        elif usar_libras:
+            return 'USA - libras'
+        else:
+            return 'Internacional - kilos'
     
     def cleanup_old_pdfs(self, days_old: int = 7):
         """

@@ -309,8 +309,12 @@ Formato de respuesta: texto directo sin JSON.
                 "suggested_response": "Responder con saludo amigable y mostrar opciones"
             }
         
-        # Patrones de proforma/cotización
-        proforma_patterns = ['proforma', 'cotizacion', 'cotizar', 'precio', 'precios', 'cuanto', 'cuesta', 'cost']
+        # Patrones de proforma/cotización (más específicos)
+        proforma_patterns = [
+            'proforma', 'cotizacion', 'cotizar', 'cotizacion', 'quote', 
+            'creame', 'crear', 'generar', 'necesito precio', 'precio de',
+            'precio del', 'cuanto cuesta', 'cuanto vale', 'cost'
+        ]
         if any(pattern in message_lower for pattern in proforma_patterns):
             # Extraer información básica
             product = None
@@ -319,13 +323,16 @@ Formato de respuesta: texto directo sin JSON.
             destination = None
             usar_libras = False
             
-            # Detectar productos
-            if 'sin cabeza' in message_lower or 'hlso' in message_lower:
+            # Detectar productos (más patrones)
+            if any(p in message_lower for p in ['sin cabeza', 'hlso', 'head less', 'headless']):
                 product = 'HLSO'
-            elif 'con cabeza' in message_lower or 'hoso' in message_lower:
+            elif any(p in message_lower for p in ['con cabeza', 'hoso', 'head on', 'entero']):
                 product = 'HOSO'
-            elif 'p&d' in message_lower or 'pelado' in message_lower:
+            elif any(p in message_lower for p in ['p&d', 'pelado', 'peeled', 'deveined']):
                 product = 'P&D IQF'
+            elif 'tipo' in message_lower and not product:
+                # Si dice "tipo" pero no especifica, asumir HLSO (más común)
+                product = 'HLSO'
             
             # Detectar tallas
             import re
@@ -339,10 +346,23 @@ Formato de respuesta: texto directo sin JSON.
                 glaseo_factor = float(glaseo_match.group(1)) / 100
             
             # Detectar destino USA
-            usa_cities = ['houston', 'miami', 'new york', 'los angeles', 'chicago', 'dallas']
-            if any(city in message_lower for city in usa_cities):
-                usar_libras = True
-                destination = next(city for city in usa_cities if city in message_lower).title()
+            usa_cities_libras = ['miami', 'new york', 'los angeles', 'chicago', 'dallas']  # Ciudades que usan libras
+            usa_cities_kilos = ['houston']  # Ciudades que usan kilos
+            
+            # Verificar ciudades que usan libras
+            for city in usa_cities_libras:
+                if city in message_lower:
+                    usar_libras = True
+                    destination = city.title()
+                    break
+            
+            # Verificar ciudades que usan kilos (Houston)
+            if not destination:
+                for city in usa_cities_kilos:
+                    if city in message_lower:
+                        usar_libras = False  # Houston usa kilos
+                        destination = city.title()
+                        break
             
             # Detectar nombre del cliente
             cliente_nombre = None

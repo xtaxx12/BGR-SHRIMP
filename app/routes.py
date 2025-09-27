@@ -102,14 +102,18 @@ async def whatsapp_webhook(
         session = session_manager.get_session(user_id)
         
         # Análisis de intención con OpenAI (si está disponible)
-        ai_analysis = None
-        if openai_service.is_available():
-            ai_analysis = openai_service.analyze_user_intent(Body, session)
-            logger.info(f"🤖 Análisis IA para {user_id}: {ai_analysis}")
-        else:
-            # Usar análisis básico como fallback
-            ai_analysis = openai_service._basic_intent_analysis(Body)
-            logger.info(f"🔍 Análisis básico para {user_id}: {ai_analysis}")
+        # Siempre usar análisis básico primero (más confiable)
+        ai_analysis = openai_service._basic_intent_analysis(Body)
+        logger.info(f"🔍 Análisis básico para {user_id}: {ai_analysis}")
+        
+        # Si el análisis básico no es confiable, intentar con OpenAI
+        if ai_analysis.get('confidence', 0) < 0.7 and openai_service.is_available():
+            openai_analysis = openai_service.analyze_user_intent(Body, session)
+            logger.info(f"🤖 Análisis OpenAI complementario para {user_id}: {openai_analysis}")
+            
+            # Usar OpenAI solo si es más confiable
+            if openai_analysis.get('confidence', 0) > ai_analysis.get('confidence', 0):
+                ai_analysis = openai_analysis
         
         # Comandos globales que funcionan desde cualquier estado
         message_lower = Body.lower().strip()
@@ -332,8 +336,8 @@ async def whatsapp_webhook(
             # Si no es una consulta válida, verificar si el análisis de IA puede generar una proforma automática
             logger.info(f"🔍 Llegando a lógica de respuesta inteligente para mensaje: '{Body}'")
             
-            # Intentar generar proforma automática si el análisis de IA es suficientemente específico
-            if ai_analysis and ai_analysis.get('confidence', 0) > 0.8:
+            # Intentar generar proforma automática si el análisis es suficientemente específico
+            if ai_analysis and ai_analysis.get('confidence', 0) > 0.7 and ai_analysis.get('intent') == 'proforma':
                 ai_query = parse_ai_analysis_to_query(ai_analysis)
                 logger.info(f"🤖 Consulta generada por IA: {ai_query}")
                 
