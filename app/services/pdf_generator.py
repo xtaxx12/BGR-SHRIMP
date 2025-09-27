@@ -178,13 +178,23 @@ class PDFGenerator:
                 glaseo_factor = 0.7
                 flete = 0.22
             
-            # Tabla principal de precios con diseño atractivo
-            main_price_data = [
-                ["PRECIO FOB", "POR KILOGRAMO", "POR LIBRA"],
-                ["", f"${precio_kg:.2f}", f"${precio_lb:.2f}"]
-            ]
+            # Verificar si es Houston (solo kilos)
+            destination = price_info.get('destination', '')
+            is_houston = destination.lower() == 'houston'
             
-            main_price_table = Table(main_price_data, colWidths=[2*inch, 2*inch, 2*inch])
+            # Tabla principal de precios - adaptada según destino
+            if is_houston:
+                main_price_data = [
+                    ["PRECIO FOB", "POR KILOGRAMO"],
+                    ["", f"${precio_kg:.2f}"]
+                ]
+                main_price_table = Table(main_price_data, colWidths=[3*inch, 3*inch])
+            else:
+                main_price_data = [
+                    ["PRECIO FOB", "POR KILOGRAMO", "POR LIBRA"],
+                    ["", f"${precio_kg:.2f}", f"${precio_lb:.2f}"]
+                ]
+                main_price_table = Table(main_price_data, colWidths=[2*inch, 2*inch, 2*inch])
             main_price_table.setStyle(TableStyle([
                 # Encabezado
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f4e79')),
@@ -216,7 +226,7 @@ class PDFGenerator:
                 ["Concepto", "Valor"],
                 ["Glaseo aplicado", f"{glaseo_factor:.1%}"],
                 ["Flete incluido", f"${flete:.2f}"],
-                ["Condición", "FOB Ecuador"]
+               
             ]
             
             specs_table = Table(specs_data, colWidths=[3*inch, 3*inch])

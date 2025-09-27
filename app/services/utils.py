@@ -195,13 +195,20 @@ def format_price_response(price_info: Dict) -> str:
         elif 'precio_kg' in price_info:
             response += f"📊 **Precio Base (Excel):** ${price_info['precio_kg']:.2f}/kg\n\n"
         
+        # Determinar si es Houston (solo kilos) o otras ciudades USA (libras)
+        destination = price_info.get('destination', '')
+        is_houston = destination.lower() == 'houston'
+        
         # Precios FOB
-        if 'precio_fob_kg' in price_info and 'precio_fob_lb' in price_info:
+        if 'precio_fob_kg' in price_info:
             response += "🚢 **Precio FOB (Base - Costo Fijo):**\n"
-            response += f"   • ${price_info['precio_fob_kg']:.2f}/kg - ${price_info['precio_fob_lb']:.2f}/lb\n\n"
+            if is_houston:
+                response += f"   • ${price_info['precio_fob_kg']:.2f}/kg\n\n"
+            else:
+                response += f"   • ${price_info['precio_fob_kg']:.2f}/kg - ${price_info['precio_fob_lb']:.2f}/lb\n\n"
         
         # Precios con glaseo
-        if 'precio_glaseo_kg' in price_info and 'precio_glaseo_lb' in price_info:
+        if 'precio_glaseo_kg' in price_info:
             glaseo_factor = price_info.get('factor_glaseo', 0)
             glaseo_especificado = valores_usuario.get('glaseo_especificado')
             
@@ -211,20 +218,30 @@ def format_price_response(price_info: Dict) -> str:
             else:
                 glaseo_percent = glaseo_factor * 100
                 response += f"❄️ **Precio con Glaseo ({glaseo_percent:.0f}%):**\n"
-            response += f"   • ${price_info['precio_glaseo_kg']:.2f}/kg - ${price_info['precio_glaseo_lb']:.2f}/lb\n\n"
+            
+            if is_houston:
+                response += f"   • ${price_info['precio_glaseo_kg']:.2f}/kg\n\n"
+            else:
+                response += f"   • ${price_info['precio_glaseo_kg']:.2f}/kg - ${price_info['precio_glaseo_lb']:.2f}/lb\n\n"
         
         # Precio final
-        if 'precio_final_kg' in price_info and 'precio_final_lb' in price_info:
+        if 'precio_final_kg' in price_info:
             flete_value = price_info.get('flete', 0)
             flete_especificado = valores_usuario.get('flete_especificado')
             
             if flete_especificado:
                 response += f"✈️ **Precio Final (Glaseo + Flete Usuario ${flete_value:.2f}):**\n"
+            elif is_houston:
+                response += f"✈️ **Precio Final (Glaseo + Flete Houston ${flete_value:.2f}):**\n"
             elif usar_libras:
                 response += f"✈️ **Precio Final (Glaseo + Flete USA ${flete_value:.2f}):**\n"
             else:
                 response += f"✈️ **Precio Final (Glaseo + Flete ${flete_value:.2f}):**\n"
-            response += f"   • ${price_info['precio_final_kg']:.2f}/kg - ${price_info['precio_final_lb']:.2f}/lb\n\n"
+            
+            if is_houston:
+                response += f"   • ${price_info['precio_final_kg']:.2f}/kg\n\n"
+            else:
+                response += f"   • ${price_info['precio_final_kg']:.2f}/kg - ${price_info['precio_final_lb']:.2f}/lb\n\n"
         
         # Información adicional
         if price_info.get('destination'):

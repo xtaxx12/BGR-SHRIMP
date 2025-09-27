@@ -154,11 +154,23 @@ class PricingService:
             # 3. Precio Final = Precio Glaseo + Costo Fijo + Flete
             precio_final_kg = precio_glaseo_kg + costo_fijo + flete_value
             
-            # Convertir a libras (siempre dividir por 2.2 para obtener precio por libra)
-            precio_fob_lb = precio_fob_kg / 2.2
-            precio_glaseo_lb = precio_glaseo_kg / 2.2
-            precio_final_lb = precio_final_kg / 2.2
-            base_price_lb = base_price_kg / 2.2
+            # Calcular precios en libras
+            if usar_libras and destination.lower() != 'houston':
+                # Para ciudades USA (excepto Houston): recalcular con costo fijo en libras
+                costo_fijo_lb = costo_fijo_sheets / 2.2
+                base_price_lb = base_price_kg / 2.2
+                flete_value_lb = flete_value / 2.2
+                
+                # Recalcular todo en libras
+                precio_fob_lb = base_price_lb - costo_fijo_lb
+                precio_glaseo_lb = precio_fob_lb * glaseo_factor
+                precio_final_lb = precio_glaseo_lb + costo_fijo_lb + flete_value_lb
+            else:
+                # Para Houston e internacionales: solo convertir dividiendo por 2.2
+                precio_fob_lb = precio_fob_kg / 2.2
+                precio_glaseo_lb = precio_glaseo_kg / 2.2
+                precio_final_lb = precio_final_kg / 2.2
+                base_price_lb = base_price_kg / 2.2
             
             result = {
                 'size': size,
