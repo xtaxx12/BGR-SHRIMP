@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 class OpenAIService:
     def __init__(self):
         self.api_key = os.getenv("OPENAI_API_KEY")
-        self.model = "gpt-4o-mini"
+        self.model = "gpt-3.5-turbo"
         self.whisper_model = "whisper-1"
         self.base_url = "https://api.openai.com/v1"
         
@@ -309,17 +309,52 @@ Formato de respuesta: texto directo sin JSON.
                 "suggested_response": "Responder con saludo amigable y mostrar opciones"
             }
         
-        # Patrones de precios
-        price_patterns = ['precio', 'precios', 'cotizar', 'cotizacion', 'cuanto', 'cuesta', 'cost']
-        if any(pattern in message_lower for pattern in price_patterns):
+        # Patrones de proforma/cotización
+        proforma_patterns = ['proforma', 'cotizacion', 'cotizar', 'precio', 'precios', 'cuanto', 'cuesta', 'cost']
+        if any(pattern in message_lower for pattern in proforma_patterns):
+            # Extraer información básica
+            product = None
+            size = None
+            glaseo_factor = None
+            destination = None
+            usar_libras = False
+            
+            # Detectar productos
+            if 'sin cabeza' in message_lower or 'hlso' in message_lower:
+                product = 'HLSO'
+            elif 'con cabeza' in message_lower or 'hoso' in message_lower:
+                product = 'HOSO'
+            elif 'p&d' in message_lower or 'pelado' in message_lower:
+                product = 'P&D IQF'
+            
+            # Detectar tallas
+            import re
+            size_match = re.search(r'(\d+/\d+)', message_lower)
+            if size_match:
+                size = size_match.group(1)
+            
+            # Detectar glaseo
+            glaseo_match = re.search(r'(\d+)\s*(?:de\s*)?glaseo', message_lower)
+            if glaseo_match:
+                glaseo_factor = float(glaseo_match.group(1)) / 100
+            
+            # Detectar destino USA
+            usa_cities = ['houston', 'miami', 'new york', 'los angeles', 'chicago', 'dallas']
+            if any(city in message_lower for city in usa_cities):
+                usar_libras = True
+                destination = next(city for city in usa_cities if city in message_lower).title()
+            
             return {
-                "intent": "pricing",
-                "product": None,
-                "size": None,
+                "intent": "proforma",
+                "product": product,
+                "size": size,
                 "quantity": None,
-                "destination": None,
+                "destination": destination,
+                "glaseo_factor": glaseo_factor,
+                "usar_libras": usar_libras,
+                "wants_proforma": True,
                 "confidence": 0.9,
-                "suggested_response": "Dirigir al menú de precios"
+                "suggested_response": "Procesar proforma con datos extraídos"
             }
         
         # Patrones de productos

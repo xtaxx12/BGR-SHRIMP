@@ -106,6 +106,10 @@ async def whatsapp_webhook(
         if openai_service.is_available():
             ai_analysis = openai_service.analyze_user_intent(Body, session)
             logger.info(f"🤖 Análisis IA para {user_id}: {ai_analysis}")
+        else:
+            # Usar análisis básico como fallback
+            ai_analysis = openai_service._basic_intent_analysis(Body)
+            logger.info(f"🔍 Análisis básico para {user_id}: {ai_analysis}")
         
         # Comandos globales que funcionan desde cualquier estado
         message_lower = Body.lower().strip()
