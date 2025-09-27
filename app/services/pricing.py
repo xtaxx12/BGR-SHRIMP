@@ -92,8 +92,9 @@ class PricingService:
         """
         Recarga los precios del Excel
         """
-        return self.excel_service.reload_data()    d
-ef _calculate_dynamic_prices(self, base_price_kg: float, size: str, product: str, user_params: Dict) -> Optional[Dict]:
+        return self.excel_service.reload_data()
+    
+    def _calculate_dynamic_prices(self, base_price_kg: float, size: str, product: str, user_params: Dict) -> Optional[Dict]:
         """
         Calcula precios usando valores completamente dinámicos del usuario
         """
