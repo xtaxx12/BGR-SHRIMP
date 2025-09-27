@@ -638,8 +638,18 @@ async def download_pdf(filename: str):
         from fastapi.responses import FileResponse
         
         pdf_path = os.path.join("generated_pdfs", filename)
+        logger.info(f"🔍 Buscando PDF en: {pdf_path}")
+        logger.info(f"📁 Directorio actual: {os.getcwd()}")
+        
+        # Listar archivos en el directorio
+        if os.path.exists("generated_pdfs"):
+            files = os.listdir("generated_pdfs")
+            logger.info(f"📄 Archivos en generated_pdfs: {files}")
+        else:
+            logger.error("❌ Directorio generated_pdfs no existe")
         
         if os.path.exists(pdf_path):
+            logger.info(f"✅ PDF encontrado: {pdf_path}")
             return FileResponse(
                 path=pdf_path,
                 filename=filename,
@@ -652,6 +662,7 @@ async def download_pdf(filename: str):
                 }
             )
         else:
+            logger.error(f"❌ PDF no encontrado en: {pdf_path}")
             raise HTTPException(status_code=404, detail="PDF no encontrado")
             
     except Exception as e:
