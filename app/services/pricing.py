@@ -34,65 +34,46 @@ class PricingService:
     
     def get_shrimp_price(self, user_input: Dict) -> Optional[Dict]:
         """
-        Obtiene el precio del camarón usando las fórmulas del Excel
+        Obtiene el precio del camarón usando valores completamente dinámicos del usuario
         """
         try:
-            size = user_input.get('size')
-            product = user_input.get('product', 'HLSO')  # Default a HLSO
+            # Obtener datos básicos
+            size = user_input.get('size', '')
+            product = user_input.get('product', 'HLSO')
             
             if not size:
+                logger.warning("No se especificó talla")
                 return None
             
-            # Primero obtener el precio base desde la tabla
-            price_data = self.excel_service.get_price_data(size, product)
-            if not price_data:
-                return None
-            
-            # Obtener el precio base por kilo
-            precio_base_kg = price_data['precio_kg']
-            
-            # Usar el calculador de Excel para obtener precios FOB, glaseo y flete
-            calculated_prices = self.calculator_service.calculate_prices(size, precio_base_kg)
-            
-            if not calculated_prices:
-                # Fallback a los datos originales si el cálculo falla
-                logger.warning("Usando precios originales como fallback")
-                result = {
-                    'size': size,
-                    'producto': price_data['producto'],
-                    'precio_kg': precio_base_kg,
-                    'precio_lb': price_data['precio_lb'],
-                    'talla': price_data['talla'],
-                    'quantity': user_input.get('quantity', ''),
-                    'destination': user_input.get('destination', ''),
-                    'unit': user_input.get('unit', 'lb'),
-                    'calculado_con': 'Datos originales'
-                }
+            # Determinar precio base
+            precio_base_kg = user_input.get('precio_base_custom')
+            if precio_base_kg:
+                logger.info(f"🎯 Usando precio base personalizado: ${precio_base_kg}/kg")
             else:
-                # Usar los precios calculados con las fórmulas del Excel
-                result = {
-                    'size': size,
-                    'producto': product,
-                    'talla': calculated_prices['talla'],
-                    'precio_base_kg': calculated_prices['precio_kg_original'],
-                    'precio_base_lb': calculated_prices['precio_lb_original'],
-                    'precio_fob_kg': calculated_prices['precio_fob_kg'],
-                    'precio_fob_lb': calculated_prices['precio_fob_lb'],
-                    'precio_glaseo_kg': calculated_prices['precio_glaseo_kg'],
-                    'precio_glaseo_lb': calculated_prices['precio_glaseo_lb'],
-                    'precio_flete_kg': calculated_prices['precio_flete_kg'],
-                    'precio_flete_lb': calculated_prices['precio_flete_lb'],
-                    'factores': calculated_prices['factores'],
-                    'quantity': user_input.get('quantity', ''),
-                    'destination': user_input.get('destination', ''),
-                    'unit': user_input.get('unit', 'lb'),
-                    'calculado_con': calculated_prices['calculado_con']
-                }
+                # Solo si no especifica precio, buscar en Excel/Google Sheets
+                price_data = self.excel_service.get_price_data(size, product)
+                if not price_data:
+                    logger.warning(f"No se encontró precio para {product} {size}")
+                    return None
+                precio_base_kg = price_data.get('precio_kg', 0)
+                logger.info(f"📊 Usando precio base del Excel: ${precio_base_kg}/kg")
             
-            return result
+            # Usar valores dinámicos del usuario
+            calculated_prices = self._calculate_dynamic_prices(
+                base_price_kg=precio_base_kg,
+                size=size,
+                product=product,
+                user_params=user_input
+            )
+            
+            if calculated_prices:
+                logger.info(f"✅ Precio calculado dinámicamente para {product} {size}: ${calculated_prices.get('precio_final_kg', 0):.2f}/kg")
+                return calculated_prices
+            
+            return None
             
         except Exception as e:
-            logger.error(f"Error obteniendo precio: {str(e)}")
+            logger.error(f"Error calculando precio: {str(e)}")
             return None
     
     def get_available_sizes(self, product: str = 'HLSO') -> list:
@@ -111,4 +92,92 @@ class PricingService:
         """
         Recarga los precios del Excel
         """
-        return self.excel_service.reload_data()
+        return self.excel_service.reload_data()    d
+ef _calculate_dynamic_prices(self, base_price_kg: float, size: str, product: str, user_params: Dict) -> Optional[Dict]:
+        """
+        Calcula precios usando valores completamente dinámicos del usuario
+        """
+        try:
+            # Extraer parámetros dinámicos del usuario
+            glaseo_factor = user_params.get('glaseo_factor')
+            flete_custom = user_params.get('flete_custom')
+            usar_libras = user_params.get('usar_libras', False)
+            destination = user_params.get('destination', '')
+            
+            # Determinar flete base según destino
+            if usar_libras:
+                flete_base = 0.13  # 0.29 / 2.2 para destinos USA
+                logger.info(f"🇺🇸 Destino USA detectado - Flete base: ${flete_base}")
+            else:
+                flete_base = 0.29  # Para otros destinos
+                logger.info(f"🌍 Destino internacional - Flete base: ${flete_base}")
+            
+            # Usar flete personalizado si se especifica, sino usar base
+            flete_value = flete_custom if flete_custom is not None else flete_base
+            
+            # Validar que se especifique glaseo
+            if glaseo_factor is None:
+                logger.error("❌ No se especificó factor de glaseo")
+                return None
+            
+            costo_fijo = 0.29  # Siempre fijo según las reglas
+            
+            logger.info(f"🧮 Cálculo dinámico: glaseo={glaseo_factor}, flete={flete_value}, libras={usar_libras}")
+            
+            # Aplicar fórmulas según las reglas especificadas
+            # 1. Precio FOB = Precio Base - Costo Fijo
+            precio_fob_kg = max(0, base_price_kg - costo_fijo)
+            
+            # 2. Precio con Glaseo = Precio FOB × Factor Glaseo
+            precio_glaseo_kg = precio_fob_kg * glaseo_factor
+            
+            # 3. Precio Final = Precio Glaseo + Flete
+            precio_final_kg = precio_glaseo_kg + flete_value
+            
+            # Convertir a libras
+            if usar_libras:
+                precio_fob_lb = precio_fob_kg / 2.2
+                precio_glaseo_lb = precio_glaseo_kg / 2.2
+                precio_final_lb = precio_final_kg / 2.2
+                base_price_lb = base_price_kg / 2.2
+            else:
+                precio_fob_lb = precio_fob_kg * 2.2
+                precio_glaseo_lb = precio_glaseo_kg * 2.2
+                precio_final_lb = precio_final_kg * 2.2
+                base_price_lb = base_price_kg * 2.2
+            
+            result = {
+                'size': size,
+                'product': product,
+                'talla': size,
+                'producto': product,
+                'precio_kg': base_price_kg,
+                'precio_lb': base_price_lb,
+                'precio_fob_kg': precio_fob_kg,
+                'precio_fob_lb': precio_fob_lb,
+                'precio_glaseo_kg': precio_glaseo_kg,
+                'precio_glaseo_lb': precio_glaseo_lb,
+                'precio_final_kg': precio_final_kg,
+                'precio_final_lb': precio_final_lb,
+                'costo_fijo': costo_fijo,
+                'factor_glaseo': glaseo_factor,
+                'flete': flete_value,
+                'flete_base': flete_base,
+                'usar_libras': usar_libras,
+                'destination': destination,
+                'quantity': user_params.get('quantity', ''),
+                'cliente_nombre': user_params.get('cliente_nombre', ''),
+                'calculo_dinamico': True,
+                'valores_usuario': {
+                    'glaseo_especificado': glaseo_factor,
+                    'flete_especificado': flete_custom,
+                    'precio_base_especificado': user_params.get('precio_base_custom')
+                }
+            }
+            
+            logger.info(f"✅ Cálculo dinámico completado: Base=${base_price_kg:.2f} → Final=${precio_final_kg:.2f}/kg")
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ Error en cálculo dinámico: {str(e)}")
+            return None

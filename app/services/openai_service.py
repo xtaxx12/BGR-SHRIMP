@@ -70,36 +70,52 @@ class OpenAIService:
         
         try:
             system_prompt = """
-Eres un asistente especializado en análisis de intenciones para un bot de WhatsApp de BGR Export (empresa de camarones).
+Eres un asistente especializado en análisis de solicitudes de exportación de camarón para BGR Export.
 
-Analiza el mensaje del usuario y extrae TODA la información específica:
+EXTRAE INFORMACIÓN ESPECÍFICA:
 
 PRODUCTOS: HOSO, HLSO, P&D IQF, P&D BLOQUE, PuD-EUROPA, EZ PEEL, PuD-EEUU, COOKED, PRE-COCIDO, COCIDO SIN TRATAR
 TALLAS: U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60, 60/70, 61/70, 70/80, 71/90
-DESTINOS: Houston, Miami, Los Angeles, New York, Europa, China, etc.
 
-Extrae:
-1. Intención principal (pricing, proforma, greeting, help, etc.)
-2. Producto específico mencionado
-3. Talla específica mencionada
-4. Cantidad (libras, kilos, toneladas)
-5. Destino o ciudad
-6. Factor de glaseo si se menciona (ej: "10 de glaseo", "glaseo 10%")
-7. Información de flete si se menciona
-8. Si solicita proforma específicamente
+DESTINOS USA (usan libras): Houston, Miami, Los Angeles, New York, Chicago, Dallas, etc.
+OTROS DESTINOS (usan kilos): Europa, China, Japón, etc.
+
+PARÁMETROS CRÍTICOS A EXTRAER (TODOS DINÁMICOS):
+- Glaseo: "10 de glaseo", "glaseo 10%", "glaseo 0.15", "con 15 glaseo" → extraer valor decimal exacto
+- Flete: "flete 0.25", "con flete 0.30", "flete Houston" → extraer valor numérico si se especifica
+- Precio base: "precio base 5.50", "base 6.20", "precio 4.80" → extraer valor si se menciona
+- Cantidad: "15000 lb", "10 toneladas", "5000 kilos" → extraer número y unidad
+- Cliente: "para [nombre]", "cliente [nombre]", "empresa [nombre]"
+
+REGLAS IMPORTANTES:
+- El usuario puede especificar TODOS los valores: glaseo, flete, precio base
+- Si menciona "proforma" o "cotización" → intent: "proforma"
+- Si destino es USA → usar_libras: true, aplicar flete_base: 0.13 (0.29/2.2)
+- Si destino NO es USA → usar_libras: false, aplicar flete_base: 0.29
+- Extraer valores numéricos EXACTOS que mencione el usuario
+- Si no especifica un valor → null (el sistema NO usará defaults fijos)
+
+EJEMPLOS DE EXTRACCIÓN:
+"Proforma 20/30 HOSO glaseo 10% flete Houston" → glaseo_factor: 0.10, usar_libras: true
+"Cotización con glaseo 15% y flete 0.25" → glaseo_factor: 0.15, flete_custom: 0.25
+"Precio base 5.50 con glaseo 0.12" → precio_base_custom: 5.50, glaseo_factor: 0.12
+"HLSO 16/20 glaseo 8% flete 0.20" → glaseo_factor: 0.08, flete_custom: 0.20
 
 Responde SOLO en formato JSON válido:
 {
     "intent": "pricing|proforma|product_info|greeting|help|contact|other",
-    "product": "producto exacto mencionado o null",
-    "size": "talla exacta mencionada o null", 
+    "product": "producto exacto o null",
+    "size": "talla exacta o null", 
     "quantity": "cantidad con unidad o null",
-    "destination": "destino específico o null",
-    "glaseo": "factor de glaseo mencionado o null",
-    "flete": "información de flete o null",
+    "destination": "ciudad/país específico o null",
+    "glaseo_factor": "valor decimal (ej: 0.10) o null",
+    "flete_custom": "valor de flete personalizado o null",
+    "precio_base_custom": "precio base personalizado o null",
+    "usar_libras": true/false,
+    "cliente_nombre": "nombre del cliente o null",
     "wants_proforma": true/false,
     "confidence": 0.95,
-    "suggested_response": "sugerencia de respuesta breve"
+    "suggested_response": "respuesta sugerida"
 }
 """
 

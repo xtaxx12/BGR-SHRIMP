@@ -23,7 +23,7 @@ def parse_user_message(message: str) -> Optional[Dict]:
 
 def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
     """
-    Convierte el análisis de IA en una consulta de precio válida
+    Convierte el análisis de IA en una consulta de precio válida con parámetros personalizados
     """
     if not ai_analysis or ai_analysis.get('intent') not in ['pricing', 'proforma']:
         return None
@@ -33,30 +33,62 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
     size = ai_analysis.get('size')
     quantity = ai_analysis.get('quantity')
     destination = ai_analysis.get('destination')
-    glaseo = ai_analysis.get('glaseo')
-    flete = ai_analysis.get('flete')
+    glaseo_factor = ai_analysis.get('glaseo_factor')
+    flete_custom = ai_analysis.get('flete_custom')
+    usar_libras = ai_analysis.get('usar_libras', False)
+    cliente_nombre = ai_analysis.get('cliente_nombre')
     
     # Validar que tengamos al menos producto y talla
     if not product or not size:
         return None
     
-    # Crear consulta estructurada
+    # Determinar unidad base según destino
+    unit = 'lb' if usar_libras else 'kg'
+    
+    # Calcular flete según destino (regla específica para USA)
+    flete_value = None
+    if flete_custom:
+        try:
+            flete_value = float(flete_custom)
+        except:
+            pass
+    
+    if not flete_value:
+        if usar_libras:
+            # Para destinos en libras (USA): 0.29 / 2.2 = 0.13
+            flete_value = 0.29 / 2.2  # ≈ 0.13
+        else:
+            # Para destinos en kilos: usar default
+            flete_value = 0.20
+    
+    # Procesar factor de glaseo
+    glaseo_value = None
+    if glaseo_factor:
+        try:
+            # Si viene como "10" convertir a 0.10
+            glaseo_num = float(glaseo_factor)
+            if glaseo_num > 1:
+                glaseo_value = glaseo_num / 100  # 10 → 0.10
+            else:
+                glaseo_value = glaseo_num  # 0.10 → 0.10
+        except:
+            glaseo_value = 0.70  # Default
+    else:
+        glaseo_value = 0.70  # Default
+    
+    # Crear consulta estructurada con parámetros personalizados
     query = {
         'product': product,
         'size': size,
         'quantity': quantity,
         'destination': destination,
-        'glaseo': glaseo,
-        'flete': flete,
-        'unit': 'lb'  # Default
+        'unit': unit,
+        'glaseo_factor': glaseo_value,
+        'flete_value': flete_value,
+        'usar_libras': usar_libras,
+        'cliente_nombre': cliente_nombre,
+        'custom_calculation': True  # Indica que usa cálculos personalizados
     }
-    
-    # Determinar unidad si hay cantidad
-    if quantity:
-        if any(unit in quantity.upper() for unit in ['KG', 'KILO']):
-            query['unit'] = 'kg'
-        else:
-            query['unit'] = 'lb'
     
     return query
     
@@ -119,15 +151,26 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
 
 def format_price_response(price_info: Dict) -> str:
     """
-    Formatea la respuesta con la información de precios calculados
+    Formatea la respuesta con la información de precios calculados dinámicamente
     """
     try:
+        # Información básica
+        product = price_info.get('producto', price_info.get('product', 'N/A'))
+        size = price_info.get('talla', price_info.get('size', 'N/A'))
+        is_dynamic = price_info.get('calculo_dinamico', False)
+        usar_libras = price_info.get('usar_libras', False)
+        valores_usuario = price_info.get('valores_usuario', {})
+        
         response = f"🦐 **BGR EXPORT - Cotización Camarón** 🦐\n\n"
-        response += f"📏 **Talla:** {price_info['talla']}\n"
-        response += f"🏷️ **Producto:** {price_info['producto']}\n\n"
+        response += f"📏 **Talla:** {size}\n"
+        response += f"🏷️ **Producto:** {product}\n"
+        
+        if is_dynamic:
+            response += "⚙️ **Cálculo Dinámico (Valores del Usuario)**\n"
+        
+        response += "\n"
         
         # Verificar si el producto no tiene precio establecido
-        # Si tenemos precios calculados válidos, no mostrar "sin precio"
         has_calculated_prices = (
             'precio_fob_kg' in price_info and 
             price_info.get('precio_fob_kg', 0) > 0
@@ -137,89 +180,90 @@ def format_price_response(price_info: Dict) -> str:
             response += "⚠️ **SIN PRECIO ESTABLECIDO**\n\n"
             response += "📞 Para obtener cotización de este producto, contacta directamente con BGR Export.\n\n"
             response += "🏢 **Información de contacto:**\n"
-            response += "   • Email: ventas@bgrexport.com\n"
-            response += "   • WhatsApp: +593 XXX XXXX\n\n"
+            response += "📧 Email: ventas@bgrexport.com\n"
+            response += "📱 WhatsApp: +593 XXX XXXX\n"
+            response += "🌐 Web: www.bgrexport.com"
             return response
         
-        # Si tenemos precios calculados con fórmulas del Excel
-        elif 'precio_fob_kg' in price_info:
-            response += f"💰 **PRECIOS CALCULADOS:**\n\n"
-            
-            # Precio base
-            response += f"📊 **Precio Base:**\n"
-            response += f"   • ${price_info['precio_base_kg']:.2f}/kg - ${price_info['precio_base_lb']:.2f}/lb\n\n"
-            
-            # Precio FOB
-            response += f"🚢 **Precio FOB:**\n"
+        response += "💰 **PRECIOS CALCULADOS:**\n\n"
+        
+        # Mostrar origen del precio base
+        precio_base_especificado = valores_usuario.get('precio_base_especificado')
+        if precio_base_especificado:
+            response += f"📊 **Precio Base (Usuario):** ${precio_base_especificado:.2f}/kg\n\n"
+        elif 'precio_kg' in price_info:
+            response += f"📊 **Precio Base (Excel):** ${price_info['precio_kg']:.2f}/kg\n\n"
+        
+        # Precios FOB
+        if 'precio_fob_kg' in price_info and 'precio_fob_lb' in price_info:
+            response += "🚢 **Precio FOB (Base - Costo Fijo):**\n"
             response += f"   • ${price_info['precio_fob_kg']:.2f}/kg - ${price_info['precio_fob_lb']:.2f}/lb\n\n"
+        
+        # Precios con glaseo
+        if 'precio_glaseo_kg' in price_info and 'precio_glaseo_lb' in price_info:
+            glaseo_factor = price_info.get('factor_glaseo', 0)
+            glaseo_especificado = valores_usuario.get('glaseo_especificado')
             
-            # Precio con glaseo
-            response += f"❄️ **Precio con Glaseo:**\n"
+            if glaseo_especificado:
+                glaseo_percent = glaseo_especificado * 100
+                response += f"❄️ **Precio con Glaseo ({glaseo_percent:.0f}% - Usuario):**\n"
+            else:
+                glaseo_percent = glaseo_factor * 100
+                response += f"❄️ **Precio con Glaseo ({glaseo_percent:.0f}%):**\n"
             response += f"   • ${price_info['precio_glaseo_kg']:.2f}/kg - ${price_info['precio_glaseo_lb']:.2f}/lb\n\n"
-            
-            # Precio final con flete
-            response += f"✈️ **Precio Final (Glaseo + Flete):**\n"
-            response += f"   • ${price_info['precio_flete_kg']:.2f}/kg - ${price_info['precio_flete_lb']:.2f}/lb\n\n"
-            
-            # Mostrar factores utilizados
-            if 'factores' in price_info:
-                factores = price_info['factores']
-                response += f"⚙️ **Factores aplicados:**\n"
-                response += f"   • Costo fijo: ${factores['costo_fijo']:.2f}\n"
-                response += f"   • Factor glaseo: {factores['factor_glaseo']:.1f}\n"
-                response += f"   • Flete: ${factores['flete']:.2f}\n\n"
-            
-            # Indicar método de cálculo
-            response += f"🧮 **Calculado con:** {price_info.get('calculado_con', 'Excel')}\n\n"
-            
-        else:
-            # Formato original para compatibilidad
-            response += f"💲 **Precio:** ${price_info.get('precio_kg', 0):.2f}/kg - ${price_info.get('precio_lb', 0):.2f}/lb\n\n"
         
-        # Agregar información adicional si está disponible
-        if price_info.get('quantity'):
-            try:
-                qty = float(price_info['quantity'].replace(',', ''))
-                unit = price_info.get('unit', 'lb')
-                
-                # Usar precio final si está disponible, sino precio base
-                if 'precio_flete_kg' in price_info:
-                    if unit == 'kg':
-                        unit_price = price_info['precio_flete_kg']
-                        total = qty * unit_price
-                        response += f"📊 **Para {price_info['quantity']} kg (precio final):**\n"
-                        response += f"💵 **Total estimado: ${total:,.2f}**\n\n"
-                    else:
-                        unit_price = price_info['precio_flete_lb']
-                        total = qty * unit_price
-                        response += f"📊 **Para {price_info['quantity']} lb (precio final):**\n"
-                        response += f"💵 **Total estimado: ${total:,.2f}**\n\n"
-                else:
-                    # Usar precio original
-                    if unit == 'kg':
-                        unit_price = price_info.get('precio_kg', 0)
-                        total = qty * unit_price
-                        response += f"📊 **Para {price_info['quantity']} kg:**\n"
-                        response += f"💵 **Total estimado: ${total:,.2f}**\n\n"
-                    else:
-                        unit_price = price_info.get('precio_lb', 0)
-                        total = qty * unit_price
-                        response += f"📊 **Para {price_info['quantity']} lb:**\n"
-                        response += f"💵 **Total estimado: ${total:,.2f}**\n\n"
-            except:
-                pass
+        # Precio final
+        if 'precio_final_kg' in price_info and 'precio_final_lb' in price_info:
+            flete_value = price_info.get('flete', 0)
+            flete_especificado = valores_usuario.get('flete_especificado')
+            
+            if flete_especificado:
+                response += f"✈️ **Precio Final (Glaseo + Flete Usuario ${flete_value:.2f}):**\n"
+            elif usar_libras:
+                response += f"✈️ **Precio Final (Glaseo + Flete USA ${flete_value:.2f}):**\n"
+            else:
+                response += f"✈️ **Precio Final (Glaseo + Flete ${flete_value:.2f}):**\n"
+            response += f"   • ${price_info['precio_final_kg']:.2f}/kg - ${price_info['precio_final_lb']:.2f}/lb\n\n"
         
+        # Información adicional
         if price_info.get('destination'):
-            response += f"🌍 **Destino:** {price_info['destination']}\n\n"
+            response += f"🌍 **Destino:** {price_info['destination']}\n"
         
-        response += f"📋 _Precios FOB sujetos a confirmación final_\n"
-        response += f"📞 **Contacto:** BGR Export\n"
-        response += f"💡 _Escribe 'menu' para más opciones_"
+        if price_info.get('quantity'):
+            response += f"📦 **Cantidad:** {price_info['quantity']}\n"
+        
+        if price_info.get('cliente_nombre'):
+            response += f"👤 **Cliente:** {price_info['cliente_nombre']}\n"
+        
+        # Factores utilizados
+        response += "\n📋 **Factores aplicados:**\n"
+        response += f"• Costo fijo: ${price_info.get('costo_fijo', 0.29):.2f}\n"
+        
+        glaseo_factor = price_info.get('factor_glaseo', 0)
+        glaseo_especificado = valores_usuario.get('glaseo_especificado')
+        if glaseo_especificado:
+            response += f"• Factor glaseo: {glaseo_factor:.1%} (especificado por usuario)\n"
+        else:
+            response += f"• Factor glaseo: {glaseo_factor:.1%}\n"
+        
+        flete_value = price_info.get('flete', 0)
+        flete_especificado = valores_usuario.get('flete_especificado')
+        if flete_especificado:
+            response += f"• Flete: ${flete_value:.2f} (especificado por usuario)\n"
+        elif usar_libras:
+            response += f"• Flete: ${flete_value:.2f} (USA - automático)\n"
+        else:
+            response += f"• Flete: ${flete_value:.2f} (internacional - automático)\n"
+        
+        response += "\n📋 _Precios FOB sujetos a confirmación final_\n"
+        response += "📞 **Contacto:** BGR Export\n"
+        response += "💡 _Escribe 'confirmar' para generar PDF_"
         
         return response
         
     except Exception as e:
-        return f"❌ Error formateando respuesta: {str(e)}"
+        logger.error(f"Error formateando respuesta de precio: {str(e)}")
+        return "❌ Error generando cotización. Intenta nuevamente."
 
 def extract_size_from_text(text: str) -> Optional[str]:
     """
