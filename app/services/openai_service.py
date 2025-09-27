@@ -401,7 +401,10 @@ Formato de respuesta: texto directo sin JSON.
             # Buscar destinos USA
             for dest_name, patterns in destination_patterns.items():
                 if any(pattern in message_lower for pattern in patterns):
-                    usar_libras = True  # Todas las ciudades USA usan libras
+                    if dest_name == 'Houston':
+                        usar_libras = False  # Houston es excepción: USA pero usa kilos
+                    else:
+                        usar_libras = True  # Otras ciudades USA usan libras
                     destination = dest_name
                     break
             
@@ -419,7 +422,10 @@ Formato de respuesta: texto directo sin JSON.
                         # Verificar si es una ciudad USA conocida
                         for dest_name, patterns in destination_patterns.items():
                             if dest_word in patterns:
-                                usar_libras = True
+                                if dest_name == 'Houston':
+                                    usar_libras = False  # Houston usa kilos
+                                else:
+                                    usar_libras = True  # Otras ciudades USA usan libras
                                 destination = dest_name
                                 break
                         if not destination:
