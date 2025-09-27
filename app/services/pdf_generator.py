@@ -77,7 +77,7 @@ class PDFGenerator:
             )
             
             # Encabezado con logo
-            logo_path = os.path.join("data", "logoBGR.jpg")
+            logo_path = os.path.join("data", "logoBGR.png")
             
             if os.path.exists(logo_path):
                 try:
@@ -119,8 +119,11 @@ class PDFGenerator:
                 ["Fecha de Cotización:", fecha_actual],
                 ["Producto:", price_info.get('producto', 'N/A')],
                 ["Talla:", price_info.get('talla', 'N/A')]
-               
             ]
+            
+            # Agregar cliente si está disponible
+            if price_info.get('cliente_nombre'):
+                info_data.append(["Cliente:", price_info['cliente_nombre'].title()])
             
             if price_info.get('destination'):
                 info_data.append(["Destino:", price_info['destination']])
@@ -152,7 +155,17 @@ class PDFGenerator:
                 ["Tipo de Precio", "Precio por Kg", "Precio por Lb", "Descripción"]
             ]
             
-            if 'precio_base_kg' in price_info:
+            # Verificar si es cálculo dinámico
+            if price_info.get('calculo_dinamico') and 'precio_final_kg' in price_info:
+                # Usar precios del cálculo dinámico
+                price_data.extend([
+                    ["Precio Base", f"${price_info['precio_kg']:.2f}", f"${price_info['precio_lb']:.2f}", "Precio original del producto"],
+                    ["Precio FOB", f"${price_info['precio_fob_kg']:.2f}", f"${price_info['precio_fob_lb']:.2f}", "Precio base - costo fijo"],
+                    ["Precio con Glaseo", f"${price_info['precio_glaseo_kg']:.2f}", f"${price_info['precio_glaseo_lb']:.2f}", f"Precio FOB × {price_info.get('factor_glaseo', 0):.1%}"],
+                    ["Precio Final", f"${price_info['precio_final_kg']:.2f}", f"${price_info['precio_final_lb']:.2f}", "Precio glaseo + flete"]
+                ])
+            elif 'precio_base_kg' in price_info:
+                # Formato Excel tradicional
                 price_data.extend([
                     ["Precio Base", f"${price_info['precio_base_kg']:.2f}", f"${price_info['precio_base_lb']:.2f}", "Precio original del producto"],
                     ["Precio FOB", f"${price_info['precio_fob_kg']:.2f}", f"${price_info['precio_fob_lb']:.2f}", "Precio base - costo fijo"],
@@ -196,18 +209,27 @@ class PDFGenerator:
             story.append(Spacer(1, 30))
             
             # Factores aplicados
-            if 'factores' in price_info:
+            if 'factores' in price_info or price_info.get('calculo_dinamico'):
                 story.append(Paragraph("⚙️ FACTORES APLICADOS", subtitle_style))
                 story.append(Spacer(1, 10))
                 
-                factores = price_info['factores']
-                factores_data = [
-                    ["Factor", "Valor", "Descripción"],
-                    ["Costo Fijo", f"${factores['costo_fijo']:.2f}", "Costo operativo por kg"],
-                    ["Factor Glaseo", f"{factores['factor_glaseo']:.1f}", "Rendimiento del producto (70% camarón, 30% hielo)"],
-                    ["Flete", f"${factores['flete']:.2f}", "Costo de transporte por kg"]
-                ]
-                
+                if price_info.get('calculo_dinamico'):
+                    # Usar factores del cálculo dinámico
+                    factores_data = [
+                        ["Factor", "Valor", "Descripción"],
+                        ["Costo Fijo", f"${price_info.get('costo_fijo', 0.29):.2f}", "Costo operativo por kg"],
+                        ["Factor Glaseo", f"{price_info.get('factor_glaseo', 0):.1%}", "Rendimiento especificado por usuario"],
+                        ["Flete", f"${price_info.get('flete', 0):.2f}", f"Costo de transporte ({'USA' if price_info.get('usar_libras') else 'Internacional'})"]
+                 
+                else:
+                    # Usar factores tradicionales
+                    factores = price_info['factores']
+                  factores_data = [
+                        ["Factor", "Valor", "Descripción"],
+                        ["Costo Fijo", f"${factores['costo_fijo']:.2f}", "Costo operativo por kg"],
+                        ["Factor Glaseo", f"{factores['factor_gla}", "Rendimiento del producto (70% camarón, 30% hielo)"],
+                        ["Flete", f"${factores['flete']:.2f}", "Costo de transporte por kg"]
+                    ]
                 factores_table = Table(factores_data, colWidths=[1.5*inch, 1*inch, 3.5*inch])
                 factores_table.setStyle(TableStyle([
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2f5f8f')),
@@ -235,7 +257,13 @@ class PDFGenerator:
                     qty = float(price_info['quantity'].replace(',', ''))
                     unit = price_info.get('unit', 'lb')
                     
-                    if 'precio_flete_kg' in price_info:
+                    # Usar precio final del cálculo dinámico si está disponible
+                    if price_info.get('calculo_dinamico') and 'precio_final_kg' in price_info:
+                        if unit == 'kg':
+                            unit_price = price_info['precio_final_kg']
+                        else:
+                            unit_price = price_info['precio_final_lb']
+                    elif 'precio_flete_kg' in price_info:
                         if unit == 'kg':
                             unit_price = price_info['precio_flete_kg']
                         else:

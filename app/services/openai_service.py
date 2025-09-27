@@ -344,6 +344,25 @@ Formato de respuesta: texto directo sin JSON.
                 usar_libras = True
                 destination = next(city for city in usa_cities if city in message_lower).title()
             
+            # Detectar nombre del cliente
+            cliente_nombre = None
+            cliente_patterns = [
+                r'cliente\s+([a-záéíóúñ\w\s]+?)(?:\s+con|\s+de|\s+para|$)',
+                r'para\s+(?:el\s+cliente\s+)?([a-záéíóúñ\w\s]+?)(?:\s+con|\s+de|\s+para|$)',
+                r'proforma\s+para\s+(?:el\s+cliente\s+)?([a-záéíóúñ\w\s]+?)(?:\s+con|\s+de|\s+para|$)'
+            ]
+            
+            for pattern in cliente_patterns:
+                match = re.search(pattern, message_lower)
+                if match:
+                    cliente_nombre = match.group(1).strip()
+                    # Limpiar palabras comunes que no son nombres
+                    stop_words = ['el', 'la', 'con', 'de', 'para', 'precio', 'tipo', 'glaseo', 'flete']
+                    cliente_words = [word for word in cliente_nombre.split() if word not in stop_words]
+                    if cliente_words:
+                        cliente_nombre = ' '.join(cliente_words)
+                        break
+            
             return {
                 "intent": "proforma",
                 "product": product,
@@ -352,6 +371,7 @@ Formato de respuesta: texto directo sin JSON.
                 "destination": destination,
                 "glaseo_factor": glaseo_factor,
                 "usar_libras": usar_libras,
+                "cliente_nombre": cliente_nombre,
                 "wants_proforma": True,
                 "confidence": 0.9,
                 "suggested_response": "Procesar proforma con datos extraídos"
