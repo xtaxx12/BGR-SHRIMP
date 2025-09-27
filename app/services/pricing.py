@@ -105,30 +105,29 @@ class PricingService:
             usar_libras = user_params.get('usar_libras', False)
             destination = user_params.get('destination', '')
             
-            # Determinar flete base según destino específico
-            if destination.lower() == 'houston':
-                # Houston es excepción: USA pero se vende en kilos
-                flete_base = 0.29  # Mantener costo fijo normal
-                usar_libras = False  # Asegurar que use kilos
-                logger.info(f"🏢 Houston detectado - Flete base: ${flete_base} (kilos)")
-            elif usar_libras:
-                # Otras ciudades USA usan libras
-                flete_base = 0.13  # 0.29 / 2.2 para destinos USA en libras
-                logger.info(f"🇺🇸 Destino USA (libras) detectado - Flete base: ${flete_base}")
+            # Determinar costo fijo según si usa libras o kilos
+            if usar_libras:
+                costo_fijo = 0.13  # 0.29 / 2.2 para destinos USA en libras
+                logger.info(f"🇺🇸 Destino USA (libras) - Costo fijo: ${costo_fijo}")
             else:
-                # Destinos internacionales
-                flete_base = 0.29  # Para otros destinos
-                logger.info(f"🌍 Destino internacional - Flete base: ${flete_base}")
+                costo_fijo = 0.29  # Para destinos en kilos
+                logger.info(f"🌍 Destino en kilos - Costo fijo: ${costo_fijo}")
             
-            # Usar flete personalizado si se especifica, sino usar base
-            flete_value = flete_custom if flete_custom is not None else flete_base
+            # Para el flete, usar valor personalizado del usuario o buscar en Google Sheets
+            # NO cambiar automáticamente el flete por destino
+            if flete_custom is not None:
+                flete_value = flete_custom
+                logger.info(f"💰 Usando flete personalizado: ${flete_value}")
+            else:
+                # TODO: Obtener flete desde Google Sheets según destino
+                # Por ahora usar un valor por defecto
+                flete_value = 0.20  # Valor por defecto
+                logger.info(f"📊 Usando flete por defecto: ${flete_value} (debería venir de Sheets)")
             
             # Validar que se especifique glaseo
             if glaseo_factor is None:
                 logger.error("❌ No se especificó factor de glaseo")
                 return None
-            
-            costo_fijo = 0.29  # Siempre fijo según las reglas
             
             logger.info(f"🧮 Cálculo dinámico: glaseo={glaseo_factor}, flete={flete_value}, libras={usar_libras}")
             

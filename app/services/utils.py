@@ -49,7 +49,7 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
     # Determinar unidad base según destino
     unit = 'lb' if usar_libras else 'kg'
     
-    # Calcular flete según destino específico
+    # Procesar flete personalizado del usuario
     flete_value = None
     if flete_custom:
         try:
@@ -57,18 +57,10 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
         except:
             pass
     
+    # Si no hay flete personalizado, usar valor por defecto
+    # NO cambiar automáticamente por destino - debe venir de Google Sheets
     if not flete_value:
-        if destination and destination.lower() == 'houston':
-            # Houston: USA pero se vende en kilos
-            flete_value = 0.29  # Mantener costo fijo normal
-            usar_libras = False  # Forzar kilos para Houston
-            unit = 'kg'
-        elif usar_libras:
-            # Otras ciudades USA en libras: 0.29 / 2.2 = 0.13
-            flete_value = 0.29 / 2.2  # ≈ 0.13
-        else:
-            # Destinos internacionales en kilos
-            flete_value = 0.29
+        flete_value = 0.20  # Valor por defecto (debería venir de Sheets)
     
     # Procesar factor de glaseo
     glaseo_value = None
@@ -261,8 +253,6 @@ def format_price_response(price_info: Dict) -> str:
         
         if flete_especificado:
             response += f"• Flete: ${flete_value:.2f} (especificado por usuario)\n"
-        elif destination.lower() == 'houston':
-            response += f"• Flete: ${flete_value:.2f} (Houston - kilos)\n"
         elif usar_libras:
             response += f"• Flete: ${flete_value:.2f} (USA - libras)\n"
         else:

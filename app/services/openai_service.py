@@ -345,24 +345,14 @@ Formato de respuesta: texto directo sin JSON.
             if glaseo_match:
                 glaseo_factor = float(glaseo_match.group(1)) / 100
             
-            # Detectar destino USA
-            usa_cities_libras = ['miami', 'new york', 'los angeles', 'chicago', 'dallas']  # Ciudades que usan libras
-            usa_cities_kilos = ['houston']  # Ciudades que usan kilos
+            # Detectar destino USA (todas las ciudades USA usan libras)
+            usa_cities = ['houston', 'miami', 'new york', 'los angeles', 'chicago', 'dallas']
             
-            # Verificar ciudades que usan libras
-            for city in usa_cities_libras:
+            for city in usa_cities:
                 if city in message_lower:
-                    usar_libras = True
+                    usar_libras = True  # Todas las ciudades USA usan libras
                     destination = city.title()
                     break
-            
-            # Verificar ciudades que usan kilos (Houston)
-            if not destination:
-                for city in usa_cities_kilos:
-                    if city in message_lower:
-                        usar_libras = False  # Houston usa kilos
-                        destination = city.title()
-                        break
             
             # Detectar nombre del cliente
             cliente_nombre = None

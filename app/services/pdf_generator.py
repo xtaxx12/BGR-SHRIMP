@@ -334,12 +334,9 @@ class PDFGenerator:
         """
         Obtiene la descripción correcta del flete según el destino
         """
-        destination = price_info.get('destination', '').lower()
         usar_libras = price_info.get('usar_libras', False)
         
-        if destination == 'houston':
-            return 'Houston - kilos'
-        elif usar_libras:
+        if usar_libras:
             return 'USA - libras'
         else:
             return 'Internacional - kilos'
