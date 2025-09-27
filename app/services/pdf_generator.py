@@ -136,6 +136,12 @@ class PDFGenerator:
             if price_info.get('quantity'):
                 info_data.append(["Cantidad:", f"{price_info['quantity']} {price_info.get('unit', 'lb')}"])
             
+            # Agregar glaseo si fue especificado por el usuario
+            if price_info.get('calculo_dinamico') and price_info.get('factor_glaseo'):
+                glaseo_percent = price_info['factor_glaseo'] * 100
+                if glaseo_percent != 70:  # Solo mostrar si es diferente al estándar
+                    info_data.append(["Glaseo solicitado:", f"{glaseo_percent:.0f}%"])
+            
             info_table = Table(info_data, colWidths=[2*inch, 3*inch])
             info_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f0f0f0')),
@@ -151,52 +157,91 @@ class PDFGenerator:
             story.append(info_table)
             story.append(Spacer(1, 30))
             
-            # Tabla de precios simplificada - solo lo que le interesa al cliente
-            story.append(Paragraph("💰 PRECIO FOB", subtitle_style))
-            story.append(Spacer(1, 10))
+            # Sección de precios mejorada y más atractiva
+            story.append(Paragraph("💰 COTIZACIÓN FOB", subtitle_style))
+            story.append(Spacer(1, 15))
             
-            # Solo mostrar el precio final - lo que realmente importa
-            price_data = [
-                ["Precio por Kg", "Precio por Lb"]
-            ]
-            
-            # Obtener precio final
+            # Obtener precio final y datos
             if price_info.get('calculo_dinamico') and 'precio_final_kg' in price_info:
                 precio_kg = price_info['precio_final_kg']
                 precio_lb = price_info['precio_final_lb']
+                glaseo_factor = price_info.get('factor_glaseo', 0)
+                flete = price_info.get('flete', 0)
             elif 'precio_flete_kg' in price_info:
                 precio_kg = price_info['precio_flete_kg']
                 precio_lb = price_info['precio_flete_lb']
+                glaseo_factor = 0.7  # Default
+                flete = 0.22  # Default
             else:
                 precio_kg = price_info.get('precio_kg', 0)
                 precio_lb = price_info.get('precio_lb', 0)
+                glaseo_factor = 0.7
+                flete = 0.22
             
-            price_data.append([
-                f"${precio_kg:.2f}",
-                f"${precio_lb:.2f}"
-            ])
+            # Tabla principal de precios con diseño atractivo
+            main_price_data = [
+                ["PRECIO FOB", "POR KILOGRAMO", "POR LIBRA"],
+                ["", f"${precio_kg:.2f}", f"${precio_lb:.2f}"]
+            ]
             
-            price_table = Table(price_data, colWidths=[3*inch, 3*inch])
-            price_table.setStyle(TableStyle([
+            main_price_table = Table(main_price_data, colWidths=[2*inch, 2*inch, 2*inch])
+            main_price_table.setStyle(TableStyle([
                 # Encabezado
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f4e79')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('FONTSIZE', (0, 0), (-1, 0), 11),
                 
-                # Precio final destacado
-                ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#e6f3ff')),
+                # Fila de precios
+                ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#f0f8ff')),
                 ('TEXTCOLOR', (0, 1), (-1, 1), colors.black),
                 ('FONTNAME', (0, 1), (-1, 1), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 1), (-1, 1), 16),
+                ('FONTSIZE', (0, 1), (-1, 1), 18),
                 
                 # Bordes
-                ('GRID', (0, 0), (-1, -1), 2, colors.black),
+                ('GRID', (0, 0), (-1, -1), 1.5, colors.black),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ]))
             
-            story.append(price_table)
+            story.append(main_price_table)
+            story.append(Spacer(1, 20))
+            
+            # Información adicional elegante
+            story.append(Paragraph("📋 ESPECIFICACIONES", subtitle_style))
+            story.append(Spacer(1, 10))
+            
+            # Tabla de especificaciones
+            specs_data = [
+                ["Concepto", "Valor"],
+                ["Glaseo aplicado", f"{glaseo_factor:.1%}"],
+                ["Flete incluido", f"${flete:.2f}"],
+                ["Condición", "FOB Ecuador"]
+            ]
+            
+            specs_table = Table(specs_data, colWidths=[3*inch, 3*inch])
+            specs_table.setStyle(TableStyle([
+                # Encabezado
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2f5f8f')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                
+                # Datos
+                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f8f8f8')),
+                ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+                
+                # Bordes
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ]))
+            
+            story.append(specs_table)
             story.append(Spacer(1, 30))
             
             # Agregar espacio después de la tabla de precios
