@@ -353,7 +353,8 @@ Formato de respuesta: texto directo sin JSON.
                 ],
                 'P&D IQF': [
                     'p&d', 'pelado', 'peeled', 'deveined', 'limpio', 'procesado',
-                    'pd', 'p d', 'pelado y desvenado'
+                    'pd', 'p d', 'pelado y desvenado', 'pid', 'qf', 'pid y qf',
+                    'p i d', 'q f', 'pid qf', 'p&d iqf', 'pd iqf'
                 ]
             }
             
@@ -367,10 +368,22 @@ Formato de respuesta: texto directo sin JSON.
             if not product and any(word in message_lower for word in ['producto', 'tipo', 'camaron', 'camarones']):
                 product = 'HLSO'  # Más común
             
-            # Detectar tallas
-            size_match = re.search(r'(\d+/\d+)', message_lower)
-            if size_match:
-                size = size_match.group(1)
+            # Detectar tallas con patrones más amplios
+            size_patterns = [
+                r'(\d+/\d+)',  # 21/25
+                r'(\d+)\s*sobre\s*(\d+)',  # 21 sobre 25
+                r'(\d+)\s*-\s*(\d+)',  # 21-25
+                r'(\d+)\s+(\d+)'  # 21 25
+            ]
+            
+            for pattern in size_patterns:
+                match = re.search(pattern, message_lower)
+                if match:
+                    if len(match.groups()) == 1:
+                        size = match.group(1)
+                    else:
+                        size = f"{match.group(1)}/{match.group(2)}"
+                    break
             
             # Detectar glaseo con patrones más amplios
             glaseo_patterns = [
