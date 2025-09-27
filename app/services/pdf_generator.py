@@ -220,14 +220,14 @@ class PDFGenerator:
                         ["Costo Fijo", f"${price_info.get('costo_fijo', 0.29):.2f}", "Costo operativo por kg"],
                         ["Factor Glaseo", f"{price_info.get('factor_glaseo', 0):.1%}", "Rendimiento especificado por usuario"],
                         ["Flete", f"${price_info.get('flete', 0):.2f}", f"Costo de transporte ({'USA' if price_info.get('usar_libras') else 'Internacional'})"]
-                 
+                    ]
                 else:
                     # Usar factores tradicionales
                     factores = price_info['factores']
-                  factores_data = [
+                    factores_data = [
                         ["Factor", "Valor", "Descripción"],
                         ["Costo Fijo", f"${factores['costo_fijo']:.2f}", "Costo operativo por kg"],
-                        ["Factor Glaseo", f"{factores['factor_gla}", "Rendimiento del producto (70% camarón, 30% hielo)"],
+                        ["Factor Glaseo", f"{factores['factor_glaseo']:.1f}", "Rendimiento del producto (70% camarón, 30% hielo)"],
                         ["Flete", f"${factores['flete']:.2f}", "Costo de transporte por kg"]
                     ]
                 factores_table = Table(factores_data, colWidths=[1.5*inch, 1*inch, 3.5*inch])
