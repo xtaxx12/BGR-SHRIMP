@@ -151,118 +151,67 @@ class PDFGenerator:
             story.append(info_table)
             story.append(Spacer(1, 30))
             
-            # Tabla de precios
-            story.append(Paragraph("💰 PRECIOS CALCULADOS", subtitle_style))
+            # Tabla de precios simplificada - solo lo que le interesa al cliente
+            story.append(Paragraph("💰 PRECIO FOB", subtitle_style))
             story.append(Spacer(1, 10))
             
-            # Preparar datos de precios
+            # Solo mostrar el precio final - lo que realmente importa
             price_data = [
-                ["Tipo de Precio", "Precio por Kg", "Precio por Lb", "Descripción"]
+                ["Precio por Kg", "Precio por Lb"]
             ]
             
-            # Verificar si es cálculo dinámico
+            # Obtener precio final
             if price_info.get('calculo_dinamico') and 'precio_final_kg' in price_info:
-                # Usar precios del cálculo dinámico
-                price_data.extend([
-                    ["Precio Base", f"${price_info['precio_kg']:.2f}", f"${price_info['precio_lb']:.2f}", "Precio original del producto"],
-                    ["Precio FOB", f"${price_info['precio_fob_kg']:.2f}", f"${price_info['precio_fob_lb']:.2f}", "Precio base - costo fijo"],
-                    ["Precio con Glaseo", f"${price_info['precio_glaseo_kg']:.2f}", f"${price_info['precio_glaseo_lb']:.2f}", f"Precio FOB × {price_info.get('factor_glaseo', 0):.1%}"],
-                    ["Precio Final", f"${price_info['precio_final_kg']:.2f}", f"${price_info['precio_final_lb']:.2f}", "Precio glaseo + flete"]
-                ])
-            elif 'precio_base_kg' in price_info:
-                # Formato Excel tradicional
-                price_data.extend([
-                    ["Precio Base", f"${price_info['precio_base_kg']:.2f}", f"${price_info['precio_base_lb']:.2f}", "Precio original del producto"],
-                    ["Precio FOB", f"${price_info['precio_fob_kg']:.2f}", f"${price_info['precio_fob_lb']:.2f}", "Precio base - costo fijo"],
-                    ["Precio con Glaseo", f"${price_info['precio_glaseo_kg']:.2f}", f"${price_info['precio_glaseo_lb']:.2f}", "Precio FOB × factor glaseo"],
-                    ["Precio Final", f"${price_info['precio_flete_kg']:.2f}", f"${price_info['precio_flete_lb']:.2f}", "Precio glaseo + costo + flete"]
-                ])
+                precio_kg = price_info['precio_final_kg']
+                precio_lb = price_info['precio_final_lb']
+            elif 'precio_flete_kg' in price_info:
+                precio_kg = price_info['precio_flete_kg']
+                precio_lb = price_info['precio_flete_lb']
             else:
-                # Formato de compatibilidad
-                price_data.append([
-                    "Precio Final", 
-                    f"${price_info.get('precio_kg', 0):.2f}", 
-                    f"${price_info.get('precio_lb', 0):.2f}", 
-                    "Precio calculado"
-                ])
+                precio_kg = price_info.get('precio_kg', 0)
+                precio_lb = price_info.get('precio_lb', 0)
             
-            price_table = Table(price_data, colWidths=[1.5*inch, 1.2*inch, 1.2*inch, 2.1*inch])
+            price_data.append([
+                f"${precio_kg:.2f}",
+                f"${precio_lb:.2f}"
+            ])
+            
+            price_table = Table(price_data, colWidths=[3*inch, 3*inch])
             price_table.setStyle(TableStyle([
                 # Encabezado
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f4e79')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
                 
-                # Datos
-                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                
-                # Última fila (precio final) destacada
-                ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#e6f3ff')),
-                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                # Precio final destacado
+                ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#e6f3ff')),
+                ('TEXTCOLOR', (0, 1), (-1, 1), colors.black),
+                ('FONTNAME', (0, 1), (-1, 1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 1), (-1, 1), 16),
                 
                 # Bordes
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('GRID', (0, 0), (-1, -1), 2, colors.black),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ]))
             
             story.append(price_table)
             story.append(Spacer(1, 30))
             
-            # Factores aplicados
-            if 'factores' in price_info or price_info.get('calculo_dinamico'):
-                story.append(Paragraph("⚙️ FACTORES APLICADOS", subtitle_style))
-                story.append(Spacer(1, 10))
-                
-                if price_info.get('calculo_dinamico'):
-                    # Usar factores del cálculo dinámico
-                    factores_data = [
-                        ["Factor", "Valor", "Descripción"],
-                        ["Costo Fijo", f"${price_info.get('costo_fijo', 0.29):.2f}", "Costo operativo por kg"],
-                        ["Factor Glaseo", f"{price_info.get('factor_glaseo', 0):.1%}", "Rendimiento especificado por usuario"],
-                        ["Flete", f"${price_info.get('flete', 0):.2f}", f"Costo de transporte ({self._get_flete_description(price_info)})"]
-                    ]
-                else:
-                    # Usar factores tradicionales
-                    factores = price_info['factores']
-                    factores_data = [
-                        ["Factor", "Valor", "Descripción"],
-                        ["Costo Fijo", f"${factores['costo_fijo']:.2f}", "Costo operativo por kg"],
-                        ["Factor Glaseo", f"{factores['factor_glaseo']:.1f}", "Rendimiento del producto (70% camarón, 30% hielo)"],
-                        ["Flete", f"${factores['flete']:.2f}", "Costo de transporte por kg"]
-                    ]
-                factores_table = Table(factores_data, colWidths=[1.5*inch, 1*inch, 3.5*inch])
-                factores_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2f5f8f')),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, 0), 10),
-                    ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
-                    ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-                    ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                    ('FONTSIZE', (0, 1), (-1, -1), 9),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ]))
-                
-                story.append(factores_table)
-                story.append(Spacer(1, 30))
+            # Agregar espacio después de la tabla de precios
+            story.append(Spacer(1, 30))
             
-            # Cálculo de total si hay cantidad
+            # Cálculo de total si hay cantidad - simplificado
             if price_info.get('quantity'):
-                story.append(Paragraph("📊 CÁLCULO TOTAL", subtitle_style))
+                story.append(Paragraph("📊 TOTAL ESTIMADO", subtitle_style))
                 story.append(Spacer(1, 10))
                 
                 try:
                     qty = float(price_info['quantity'].replace(',', ''))
                     unit = price_info.get('unit', 'lb')
                     
-                    # Usar precio final del cálculo dinámico si está disponible
+                    # Usar precio final
                     if price_info.get('calculo_dinamico') and 'precio_final_kg' in price_info:
                         if unit == 'kg':
                             unit_price = price_info['precio_final_kg']
@@ -281,26 +230,24 @@ class PDFGenerator:
                     
                     total = qty * unit_price
                     
+                    # Tabla simple de total
                     total_data = [
-                        ["Concepto", "Cantidad", "Precio Unitario", "Total"],
-                        [f"Camarón {price_info.get('producto', '')} {price_info.get('talla', '')}", 
-                         f"{price_info['quantity']} {unit}", 
-                         f"${unit_price:.2f}/{unit}", 
-                         f"${total:,.2f}"]
+                        ["Cantidad", "Total FOB"],
+                        [f"{price_info['quantity']} {unit}", f"${total:,.2f}"]
                     ]
                     
-                    total_table = Table(total_data, colWidths=[2*inch, 1.5*inch, 1.5*inch, 1*inch])
+                    total_table = Table(total_data, colWidths=[3*inch, 3*inch])
                     total_table.setStyle(TableStyle([
                         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f4e79')),
                         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                        ('FONTSIZE', (0, 0), (-1, 0), 10),
-                        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#fff2cc')),
-                        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-                        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica-Bold'),
-                        ('FONTSIZE', (0, 1), (-1, -1), 11),
-                        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                        ('FONTSIZE', (0, 0), (-1, 0), 12),
+                        ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#fff2cc')),
+                        ('TEXTCOLOR', (0, 1), (-1, 1), colors.black),
+                        ('FONTNAME', (0, 1), (-1, 1), 'Helvetica-Bold'),
+                        ('FONTSIZE', (0, 1), (-1, 1), 16),
+                        ('GRID', (0, 0), (-1, -1), 2, colors.black),
                         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                     ]))
                     
@@ -321,9 +268,8 @@ class PDFGenerator:
                 textColor=colors.grey
             )
             
-            story.append(Paragraph("📋 Precios FOB sujetos a confirmación final", footer_style))
-            story.append(Paragraph("📞 Contacto: BGR Export", footer_style))
-            story.append(Paragraph(f"📅 Documento generado el {fecha_actual}", footer_style))
+            story.append(Paragraph("Precios FOB sujetos a confirmación final", footer_style))
+            story.append(Paragraph("BGR Export - Camarón Premium", footer_style))
             
             # Generar PDF
             doc.build(story)
