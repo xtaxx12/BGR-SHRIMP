@@ -142,27 +142,26 @@ class PricingService:
             
             logger.info(f"🧮 Cálculo dinámico: glaseo={glaseo_factor}, flete={flete_value}, libras={usar_libras}")
             
-            # Aplicar fórmulas según las reglas especificadas
-            # 1. Precio FOB = Precio Base - Costo Fijo
-            precio_fob_kg = max(0, base_price_kg - costo_fijo)
+            # Aplicar fórmulas según la hoja de Google Sheets
+            # Fórmula: Precio Final = (Precio Base + Costo Fijo) / Factor Glaseo + Flete
             
-            # 2. Precio con Glaseo = Precio FOB × Factor Glaseo
-            precio_glaseo_kg = precio_fob_kg * glaseo_factor
+            # 1. Precio con Costo = Precio Base + Costo Fijo
+            precio_con_costo_kg = base_price_kg + costo_fijo
+            
+            # 2. Precio con Glaseo = (Precio Base + Costo Fijo) / Factor Glaseo
+            precio_glaseo_kg = precio_con_costo_kg / glaseo_factor
             
             # 3. Precio Final = Precio Glaseo + Flete
             precio_final_kg = precio_glaseo_kg + flete_value
             
-            # Convertir a libras
-            if usar_libras:
-                precio_fob_lb = precio_fob_kg / 2.2
-                precio_glaseo_lb = precio_glaseo_kg / 2.2
-                precio_final_lb = precio_final_kg / 2.2
-                base_price_lb = base_price_kg / 2.2
-            else:
-                precio_fob_lb = precio_fob_kg * 2.2
-                precio_glaseo_lb = precio_glaseo_kg * 2.2
-                precio_final_lb = precio_final_kg * 2.2
-                base_price_lb = base_price_kg * 2.2
+            # Para mostrar pasos intermedios
+            precio_fob_kg = base_price_kg  # Solo para mostrar en la respuesta
+            
+            # Convertir a libras (siempre dividir por 2.2 para obtener precio por libra)
+            precio_fob_lb = precio_fob_kg / 2.2
+            precio_glaseo_lb = precio_glaseo_kg / 2.2
+            precio_final_lb = precio_final_kg / 2.2
+            base_price_lb = base_price_kg / 2.2
             
             result = {
                 'size': size,

@@ -392,11 +392,23 @@ class GoogleSheetsService:
                 logger.warning("Google Sheets no configurado, usando flete por defecto")
                 return 0.22  # Valor por defecto
             
-            # Obtener la primera hoja de trabajo
-            worksheet = self.sheet.worksheets()[0]
+            # Obtener la hoja de trabajo correcta (evitar gráficos)
+            worksheets = self.sheet.worksheets()
+            worksheet = None
             
-            # Leer celda AE28 (columna 31, fila 28)
-            flete_value = worksheet.cell(28, 31).value
+            # Buscar una hoja que no sea un gráfico
+            for ws in worksheets:
+                if 'gráfico' not in ws.title.lower() and 'chart' not in ws.title.lower():
+                    worksheet = ws
+                    break
+            
+            if not worksheet:
+                worksheet = worksheets[0]  # Fallback
+            
+            logger.info(f"📊 Leyendo flete de hoja: {worksheet.title}")
+            
+            # Leer celda AE28 (columna 31, fila 28) - según tu imagen es AC28
+            flete_value = worksheet.cell(28, 29).value  # AC28 = columna 29
             
             if flete_value and self._is_number(flete_value):
                 flete = self._clean_price(flete_value)
@@ -419,8 +431,20 @@ class GoogleSheetsService:
                 logger.warning("Google Sheets no configurado, usando costo fijo por defecto")
                 return 0.29  # Valor por defecto
             
-            # Obtener la primera hoja de trabajo
-            worksheet = self.sheet.worksheets()[0]
+            # Obtener la hoja de trabajo correcta (evitar gráficos)
+            worksheets = self.sheet.worksheets()
+            worksheet = None
+            
+            # Buscar una hoja que no sea un gráfico
+            for ws in worksheets:
+                if 'gráfico' not in ws.title.lower() and 'chart' not in ws.title.lower():
+                    worksheet = ws
+                    break
+            
+            if not worksheet:
+                worksheet = worksheets[0]  # Fallback
+            
+            logger.info(f"📊 Leyendo costo fijo de hoja: {worksheet.title}")
             
             # Leer celda AA28 (columna 27, fila 28)
             costo_fijo_value = worksheet.cell(28, 27).value
