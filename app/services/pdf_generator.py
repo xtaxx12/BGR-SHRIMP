@@ -58,19 +58,22 @@ class PDFGenerator:
             title_style = ParagraphStyle(
                 'CustomTitle',
                 parent=styles['Heading1'],
-                fontSize=24,
+                fontSize=26,
                 spaceAfter=30,
                 alignment=TA_CENTER,
-                textColor=colors.HexColor('#1f4e79')
+                textColor=colors.HexColor('#1f4e79'),
+                fontName='Helvetica-Bold'
             )
             
             # Estilo para subtítulos
             subtitle_style = ParagraphStyle(
                 'CustomSubtitle',
                 parent=styles['Heading2'],
-                fontSize=16,
-                spaceAfter=12,
-                textColor=colors.HexColor('#2f5f8f')
+                fontSize=18,
+                spaceAfter=15,
+                spaceBefore=10,
+                textColor=colors.HexColor('#2f5f8f'),
+                fontName='Helvetica-Bold'
             )
             
             # Estilo para texto normal
@@ -142,16 +145,21 @@ class PDFGenerator:
                 if glaseo_percent != 70:  # Solo mostrar si es diferente al estándar
                     info_data.append(["Glaseo solicitado:", f"{glaseo_percent:.0f}%"])
             
-            info_table = Table(info_data, colWidths=[2*inch, 3*inch])
+            info_table = Table(info_data, colWidths=[2.5*inch, 3.5*inch])
             info_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f0f0f0')),
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e8f4f8')),
                 ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('ALIGN', (0, 0), (0, -1), 'LEFT'),    # Etiquetas alineadas a la izquierda
+                ('ALIGN', (1, 0), (1, -1), 'LEFT'),    # Valores alineados a la izquierda
                 ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
                 ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('FONTSIZE', (0, 0), (-1, -1), 11),
                 ('GRID', (0, 0), (-1, -1), 1, colors.black),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 10),
             ]))
             
             story.append(info_table)
@@ -186,33 +194,63 @@ class PDFGenerator:
             if is_houston:
                 main_price_data = [
                     ["PRECIO FOB", "POR KILOGRAMO"],
-                    ["", f"${precio_kg:.2f}"]
+                    [f"${precio_kg:.2f}", ""]
                 ]
                 main_price_table = Table(main_price_data, colWidths=[3*inch, 3*inch])
+                main_price_table.setStyle(TableStyle([
+                    # Encabezado
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f4e79')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (0, 0), 'CENTER'),  # PRECIO FOB centrado
+                    ('ALIGN', (1, 0), (1, 0), 'CENTER'),  # POR KILOGRAMO centrado
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 12),
+                    
+                    # Fila de precios
+                    ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#f0f8ff')),
+                    ('TEXTCOLOR', (0, 1), (-1, 1), colors.black),
+                    ('FONTNAME', (0, 1), (-1, 1), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 1), (-1, 1), 20),
+                    ('ALIGN', (0, 1), (0, 1), 'CENTER'),  # Precio centrado
+                    ('ALIGN', (1, 1), (1, 1), 'CENTER'),  # Celda vacía centrada
+                    
+                    # Bordes y espaciado
+                    ('GRID', (0, 0), (-1, -1), 1.5, colors.black),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('TOPPADDING', (0, 0), (-1, -1), 12),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                ]))
             else:
                 main_price_data = [
                     ["PRECIO FOB", "POR KILOGRAMO", "POR LIBRA"],
-                    ["", f"${precio_kg:.2f}", f"${precio_lb:.2f}"]
+                    [f"${precio_kg:.2f}", f"${precio_lb:.2f}", ""]
                 ]
-                main_price_table = Table(main_price_data, colWidths=[2*inch, 2*inch, 2*inch])
-            main_price_table.setStyle(TableStyle([
-                # Encabezado
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f4e79')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 11),
-                
-                # Fila de precios
-                ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#f0f8ff')),
-                ('TEXTCOLOR', (0, 1), (-1, 1), colors.black),
-                ('FONTNAME', (0, 1), (-1, 1), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 1), (-1, 1), 18),
-                
-                # Bordes
-                ('GRID', (0, 0), (-1, -1), 1.5, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
+                main_price_table = Table(main_price_data, colWidths=[2.5*inch, 2*inch, 1.5*inch])
+                main_price_table.setStyle(TableStyle([
+                    # Encabezado
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f4e79')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 12),
+                    
+                    # Fila de precios
+                    ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#f0f8ff')),
+                    ('TEXTCOLOR', (0, 1), (-1, 1), colors.black),
+                    ('FONTNAME', (0, 1), (-1, 1), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 1), (-1, 1), 18),
+                    ('ALIGN', (0, 1), (-1, 1), 'CENTER'),
+                    
+                    # Bordes y espaciado
+                    ('GRID', (0, 0), (-1, -1), 1.5, colors.black),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('TOPPADDING', (0, 0), (-1, -1), 12),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                ]))
             
             story.append(main_price_table)
             story.append(Spacer(1, 20))
@@ -226,29 +264,33 @@ class PDFGenerator:
                 ["Concepto", "Valor"],
                 ["Glaseo aplicado", f"{glaseo_factor:.1%}"],
                 ["Flete incluido", f"${flete:.2f}"],
-               
             ]
             
-            specs_table = Table(specs_data, colWidths=[3*inch, 3*inch])
+            specs_table = Table(specs_data, colWidths=[3.5*inch, 2.5*inch])
             specs_table.setStyle(TableStyle([
                 # Encabezado
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2f5f8f')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('ALIGN', (0, 0), (0, 0), 'LEFT'),    # Concepto alineado a la izquierda
+                ('ALIGN', (1, 0), (1, 0), 'CENTER'),  # Valor centrado
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('FONTSIZE', (0, 0), (-1, 0), 11),
                 
                 # Datos
                 ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f8f8f8')),
                 ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
                 ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 10),
+                ('FONTSIZE', (0, 1), (-1, -1), 11),
+                ('ALIGN', (0, 1), (0, -1), 'LEFT'),    # Conceptos alineados a la izquierda
+                ('ALIGN', (1, 1), (1, -1), 'CENTER'),  # Valores centrados
                 
-                # Bordes
+                # Bordes y espaciado
                 ('GRID', (0, 0), (-1, -1), 1, colors.black),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('LEFTPADDING', (0, 0), (-1, -1), 10),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('LEFTPADDING', (0, 0), (-1, -1), 12),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 12),
             ]))
             
             story.append(specs_table)
@@ -293,17 +335,27 @@ class PDFGenerator:
                     
                     total_table = Table(total_data, colWidths=[3*inch, 3*inch])
                     total_table.setStyle(TableStyle([
+                        # Encabezado
                         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f4e79')),
                         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
                         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                         ('FONTSIZE', (0, 0), (-1, 0), 12),
+                        
+                        # Fila de totales
                         ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#fff2cc')),
                         ('TEXTCOLOR', (0, 1), (-1, 1), colors.black),
                         ('FONTNAME', (0, 1), (-1, 1), 'Helvetica-Bold'),
                         ('FONTSIZE', (0, 1), (-1, 1), 16),
+                        ('ALIGN', (0, 1), (-1, 1), 'CENTER'),
+                        
+                        # Bordes y espaciado
                         ('GRID', (0, 0), (-1, -1), 2, colors.black),
                         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('TOPPADDING', (0, 0), (-1, -1), 10),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+                        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
                     ]))
                     
                     story.append(total_table)
