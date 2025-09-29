@@ -170,7 +170,7 @@ class PDFGenerator:
                         Paragraph("Camarón Premium del Ecuador para el Mundo", header_slogan_style),
                         Paragraph("Web: www.bgrexport.com", header_contact_style),
                         Paragraph("Email: info@bgrexport.com", header_contact_style),
-                        Paragraph("Tel: +593 4 123-4567", header_contact_style)
+                        Paragraph("Tel: +593 98-805-7425", header_contact_style)
                     ]
                     
                     # Crear fondo blanco para el logo para que resalte
@@ -207,7 +207,7 @@ class PDFGenerator:
                 except Exception as logo_error:
                     logger.warning(f"⚠️ Error cargando logo: {logo_error}")
                     # Fallback con fondo azul marino sin logo
-                    fallback_data = [["BGR EXPORT SHRIMP S.A.\nCamarón Premium del Ecuador para el Mundo\nWeb: www.bgrexport.com | Email: info@bgrexport.com | Tel: +593 4 123-4567"]]
+                    fallback_data = [["BGR EXPORT SHRIMP S.A.\nCamarón Premium del Ecuador para el Mundo\nWeb: www.bgrexport.com | Email: info@bgrexport.com | Tel: +593 98-805-7425"]]
                     fallback_table = Table(fallback_data, colWidths=[7.5*inch])
                     fallback_table.setStyle(TableStyle([
                         ('BACKGROUND', (0, 0), (-1, -1), azul_marino),
@@ -222,7 +222,7 @@ class PDFGenerator:
             else:
                 logger.warning(f"⚠️ Logo no encontrado en: {logo_path}")
                 # Fallback con fondo azul marino sin logo
-                fallback_data = [["BGR EXPORT SHRIMP S.A.\nCamarón Premium del Ecuador para el Mundo\nWeb: www.bgrexport.com | Email: info@bgrexport.com | Tel: +593 4 123-4567"]]
+                fallback_data = [["BGR EXPORT SHRIMP S.A.\nCamarón Premium del Ecuador para el Mundo\nWeb: www.bgrexport.com | Email: info@bgrexport.com | Tel: +593 98-805-7425"]]
                 fallback_table = Table(fallback_data, colWidths=[7.5*inch])
                 fallback_table.setStyle(TableStyle([
                     ('BACKGROUND', (0, 0), (-1, -1), azul_marino),
@@ -342,22 +342,24 @@ class PDFGenerator:
                     # Encabezado elegante
                     ('BACKGROUND', (0, 0), (-1, 0), azul_marino),
                     ('TEXTCOLOR', (0, 0), (-1, 0), blanco),
-                    ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, 0), 14),
+                    ('ALIGN', (0, 0), (0, 0), 'CENTER'),  # Encabezado centrado
+                    ('FONTNAME', (0, 0), (0, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (0, 0), 14),
                     
-                    # Precio destacado - GRANDE, NEGRITA Y CENTRADO
-                    ('BACKGROUND', (0, 1), (-1, 1), blanco),
-                    ('TEXTCOLOR', (0, 1), (-1, 1), azul_marino),
-                    ('FONTNAME', (0, 1), (-1, 1), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 1), (-1, 1), 36),  # Precio MUY GRANDE
-                    ('ALIGN', (0, 1), (-1, 1), 'CENTER'),
+                    # Precio destacado - PERFECTAMENTE CENTRADO
+                    ('BACKGROUND', (0, 1), (0, 1), blanco),
+                    ('TEXTCOLOR', (0, 1), (0, 1), azul_marino),
+                    ('FONTNAME', (0, 1), (0, 1), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 1), (0, 1), 36),  # Precio MUY GRANDE
+                    ('ALIGN', (0, 1), (0, 1), 'CENTER'),  # PRECIO CENTRADO
                     
                     # Bordes minimalistas
                     ('GRID', (0, 0), (-1, -1), 1.5, azul_marino),
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                     ('TOPPADDING', (0, 0), (-1, -1), 20),
                     ('BOTTOMPADDING', (0, 0), (-1, -1), 20),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 10),
                 ]))
             else:
                 # Para otros destinos: Kilogramos y libras
@@ -593,7 +595,7 @@ class PDFGenerator:
             story.append(Paragraph("Precios FOB sujetos a confirmación final. BGR Export Shrimp – Garantía de calidad y frescura.", disclaimer_style))
             
             # Contacto de la empresa alineado al centro
-            story.append(Paragraph("Tel: +593 4 123-4567 | Email: info@bgrexport.com | Web: www.bgrexport.com", contact_style))
+            story.append(Paragraph("Tel: +593 98-805-7425 | Email: info@bgrexport.com | Web: www.bgrexport.com", contact_style))
             story.append(Paragraph("BGR EXPORT SHRIMP S.A. - Camarón Premium del Ecuador", company_footer_style))
             
             # Generar PDF
