@@ -356,8 +356,12 @@ class PDFGenerator:
                     # Bordes minimalistas
                     ('GRID', (0, 0), (-1, -1), 1.5, azul_marino),
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                    ('TOPPADDING', (0, 0), (-1, -1), 20),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 20),
+                    # Padding del encabezado
+                    ('TOPPADDING', (0, 0), (0, 0), 20),
+                    ('BOTTOMPADDING', (0, 0), (0, 0), 20),
+                    # Padding del precio - menos padding arriba para que suba
+                    ('TOPPADDING', (0, 1), (0, 1), 10),  # Reducido para subir el precio
+                    ('BOTTOMPADDING', (0, 1), (0, 1), 30), # Aumentado para compensar
                     ('LEFTPADDING', (0, 0), (-1, -1), 10),
                     ('RIGHTPADDING', (0, 0), (-1, -1), 10),
                 ]))
