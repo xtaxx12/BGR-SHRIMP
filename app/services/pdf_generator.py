@@ -425,7 +425,12 @@ class PDFGenerator:
             if price_info.get('calculo_dinamico') and flete > 0:
                 specs_data.append(["Flete Incluido", f"${flete:.2f}/kg"])
             
-         
+            # Agregar observaciones adicionales si aplica
+            if price_info.get('destination'):
+                if is_houston:
+                    specs_data.append(["Destino Especial", "Houston - Precios en kilos"])
+                else:
+                    specs_data.append(["Destino", price_info['destination']])
             
             # Agregar tipo de producto
             if price_info.get('producto') and price_info.get('talla'):
@@ -467,7 +472,7 @@ class PDFGenerator:
             story.append(Spacer(1, 30))       
      
             # CUADRO DE PRECIO TOTAL - Cantidad × Precio Unitario
-            if price_info.get('quantity'):
+            if price_info.get('quantity') and price_info['quantity'] is not None:
                 total_title_style = ParagraphStyle(
                     'TotalTitle',
                     parent=styles['Heading2'],
@@ -482,7 +487,9 @@ class PDFGenerator:
                 story.append(Paragraph("TOTAL ESTIMADO", total_title_style))
                 
                 try:
-                    qty = float(price_info['quantity'].replace(',', ''))
+                    # Verificar que quantity no sea None y sea convertible a string
+                    quantity_str = str(price_info['quantity']) if price_info['quantity'] is not None else "0"
+                    qty = float(quantity_str.replace(',', ''))
                     unit = price_info.get('unit', 'lb')
                     
                     # Usar precio final
@@ -507,7 +514,7 @@ class PDFGenerator:
                     # Tabla elegante de total con diseño minimalista
                     total_data = [
                         ["CANTIDAD", "PRECIO UNITARIO", "TOTAL FOB USD"],
-                        [f"{price_info['quantity']} {unit.upper()}", f"${unit_price:.2f}", f"${total:,.2f}"]
+                        [f"{quantity_str} {unit.upper()}", f"${unit_price:.2f}", f"${total:,.2f}"]
                     ]
                     
                     total_table = Table(total_data, colWidths=[2.3*inch, 2.3*inch, 2.4*inch])
