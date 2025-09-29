@@ -184,10 +184,10 @@ class PDFGenerator:
             story.append(Paragraph("COTIZACIÓN DE CAMARÓN", quote_title_style))
             story.append(Spacer(1, 20))
             
-            # DATOS DE Ln de la coÓN - Bloque elegante con fondo gris y bordes redondeados
+            # DATOS DE LA COTIZACIÓN - Bloque elegante con fondo gris y bordes redondeados
             fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
             
-            # Credataatos de información
+            # Crear datos de información
             info_data = [
                 ["📅 Fecha de Cotización:", fecha_actual],
                 ["🦐 Producto:", price_info.get('producto', 'Camarón')],
@@ -198,7 +198,7 @@ class PDFGenerator:
             if price_info.get('cliente_nombre'):
                 info_data.append(["👤 Cliente:", price_info['cliente_nombre'].title()])
             
-            if price_info.get('d([tination'):
+            if price_info.get('destination'):
                 info_data.append(["🌍 Destino:", price_info['destination']])
             
             if price_info.get('quantity'):
@@ -207,13 +207,13 @@ class PDFGenerator:
             # Agregar glaseo si fue especificado por el usuario
             if price_info.get('calculo_dinamico') and price_info.get('factor_glaseo'):
                 glaseo_percent = price_info['factor_glaseo'] * 100
-                if glaso_data.appe!= 70:  # Solo mostrar si es diferente al estándar
+                if glaseo_percent != 70:  # Solo mostrar si es diferente al estándar
                     info_data.append(["❄️ Glaseo solicitado:", f"{glaseo_percent:.0f}%"])
             
             # Tabla de información con diseño elegante
             info_table = Table(info_data, colWidths=[2.8*inch, 3.5*inch])
             info_table.setStyle(TableStyle([
-                # Fondo gris claro para1), 'LEFTtabla
+                # Fondo gris claro para toda la tabla
                 ('BACKGROUND', (0, 0), (-1, -1), gris_claro),
                 # Fondo más oscuro para las etiquetas
                 ('BACKGROUND', (0, 0), (0, -1), gris_medio),
@@ -230,13 +230,11 @@ class PDFGenerator:
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
                 ('LEFTPADDING', (0, 0), (-1, -1), 12),
                 ('RIGHTPADDING', (0, 0), (-1, -1), 12),
-                # Bordes redondeados simulados con espaciado
-                ('ROUNDEDCORNERS', [5, 5, 5, 5]),
             ]))
             
             story.append(info_table)
-            story.append(Spacer(1, 25))
-            
+            story.append(Spacer(1, 25))     
+       
             # SECCIÓN PRINCIPAL: COTIZACIÓN FOB - Precio destacado
             story.append(Paragraph("💰 COTIZACIÓN FOB", section_title_style))
             story.append(Spacer(1, 15))
@@ -389,8 +387,8 @@ class PDFGenerator:
             ]))
             
             story.append(specs_table)
-            story.append(Spacer(1, 25))
-            
+            story.append(Spacer(1, 25))       
+     
             # CUADRO CON PRECIO TOTAL CALCULADO (si hay cantidad)
             if price_info.get('quantity'):
                 story.append(Paragraph("📊 TOTAL ESTIMADO", section_title_style))
