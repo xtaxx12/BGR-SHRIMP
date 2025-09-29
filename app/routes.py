@@ -399,6 +399,20 @@ async def whatsapp_webhook(
         
         response_xml = str(response)
         logger.info(f"Enviando respuesta XML: {response_xml}")
+        
+        # Validar que el XML sea válido
+        try:
+            import xml.etree.ElementTree as ET
+            ET.fromstring(response_xml)
+            logger.info("✅ XML válido")
+        except Exception as xml_error:
+            logger.error(f"❌ XML inválido: {xml_error}")
+            # Crear respuesta de emergencia
+            emergency_response = MessagingResponse()
+            emergency_response.message("¡Hola! Soy ShrimpBot de BGR Export. ¿En qué puedo ayudarte?")
+            response_xml = str(emergency_response)
+            logger.info(f"🚨 Usando respuesta de emergencia: {response_xml}")
+        
         return PlainTextResponse(response_xml, media_type="application/xml")
         
     except Exception as e:

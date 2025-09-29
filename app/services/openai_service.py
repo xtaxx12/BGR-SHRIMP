@@ -13,11 +13,7 @@ class OpenAIService:
         self.model = "gpt-3.5-turbo"
         self.whisper_model = "whisper-1"
         self.base_url = "https://api.openai.com/v1"
-        
-        if self.api_key:
-            logger.info("✅ OpenAI API configurada correctamente")
-        else:
-            logger.warning("⚠️ OpenAI API Key no configurada")
+    
     
     def is_available(self) -> bool:
         """Verifica si OpenAI está disponible"""
@@ -207,8 +203,10 @@ OBJETIVO: Generar proformas inmediatamente cuando tengas datos suficientes.
             result = self._make_request(messages, max_tokens=200, temperature=0.7)
             
             if result:
-                logger.info(f"🤖 Respuesta generada por OpenAI: {result}")
-                return result
+                # Limpiar emojis problemáticos que pueden causar errores de codificación
+                cleaned_result = self._clean_problematic_emojis(result)
+                logger.info(f"🤖 Respuesta generada por OpenAI: {cleaned_result}")
+                return cleaned_result
             else:
                 return None
             
@@ -570,3 +568,21 @@ Formato de respuesta: texto directo sin JSON.
         
         else:
             return "🦐 ¡Hola! Soy ShrimpBot de BGR Export. ¿Qué camarón necesitas? Te genero la proforma al instante 📋💰"
+    
+    def _clean_problematic_emojis(self, text: str) -> str:
+        """
+        Limpia emojis que pueden causar problemas de codificación en WhatsApp
+        """
+        # Lista de emojis problemáticos y sus reemplazos
+        problematic_emojis = {
+            '🤑': '💰',  # Reemplazar cara con dinero por bolsa de dinero
+            '🤖': '🦐',  # Reemplazar robot por camarón
+            '💸': '💰',  # Reemplazar dinero volando por bolsa de dinero
+            '🤔': '🤝',  # Reemplazar cara pensando por apretón de manos
+        }
+        
+        cleaned_text = text
+        for problematic, replacement in problematic_emojis.items():
+            cleaned_text = cleaned_text.replace(problematic, replacement)
+        
+        return cleaned_text
