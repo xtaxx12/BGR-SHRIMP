@@ -181,7 +181,7 @@ def format_price_response(price_info: Dict) -> str:
             response += "⚠️ **SIN PRECIO ESTABLECIDO**\n\n"
             response += "📞 Para obtener cotización de este producto, contacta directamente con BGR Export.\n\n"
             response += "🏢 **Información de contacto:**\n"
-            response += "📧 Email: ventas@bgrexport.com\n"
+            response += "📧 Email: amerino@bgrexport.com\n"
             response += "📱 WhatsApp: +593 98-805-7425\n"
             response += "🌐 Web: www.bgrexport.com"
             return response

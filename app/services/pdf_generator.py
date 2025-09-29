@@ -169,7 +169,7 @@ class PDFGenerator:
                         Paragraph("BGR EXPORT SHRIMP S.A.", header_company_style),
                         Paragraph("Camarón Premium del Ecuador para el Mundo", header_slogan_style),
                         Paragraph("Web: www.bgrexport.com", header_contact_style),
-                        Paragraph("Email: info@bgrexport.com", header_contact_style),
+                        Paragraph("Email: amerino@bgrexport.com", header_contact_style),
                         Paragraph("Tel: +593 98-805-7425", header_contact_style)
                     ]
                     
@@ -207,7 +207,7 @@ class PDFGenerator:
                 except Exception as logo_error:
                     logger.warning(f"⚠️ Error cargando logo: {logo_error}")
                     # Fallback con fondo azul marino sin logo
-                    fallback_data = [["BGR EXPORT SHRIMP S.A.\nCamarón Premium del Ecuador para el Mundo\nWeb: www.bgrexport.com | Email: info@bgrexport.com | Tel: +593 98-805-7425"]]
+                    fallback_data = [["BGR EXPORT SHRIMP S.A.\nCamarón Premium del Ecuador para el Mundo\nWeb: www.bgrexport.com | Email: amerino@bgrexport.com | Tel: +593 98-805-7425"]]
                     fallback_table = Table(fallback_data, colWidths=[7.5*inch])
                     fallback_table.setStyle(TableStyle([
                         ('BACKGROUND', (0, 0), (-1, -1), azul_marino),
@@ -222,7 +222,7 @@ class PDFGenerator:
             else:
                 logger.warning(f"⚠️ Logo no encontrado en: {logo_path}")
                 # Fallback con fondo azul marino sin logo
-                fallback_data = [["BGR EXPORT SHRIMP S.A.\nCamarón Premium del Ecuador para el Mundo\nWeb: www.bgrexport.com | Email: info@bgrexport.com | Tel: +593 98-805-7425"]]
+                fallback_data = [["BGR EXPORT SHRIMP S.A.\nCamarón Premium del Ecuador para el Mundo\nWeb: www.bgrexport.com | Email: amerino@bgrexport.com | Tel: +593 98-805-7425"]]
                 fallback_table = Table(fallback_data, colWidths=[7.5*inch])
                 fallback_table.setStyle(TableStyle([
                     ('BACKGROUND', (0, 0), (-1, -1), azul_marino),
@@ -356,8 +356,12 @@ class PDFGenerator:
                     # Bordes minimalistas
                     ('GRID', (0, 0), (-1, -1), 1.5, azul_marino),
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                    ('TOPPADDING', (0, 0), (-1, -1), 20),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 20),
+                    # Padding del encabezado
+                    ('TOPPADDING', (0, 0), (0, 0), 20),
+                    ('BOTTOMPADDING', (0, 0), (0, 0), 20),
+                    # Padding del precio - menos padding arriba para que suba
+                    ('TOPPADDING', (0, 1), (0, 1), 10),  # Reducido para subir el precio
+                    ('BOTTOMPADDING', (0, 1), (0, 1), 30), # Aumentado para compensar
                     ('LEFTPADDING', (0, 0), (-1, -1), 10),
                     ('RIGHTPADDING', (0, 0), (-1, -1), 10),
                 ]))
@@ -421,12 +425,7 @@ class PDFGenerator:
             if price_info.get('calculo_dinamico') and flete > 0:
                 specs_data.append(["Flete Incluido", f"${flete:.2f}/kg"])
             
-            # Agregar observaciones adicionales si aplica
-            if price_info.get('destination'):
-                if is_houston:
-                    specs_data.append(["Destino Especial", "Houston - Precios en kilos"])
-                else:
-                    specs_data.append(["Destino", price_info['destination']])
+         
             
             # Agregar tipo de producto
             if price_info.get('producto') and price_info.get('talla'):
@@ -595,7 +594,7 @@ class PDFGenerator:
             story.append(Paragraph("Precios FOB sujetos a confirmación final. BGR Export Shrimp – Garantía de calidad y frescura.", disclaimer_style))
             
             # Contacto de la empresa alineado al centro
-            story.append(Paragraph("Tel: +593 98-805-7425 | Email: info@bgrexport.com | Web: www.bgrexport.com", contact_style))
+            story.append(Paragraph("Tel: +593 98-805-7425 | Email: amerino@bgrexport.com | Web: www.bgrexport.com", contact_style))
             story.append(Paragraph("BGR EXPORT SHRIMP S.A. - Camarón Premium del Ecuador", company_footer_style))
             
             # Generar PDF
