@@ -392,23 +392,25 @@ class GoogleSheetsService:
                 logger.warning("Google Sheets no configurado, usando flete por defecto")
                 return 0.22  # Valor por defecto
             
-            # Obtener la hoja de trabajo correcta (evitar gráficos)
+            # Obtener la hoja de trabajo correcta
             worksheets = self.sheet.worksheets()
             worksheet = None
             
-            # Buscar una hoja que no sea un gráfico
+            # Buscar la hoja con datos de precios (no gráficos ni hojas pequeñas)
             for ws in worksheets:
-                if 'gráfico' not in ws.title.lower() and 'chart' not in ws.title.lower():
-                    worksheet = ws
-                    break
+                try:
+                    # Verificar que la hoja tenga suficientes columnas
+                    if ws.col_count >= 30 and 'gráfico' not in ws.title.lower():
+                        worksheet = ws
+                        break
+                except:
+                    continue
             
             if not worksheet:
                 worksheet = worksheets[0]  # Fallback
             
-            logger.info(f"📊 Leyendo flete de hoja: {worksheet.title}")
-            
-            # Leer celda AE28 (columna 31, fila 28) - según tu imagen es AC28
-            flete_value = worksheet.cell(28, 29).value  # AC28 = columna 29
+            # Leer celda AC28 (columna 29, fila 28)
+            flete_value = worksheet.cell(28, 29).value
             
             if flete_value and self._is_number(flete_value):
                 flete = self._clean_price(flete_value)

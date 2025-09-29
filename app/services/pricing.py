@@ -112,35 +112,21 @@ class PricingService:
             
             # Determinar costo fijo según destino
             if destination.lower() == 'houston':
-                # Houston: USA pero usa el costo fijo de Sheets (no cambiar)
                 costo_fijo = costo_fijo_sheets
-                logger.info(f"🏢 Houston - Costo fijo desde Sheets: ${costo_fijo}")
             elif usar_libras:
-                # Otras ciudades USA: convertir a libras
                 costo_fijo = costo_fijo_sheets / 2.2
-                logger.info(f"🇺🇸 Destino USA (libras) - Costo fijo: ${costo_fijo} (${costo_fijo_sheets}/2.2)")
             else:
-                # Destinos internacionales: usar valor de Sheets
                 costo_fijo = costo_fijo_sheets
-                logger.info(f"🌍 Destino internacional - Costo fijo desde Sheets: ${costo_fijo}")
             
             # Para el flete, usar valor personalizado del usuario o desde Google Sheets
             if flete_custom is not None:
                 flete_value = flete_custom
-                logger.info(f"💰 Usando flete personalizado: ${flete_value}")
             else:
-                # Obtener flete desde Google Sheets celda AE28
                 flete_value = self.sheets_service.get_flete_value()
-                logger.info(f"📊 Flete obtenido desde Sheets AE28: ${flete_value}")
             
             # Usar glaseo especificado o valor por defecto
             if glaseo_factor is None:
-                glaseo_factor = 0.70  # Valor por defecto (70%)
-                logger.info(f"📊 Usando glaseo por defecto: {glaseo_factor:.1%}")
-            else:
-                logger.info(f"🎯 Usando glaseo especificado: {glaseo_factor:.1%}")
-            
-            logger.info(f"🧮 Cálculo dinámico: glaseo={glaseo_factor}, flete={flete_value}, libras={usar_libras}")
+                glaseo_factor = 0.70
             
             # Aplicar fórmulas según la hoja de Google Sheets
             # Fórmula: Precio Final = Precio Glaseo (AC33) + Costo Fijo (AA28) + Flete (AE28)
