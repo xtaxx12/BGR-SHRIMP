@@ -347,22 +347,54 @@ async def whatsapp_webhook(
                     
                     if price_info:
                         logger.info(f"✅ Proforma automática generada para: {ai_query}")
-                        formatted_response = format_price_response(price_info)
                         
-                        # Agregar contexto de que fue procesado desde audio/IA
-                        if NumMedia > 0:
-                            formatted_response = f"🎤 **Procesado desde audio:**\n\n{formatted_response}"
+                        # Generar PDF directamente sin mostrar cotización en texto
+                        logger.info(f"📄 Generando PDF automáticamente para usuario {user_id}")
+                        pdf_path = pdf_generator.generate_quote_pdf(price_info, From)
+                        
+                        if pdf_path:
+                            # Crear URL pública del PDF para envío
+                            filename = os.path.basename(pdf_path)
+                            base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
+                            download_url = f"{base_url}/webhook/download-pdf/{filename}"
+                            
+                            # Intentar enviar el PDF por WhatsApp
+                            pdf_sent = whatsapp_sender.send_pdf_document(
+                                From, 
+                                pdf_path, 
+                                f"Cotización BGR Export - {price_info.get('producto', 'Camarón')} {price_info.get('talla', '')}"
+                            )
+                            
+                            if pdf_sent:
+                                logger.info(f"✅ PDF enviado exitosamente por WhatsApp: {pdf_path}")
+                                
+                                # Mensaje de confirmación con información básica
+                                confirmation_msg = f"✅ **Proforma generada y enviada**\n\n"
+                                confirmation_msg += f"🦐 **{price_info.get('producto', 'Camarón')} {price_info.get('talla', '')}**\n"
+                                
+                                if price_info.get('cliente_nombre'):
+                                    confirmation_msg += f"👤 Cliente: {price_info['cliente_nombre'].title()}\n"
+                                
+                                if price_info.get('destination'):
+                                    confirmation_msg += f"🌍 Destino: {price_info['destination']}\n"
+                                
+                                # Mostrar precio final
+                                if price_info.get('precio_final_kg'):
+                                    if price_info.get('destination', '').lower() == 'houston':
+                                        confirmation_msg += f"💰 Precio FOB: ${price_info['precio_final_kg']:.2f}/kg\n"
+                                    else:
+                                        confirmation_msg += f"💰 Precio FOB: ${price_info['precio_final_kg']:.2f}/kg - ${price_info.get('precio_final_lb', 0):.2f}/lb\n"
+                                
+                                confirmation_msg += f"\n📄 **PDF enviado por WhatsApp**"
+                                
+                                response.message(confirmation_msg)
+                            else:
+                                logger.error(f"❌ Error enviando PDF por WhatsApp")
+                                response.message(f"✅ Proforma generada\n📄 Descarga tu PDF: {download_url}")
                         else:
-                            formatted_response = f"🤖 **Procesado automáticamente:**\n\n{formatted_response}"
+                            logger.error(f"❌ Error generando PDF")
+                            response.message("❌ Error generando la proforma. Intenta nuevamente.")
                         
-                        # Agregar instrucción para confirmar
-                        formatted_response += "\n\n✅ **Para generar PDF:** Escribe 'confirmar'"
-                        
-                        response.message(formatted_response)
-                        
-                        # Almacenar cotización para posible confirmación
-                        session_manager.set_last_quote(user_id, price_info)
-                        session_manager.set_session_state(user_id, 'quote_ready', {})
                         return PlainTextResponse(str(response), media_type="application/xml")
             
             smart_response = None
