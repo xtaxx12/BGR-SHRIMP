@@ -426,11 +426,8 @@ class PDFGenerator:
                 specs_data.append(["Flete Incluido", f"${flete:.2f}/kg"])
             
             # Agregar observaciones adicionales si aplica
-            if price_info.get('destination'):
-                if is_houston:
-                    specs_data.append(["Destino Especial", "Houston - Precios en kilos"])
-                else:
-                    specs_data.append(["Destino", price_info['destination']])
+            if price_info.get('destination') and not is_houston:
+                specs_data.append(["Destino", price_info['destination']])
             
             # Agregar tipo de producto
             if price_info.get('producto') and price_info.get('talla'):
