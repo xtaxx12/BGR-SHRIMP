@@ -164,29 +164,41 @@ class PDFGenerator:
                         fontName='Helvetica'
                     )
                     
-                    # Datos de la empresa con texto blanco
+                    # Datos de la empresa con texto blanco (sin emojis)
                     company_info = [
                         Paragraph("BGR EXPORT SHRIMP S.A.", header_company_style),
                         Paragraph("Camarón Premium del Ecuador para el Mundo", header_slogan_style),
-                        Paragraph("🌐 www.bgrexport.com", header_contact_style),
-                        Paragraph("📧 info@bgrexport.com", header_contact_style),
-                        Paragraph("📞 +593 4 123-4567", header_contact_style)
+                        Paragraph("Web: www.bgrexport.com", header_contact_style),
+                        Paragraph("Email: info@bgrexport.com", header_contact_style),
+                        Paragraph("Tel: +593 4 123-4567", header_contact_style)
                     ]
                     
+                    # Crear fondo blanco para el logo para que resalte
+                    logo_with_bg = Table([[logo_img]], colWidths=[2.5*inch])
+                    logo_with_bg.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, -1), blanco),
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('TOPPADDING', (0, 0), (-1, -1), 10),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+                        ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+                    ]))
+                    
                     # Tabla del encabezado con fondo azul marino
-                    header_data = [[logo_img, company_info]]
+                    header_data = [[logo_with_bg, company_info]]
                     header_table = Table(header_data, colWidths=[3*inch, 4.5*inch])
                     header_table.setStyle(TableStyle([
                         # Fondo azul marino para toda la tabla
                         ('BACKGROUND', (0, 0), (-1, -1), azul_marino),
-                        ('ALIGN', (0, 0), (0, 0), 'LEFT'),     # Logo a la izquierda
-                        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),    # Datos a la derecha
+                        ('ALIGN', (0, 0), (0, 0), 'CENTER'),    # Logo centrado
+                        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),     # Datos a la derecha
                         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'), # Centrado vertical
                         ('TOPPADDING', (0, 0), (-1, -1), 15),
                         ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
                         ('LEFTPADDING', (0, 0), (-1, -1), 20),
                         ('RIGHTPADDING', (0, 0), (-1, -1), 20),
-                        # Bordes redondeados simulados
+                        # Sin bordes para un look más limpio
                         ('GRID', (0, 0), (-1, -1), 0, azul_marino),
                     ]))
                     
@@ -195,7 +207,7 @@ class PDFGenerator:
                 except Exception as logo_error:
                     logger.warning(f"⚠️ Error cargando logo: {logo_error}")
                     # Fallback con fondo azul marino sin logo
-                    fallback_data = [["BGR EXPORT SHRIMP S.A.\nCamarón Premium del Ecuador para el Mundo\n🌐 www.bgrexport.com | 📧 info@bgrexport.com | 📞 +593 4 123-4567"]]
+                    fallback_data = [["BGR EXPORT SHRIMP S.A.\nCamarón Premium del Ecuador para el Mundo\nWeb: www.bgrexport.com | Email: info@bgrexport.com | Tel: +593 4 123-4567"]]
                     fallback_table = Table(fallback_data, colWidths=[7.5*inch])
                     fallback_table.setStyle(TableStyle([
                         ('BACKGROUND', (0, 0), (-1, -1), azul_marino),
@@ -210,7 +222,7 @@ class PDFGenerator:
             else:
                 logger.warning(f"⚠️ Logo no encontrado en: {logo_path}")
                 # Fallback con fondo azul marino sin logo
-                fallback_data = [["BGR EXPORT SHRIMP S.A.\nCamarón Premium del Ecuador para el Mundo\n🌐 www.bgrexport.com | 📧 info@bgrexport.com | 📞 +593 4 123-4567"]]
+                fallback_data = [["BGR EXPORT SHRIMP S.A.\nCamarón Premium del Ecuador para el Mundo\nWeb: www.bgrexport.com | Email: info@bgrexport.com | Tel: +593 4 123-4567"]]
                 fallback_table = Table(fallback_data, colWidths=[7.5*inch])
                 fallback_table.setStyle(TableStyle([
                     ('BACKGROUND', (0, 0), (-1, -1), azul_marino),
@@ -235,26 +247,26 @@ class PDFGenerator:
             
             # Crear datos de información con íconos visuales
             info_data = [
-                ["📅 Fecha de Cotización", fecha_actual],
-                ["🦐 Producto", price_info.get('producto', 'Camarón')],
-                ["📏 Talla", price_info.get('talla', 'N/A')]
+                ["Fecha de Cotización", fecha_actual],
+                ["Producto", price_info.get('producto', 'Camarón')],
+                ["Talla", price_info.get('talla', 'N/A')]
             ]
             
             # Agregar cliente si está disponible
             if price_info.get('cliente_nombre'):
-                info_data.append(["👤 Cliente", price_info['cliente_nombre'].title()])
+                info_data.append(["Cliente", price_info['cliente_nombre'].title()])
             
             if price_info.get('destination'):
-                info_data.append(["🌍 Destino", price_info['destination']])
+                info_data.append(["Destino", price_info['destination']])
             
             if price_info.get('quantity'):
-                info_data.append(["📦 Cantidad", f"{price_info['quantity']} {price_info.get('unit', 'lb')}"])
+                info_data.append(["Cantidad", f"{price_info['quantity']} {price_info.get('unit', 'lb')}"])
             
             # Agregar glaseo si fue especificado por el usuario
             if price_info.get('calculo_dinamico') and price_info.get('factor_glaseo'):
                 glaseo_percent = price_info['factor_glaseo'] * 100
                 if glaseo_percent != 70:  # Solo mostrar si es diferente al estándar
-                    info_data.append(["❄️ Glaseo Solicitado", f"{glaseo_percent:.0f}%"])
+                    info_data.append(["Glaseo Solicitado", f"{glaseo_percent:.0f}%"])
             
             # Tabla de información con diseño corporativo minimalista
             info_table = Table(info_data, colWidths=[3.2*inch, 3.8*inch])
@@ -294,7 +306,7 @@ class PDFGenerator:
                 fontName='Helvetica-Bold'
             )
             
-            story.append(Paragraph("💰 COTIZACIÓN FOB", fob_title_style))
+            story.append(Paragraph("COTIZACIÓN FOB", fob_title_style))
             
             # Obtener precio final y datos
             if price_info.get('calculo_dinamico') and 'precio_final_kg' in price_info:
@@ -392,28 +404,28 @@ class PDFGenerator:
                 fontName='Helvetica-Bold'
             )
             
-            story.append(Paragraph("📋 ESPECIFICACIONES", specs_title_style))
+            story.append(Paragraph("ESPECIFICACIONES", specs_title_style))
             
             # Preparar datos de especificaciones con íconos visuales
             specs_data = [
                 ["Concepto", "Detalle"],
-                ["❄️ Glaseo Aplicado", f"{glaseo_factor:.1%}"],
+                ["Glaseo Aplicado", f"{glaseo_factor:.1%}"],
             ]
             
             # Agregar flete si está incluido
             if price_info.get('calculo_dinamico') and flete > 0:
-                specs_data.append(["🚢 Flete Incluido", f"${flete:.2f}/kg"])
+                specs_data.append(["Flete Incluido", f"${flete:.2f}/kg"])
             
             # Agregar observaciones adicionales si aplica
             if price_info.get('destination'):
                 if is_houston:
-                    specs_data.append(["📍 Destino Especial", "Houston - Precios en kilos"])
+                    specs_data.append(["Destino Especial", "Houston - Precios en kilos"])
                 else:
-                    specs_data.append(["🌍 Destino", price_info['destination']])
+                    specs_data.append(["Destino", price_info['destination']])
             
             # Agregar tipo de producto
             if price_info.get('producto') and price_info.get('talla'):
-                specs_data.append(["🦐 Especificación", f"{price_info['producto']} - Talla {price_info['talla']}"])
+                specs_data.append(["Especificación", f"{price_info['producto']} - Talla {price_info['talla']}"])
             
             # Tabla de especificaciones con diseño corporativo elegante
             specs_table = Table(specs_data, colWidths=[3.5*inch, 3.5*inch])
@@ -462,7 +474,7 @@ class PDFGenerator:
                     fontName='Helvetica-Bold'
                 )
                 
-                story.append(Paragraph("💰 TOTAL ESTIMADO", total_title_style))
+                story.append(Paragraph("TOTAL ESTIMADO", total_title_style))
                 
                 try:
                     qty = float(price_info['quantity'].replace(',', ''))
@@ -576,7 +588,7 @@ class PDFGenerator:
             story.append(Paragraph("Precios FOB sujetos a confirmación final. BGR Export Shrimp – Garantía de calidad y frescura.", disclaimer_style))
             
             # Contacto de la empresa alineado al centro
-            story.append(Paragraph("📞 +593 4 123-4567 | 📧 info@bgrexport.com | 🌐 www.bgrexport.com", contact_style))
+            story.append(Paragraph("Tel: +593 4 123-4567 | Email: info@bgrexport.com | Web: www.bgrexport.com", contact_style))
             story.append(Paragraph("BGR EXPORT SHRIMP S.A. - Camarón Premium del Ecuador", company_footer_style))
             
             # Generar PDF
