@@ -178,7 +178,7 @@ class GoogleSheetsService:
                         precio_kg = df.iloc[i, cols['precio_kg_col']]
                         precio_lb = df.iloc[i, cols['precio_lb_col']]
                         
-                        logger.info(f"Leyendo {product} fila {i+1}: talla='{talla}', kg='{precio_kg}', lb='{precio_lb}'")
+                        logger.debug(f"Leyendo {product} fila {i+1}: talla='{talla}', kg='{precio_kg}', lb='{precio_lb}'")
                         
                         # Verificar que la talla tenga formato válido (ej: 16/20)
                         if (('/' in talla or talla.startswith('U') or talla.endswith('/100')) and talla != 'nan' and talla and talla != '' and talla != 'TALLA'):
@@ -222,7 +222,7 @@ class GoogleSheetsService:
                         precio_kg = df.iloc[i, cols['precio_kg_col']]
                         precio_lb = df.iloc[i, cols['precio_lb_col']]
                         
-                        logger.info(f"Leyendo {product} fila {i+1}: talla='{talla}', kg='{precio_kg}', lb='{precio_lb}'")
+                        logger.debug(f"Leyendo {product} fila {i+1}: talla='{talla}', kg='{precio_kg}', lb='{precio_lb}'")
                         
                         # Verificar que la talla tenga formato válido (ej: 16/20)
                         if (('/' in talla or talla.startswith('U') or talla.endswith('/100')) and talla != 'nan' and talla and talla != '' and talla != 'TALLA'):

@@ -33,21 +33,21 @@ class PDFGenerator:
         Genera un PDF profesional con la cotización corporativa
         """
         try:
-            logger.info(f"🔍 Iniciando generación PDF con datos: {price_info}")
-            logger.info(f"📱 Teléfono usuario: {user_phone}")
+            logger.debug(f"🔍 Iniciando generación PDF con datos: {price_info}")
+            logger.debug(f"📱 Teléfono usuario: {user_phone}")
             # Generar nombre único para el archivo
-            logger.info("🔍 Generando nombre de archivo...")
+            logger.debug("🔍 Generando nombre de archivo...")
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             if user_phone:
                 cleaned_phone = user_phone.replace("+", "").replace(":", "")
                 phone_suffix = cleaned_phone[-4:] if len(cleaned_phone) >= 4 else cleaned_phone.zfill(4)
-                logger.info(f"📱 Teléfono procesado: {cleaned_phone} -> {phone_suffix}")
+                logger.debug(f"📱 Teléfono procesado: {cleaned_phone} -> {phone_suffix}")
             else:
                 phone_suffix = "0000"
-                logger.info("📱 Sin teléfono, usando 0000")
+                logger.debug("📱 Sin teléfono, usando 0000")
             filename = f"cotizacion_BGR_{timestamp}_{phone_suffix}.pdf"
             filepath = os.path.join(self.output_dir, filename)
-            logger.info(f"📄 Archivo: {filename}")
+            logger.debug(f"📄 Archivo: {filename}")
             
             logger.info(f"📁 Directorio de salida: {self.output_dir}")
             logger.info(f"📄 Nombre del archivo: {filename}")
@@ -253,7 +253,7 @@ class PDFGenerator:
             story.append(Spacer(1, 20))
             
             # BLOQUE DE DATOS DE LA COTIZACIÓN - Tabla con fondo gris claro y bordes suaves
-            logger.info("🔍 Creando datos de cotización...")
+            logger.debug("🔍 Creando datos de cotización...")
             fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
             
             # Crear datos de información con íconos visuales
@@ -262,7 +262,7 @@ class PDFGenerator:
                 ["Producto", price_info.get('producto', 'Camarón')],
                 ["Talla", price_info.get('talla', 'N/A')]
             ]
-            logger.info(f"📋 Datos base creados: {len(info_data)} filas")
+            logger.debug(f"📋 Datos base creados: {len(info_data)} filas")
             
             # Agregar cliente si está disponible
             if price_info.get('cliente_nombre'):
@@ -322,42 +322,42 @@ class PDFGenerator:
             story.append(Paragraph("COTIZACIÓN FOB", fob_title_style))
             
             # Obtener precio final y datos
-            logger.info("🔍 Obteniendo precios...")
+            logger.debug("🔍 Obteniendo precios...")
             if price_info.get('calculo_dinamico') and 'precio_final_kg' in price_info:
                 precio_kg = price_info['precio_final_kg']
                 precio_lb = price_info['precio_final_lb']
                 glaseo_factor = price_info.get('factor_glaseo', 0)
                 flete = price_info.get('flete', 0)
-                logger.info(f"💰 Precios dinámicos: kg=${precio_kg}, lb=${precio_lb}")
+                logger.debug(f"💰 Precios dinámicos: kg=${precio_kg}, lb=${precio_lb}")
             elif 'precio_flete_kg' in price_info:
                 precio_kg = price_info['precio_flete_kg']
                 precio_lb = price_info['precio_flete_lb']
                 glaseo_factor = 0.7  # Default
                 flete = 0.22  # Default
-                logger.info(f"💰 Precios con flete: kg=${precio_kg}, lb=${precio_lb}")
+                logger.debug(f"💰 Precios con flete: kg=${precio_kg}, lb=${precio_lb}")
             else:
                 precio_kg = price_info.get('precio_kg', 0)
                 precio_lb = price_info.get('precio_lb', 0)
                 glaseo_factor = 0.7
                 flete = 0.22
-                logger.info(f"💰 Precios básicos: kg=${precio_kg}, lb=${precio_lb}")
+                logger.debug(f"💰 Precios básicos: kg=${precio_kg}, lb=${precio_lb}")
             
             # Verificar si es Houston (solo kilos)
             destination = price_info.get('destination', '')
             is_houston = destination.lower() == 'houston'
             
             # TABLA PRINCIPAL DE PRECIOS - Diseño minimalista y elegante
-            logger.info("🔍 Creando tabla de precios...")
+            logger.debug("🔍 Creando tabla de precios...")
             if is_houston:
                 # Para Houston: Solo kilogramos
-                logger.info("🏢 Configurando tabla para Houston")
+                logger.debug("🏢 Configurando tabla para Houston")
                 main_price_data = [
                     ["PRECIO FOB USD/KG"],
                     [f"${precio_kg:.2f}"]
                 ]
-                logger.info(f"📊 Datos de tabla Houston: {main_price_data}")
+                logger.debug(f"📊 Datos de tabla Houston: {main_price_data}")
                 main_price_table = Table(main_price_data, colWidths=[5*inch])
-                logger.info("🎨 Aplicando estilos a tabla Houston...")
+                logger.debug("🎨 Aplicando estilos a tabla Houston...")
                 main_price_table.setStyle(TableStyle([
                     # Encabezado elegante
                     ('BACKGROUND', (0, 0), (-1, 0), azul_marino),
@@ -385,7 +385,7 @@ class PDFGenerator:
                     ('LEFTPADDING', (0, 0), (-1, -1), 10),
                     ('RIGHTPADDING', (0, 0), (-1, -1), 10),
                 ]))
-                logger.info("✅ Estilos aplicados a tabla Houston")
+                logger.debug("✅ Estilos aplicados a tabla Houston")
             else:
                 # Para otros destinos: Kilogramos y libras
                 main_price_data = [
@@ -418,11 +418,11 @@ class PDFGenerator:
                 ]))
             
             # Centrar la tabla en la página
-            logger.info("📐 Centrando tabla y agregando al story...")
+            logger.debug("📐 Centrando tabla y agregando al story...")
             main_price_table.hAlign = 'CENTER'
             story.append(main_price_table)
             story.append(Spacer(1, 25))
-            logger.info("✅ Tabla de precios agregada al story")
+            logger.debug("✅ Tabla de precios agregada al story")
             
             # ESPECIFICACIONES - Tabla estilizada con colores corporativos e íconos
             specs_title_style = ParagraphStyle(
@@ -439,12 +439,12 @@ class PDFGenerator:
             story.append(Paragraph("ESPECIFICACIONES", specs_title_style))
             
             # Preparar datos de especificaciones con íconos visuales
-            logger.info("🔍 Creando especificaciones...")
+            logger.debug("🔍 Creando especificaciones...")
             specs_data = [
                 ["Concepto", "Detalle"],
                 ["Glaseo Aplicado", f"{glaseo_factor:.1%}"],
             ]
-            logger.info(f"📋 Especificaciones base: {specs_data}")
+            logger.debug(f"📋 Especificaciones base: {specs_data}")
             
             # Agregar flete si está incluido
             if price_info.get('calculo_dinamico') and flete > 0:
@@ -459,9 +459,9 @@ class PDFGenerator:
                 specs_data.append(["Especificación", f"{price_info['producto']} - Talla {price_info['talla']}"])
             
             # Tabla de especificaciones con diseño corporativo elegante
-            logger.info(f"📊 Creando tabla de especificaciones con {len(specs_data)} filas...")
+            logger.debug(f"📊 Creando tabla de especificaciones con {len(specs_data)} filas...")
             specs_table = Table(specs_data, colWidths=[3.5*inch, 3.5*inch])
-            logger.info("🎨 Aplicando estilos a especificaciones...")
+            logger.debug("🎨 Aplicando estilos a especificaciones...")
             
             # Crear estilos base
             table_styles = [
@@ -497,11 +497,11 @@ class PDFGenerator:
                 ('RIGHTPADDING', (0, 0), (-1, -1), 15),
             ]))
             
-            logger.info("📐 Centrando tabla de especificaciones...")
+            logger.debug("📐 Centrando tabla de especificaciones...")
             specs_table.hAlign = 'CENTER'
             story.append(specs_table)
             story.append(Spacer(1, 30))
-            logger.info("✅ Especificaciones agregadas al story")       
+            logger.debug("✅ Especificaciones agregadas al story")       
      
             # CUADRO DE PRECIO TOTAL - Cantidad × Precio Unitario
             if price_info.get('quantity') and price_info['quantity'] is not None:
