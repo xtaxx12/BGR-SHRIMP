@@ -291,6 +291,7 @@ class PDFGenerator:
                 ('RIGHTPADDING', (0, 0), (-1, -1), 15),
             ]))
             
+            info_table.hAlign = 'CENTER'
             story.append(info_table)
             story.append(Spacer(1, 30))     
        
@@ -389,6 +390,8 @@ class PDFGenerator:
                     ('RIGHTPADDING', (0, 0), (-1, -1), 8),
                 ]))
             
+            # Centrar la tabla en la página
+            main_price_table.hAlign = 'CENTER'
             story.append(main_price_table)
             story.append(Spacer(1, 25))
             
@@ -458,6 +461,7 @@ class PDFGenerator:
                 ('RIGHTPADDING', (0, 0), (-1, -1), 15),
             ]))
             
+            specs_table.hAlign = 'CENTER'
             story.append(specs_table)
             story.append(Spacer(1, 30))       
      
@@ -533,6 +537,7 @@ class PDFGenerator:
                         ('RIGHTPADDING', (0, 0), (-1, -1), 10),
                     ]))
                     
+                    total_table.hAlign = 'CENTER'
                     story.append(total_table)
                     story.append(Spacer(1, 35))
                     
