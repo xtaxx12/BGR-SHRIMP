@@ -35,7 +35,11 @@ class PDFGenerator:
         try:
             # Generar nombre único para el archivo
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            phone_suffix = user_phone.replace("+", "").replace(":", "")[-4:] if user_phone else "0000"
+            if user_phone:
+                cleaned_phone = user_phone.replace("+", "").replace(":", "")
+                phone_suffix = cleaned_phone[-4:] if len(cleaned_phone) >= 4 else cleaned_phone.zfill(4)
+            else:
+                phone_suffix = "0000"
             filename = f"cotizacion_BGR_{timestamp}_{phone_suffix}.pdf"
             filepath = os.path.join(self.output_dir, filename)
             
@@ -165,13 +169,13 @@ class PDFGenerator:
                     )
                     
                     # Datos de la empresa con texto blanco (sin emojis)
-                    company_info = [
-                        Paragraph("BGR EXPORT SHRIMP S.A.", header_company_style),
-                        Paragraph("Camarón Premium del Ecuador para el Mundo", header_slogan_style),
-                        Paragraph("Web: www.bgrexport.com", header_contact_style),
-                        Paragraph("Email: amerino@bgrexport.com", header_contact_style),
-                        Paragraph("Tel: +593 98-805-7425", header_contact_style)
-                    ]
+                    company_info_text = """BGR EXPORT SHRIMP S.A.<br/>
+                    Camarón Premium del Ecuador para el Mundo<br/>
+                    Web: www.bgrexport.com<br/>
+                    Email: amerino@bgrexport.com<br/>
+                    Tel: +593 4 123-4567"""
+                    
+                    company_info = Paragraph(company_info_text, header_contact_style)
                     
                     # Crear fondo blanco para el logo para que resalte
                     logo_with_bg = Table([[logo_img]], colWidths=[2.5*inch])
