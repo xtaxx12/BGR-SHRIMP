@@ -96,8 +96,8 @@ async def whatsapp_webhook(
             response = MessagingResponse()
             return PlainTextResponse(str(response), media_type="application/xml")
         
-        logger.info(f"Mensaje recibido de {From}: {Body}")
-        logger.info(f"Multimedia: NumMedia={NumMedia}, MediaUrl={MediaUrl0}, ContentType={MediaContentType0}")
+        logger.debug(f"Mensaje recibido de {From}: {Body}")
+        logger.debug(f"Multimedia: NumMedia={NumMedia}, MediaUrl={MediaUrl0}, ContentType={MediaContentType0}")
         
         # Inicializar servicios si no están inicializados
         pricing_service, interactive_service, pdf_generator, whatsapp_sender, openai_service = get_services()

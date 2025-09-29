@@ -30,29 +30,29 @@ class GoogleSheetsService:
                 return
             
             # Parsear las credenciales JSON
-            logger.info("Parseando credenciales JSON...")
+            logger.debug("Parseando credenciales JSON...")
             credentials_dict = json.loads(credentials_json)
-            logger.info(f"Service account: {credentials_dict.get('client_email', 'N/A')}")
+            logger.debug(f"Service account: {credentials_dict.get('client_email', 'N/A')}")
             
             # Configurar los scopes necesarios
             scopes = [
                 'https://www.googleapis.com/auth/spreadsheets.readonly',
                 'https://www.googleapis.com/auth/drive.readonly'
             ]
-            logger.info(f"Configurando scopes: {scopes}")
+            logger.debug(f"Configurando scopes: {scopes}")
             
             # Crear credenciales
-            logger.info("Creando credenciales...")
+            logger.debug("Creando credenciales...")
             credentials = Credentials.from_service_account_info(
                 credentials_dict, 
                 scopes=scopes
             )
             
             # Conectar con Google Sheets
-            logger.info("Autorizando cliente gspread...")
+            logger.debug("Autorizando cliente gspread...")
             self.gc = gspread.authorize(credentials)
             
-            logger.info(f"Abriendo hoja con ID: {sheet_id}")
+            logger.debug(f"Abriendo hoja con ID: {sheet_id}")
             self.sheet = self.gc.open_by_key(sheet_id)
             
             logger.info("Conexión con Google Sheets establecida exitosamente")
@@ -76,7 +76,7 @@ class GoogleSheetsService:
             
             # Listar todas las hojas disponibles
             worksheets = self.sheet.worksheets()
-            logger.info(f"Hojas disponibles: {[ws.title for ws in worksheets]}")
+            logger.debug(f"Hojas disponibles: {[ws.title for ws in worksheets]}")
             
             # Intentar encontrar la hoja correcta
             worksheet = None
@@ -85,7 +85,7 @@ class GoogleSheetsService:
             for name in possible_names:
                 try:
                     worksheet = self.sheet.worksheet(name)
-                    logger.info(f"Usando hoja: {name}")
+                    logger.debug(f"Usando hoja: {name}")
                     break
                 except:
                     continue
@@ -101,9 +101,9 @@ class GoogleSheetsService:
             
             # Mostrar las primeras filas para debug
             if all_values:
-                logger.info(f"Primera fila: {all_values[0][:10]}...")
+                logger.debug(f"Primera fila: {all_values[0][:10]}...")
                 if len(all_values) > 1:
-                    logger.info(f"Segunda fila: {all_values[1][:10]}...")
+                    logger.debug(f"Segunda fila: {all_values[1][:10]}...")
             
             # Convertir a DataFrame para facilitar el procesamiento
             df = pd.DataFrame(all_values)
