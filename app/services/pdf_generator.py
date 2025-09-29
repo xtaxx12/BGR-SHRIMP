@@ -462,7 +462,9 @@ class PDFGenerator:
             logger.info(f"📊 Creando tabla de especificaciones con {len(specs_data)} filas...")
             specs_table = Table(specs_data, colWidths=[3.5*inch, 3.5*inch])
             logger.info("🎨 Aplicando estilos a especificaciones...")
-            specs_table.setStyle(TableStyle([
+            
+            # Crear estilos base
+            table_styles = [
                 # Encabezado con azul marino
                 ('BACKGROUND', (0, 0), (-1, 0), azul_marino),
                 ('TEXTCOLOR', (0, 0), (-1, 0), blanco),
@@ -470,12 +472,16 @@ class PDFGenerator:
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, 0), 12),
                 
-                # Filas alternadas elegantes
-                ('BACKGROUND', (0, 1), (-1, 1), blanco),
-                ('BACKGROUND', (0, 2), (-1, 2), gris_claro),
-                ('BACKGROUND', (0, 3), (-1, 3), blanco),
-                ('BACKGROUND', (0, 4), (-1, 4), gris_claro),
-                ('BACKGROUND', (0, 5), (-1, 5), blanco),
+                # Todas las filas de datos
+                ('BACKGROUND', (0, 1), (-1, -1), blanco),
+            ]
+            
+            # Agregar filas alternadas dinámicamente
+            for i in range(1, len(specs_data)):
+                if i % 2 == 0:  # Filas pares (2, 4, 6...) con fondo gris
+                    table_styles.append(('BACKGROUND', (0, i), (-1, i), gris_claro))
+            
+            specs_table.setStyle(TableStyle(table_styles + [
                 ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
                 ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
                 ('FONTSIZE', (0, 1), (-1, -1), 11),
