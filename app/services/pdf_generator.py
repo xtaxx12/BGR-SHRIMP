@@ -357,6 +357,7 @@ class PDFGenerator:
                 ]
                 logger.info(f"📊 Datos de tabla Houston: {main_price_data}")
                 main_price_table = Table(main_price_data, colWidths=[5*inch])
+                logger.info("🎨 Aplicando estilos a tabla Houston...")
                 main_price_table.setStyle(TableStyle([
                     # Encabezado elegante
                     ('BACKGROUND', (0, 0), (-1, 0), azul_marino),
@@ -384,6 +385,7 @@ class PDFGenerator:
                     ('LEFTPADDING', (0, 0), (-1, -1), 10),
                     ('RIGHTPADDING', (0, 0), (-1, -1), 10),
                 ]))
+                logger.info("✅ Estilos aplicados a tabla Houston")
             else:
                 # Para otros destinos: Kilogramos y libras
                 main_price_data = [
@@ -416,9 +418,11 @@ class PDFGenerator:
                 ]))
             
             # Centrar la tabla en la página
+            logger.info("📐 Centrando tabla y agregando al story...")
             main_price_table.hAlign = 'CENTER'
             story.append(main_price_table)
             story.append(Spacer(1, 25))
+            logger.info("✅ Tabla de precios agregada al story")
             
             # ESPECIFICACIONES - Tabla estilizada con colores corporativos e íconos
             specs_title_style = ParagraphStyle(
@@ -435,10 +439,12 @@ class PDFGenerator:
             story.append(Paragraph("ESPECIFICACIONES", specs_title_style))
             
             # Preparar datos de especificaciones con íconos visuales
+            logger.info("🔍 Creando especificaciones...")
             specs_data = [
                 ["Concepto", "Detalle"],
                 ["Glaseo Aplicado", f"{glaseo_factor:.1%}"],
             ]
+            logger.info(f"📋 Especificaciones base: {specs_data}")
             
             # Agregar flete si está incluido
             if price_info.get('calculo_dinamico') and flete > 0:
@@ -453,7 +459,9 @@ class PDFGenerator:
                 specs_data.append(["Especificación", f"{price_info['producto']} - Talla {price_info['talla']}"])
             
             # Tabla de especificaciones con diseño corporativo elegante
+            logger.info(f"📊 Creando tabla de especificaciones con {len(specs_data)} filas...")
             specs_table = Table(specs_data, colWidths=[3.5*inch, 3.5*inch])
+            logger.info("🎨 Aplicando estilos a especificaciones...")
             specs_table.setStyle(TableStyle([
                 # Encabezado con azul marino
                 ('BACKGROUND', (0, 0), (-1, 0), azul_marino),
@@ -483,9 +491,11 @@ class PDFGenerator:
                 ('RIGHTPADDING', (0, 0), (-1, -1), 15),
             ]))
             
+            logger.info("📐 Centrando tabla de especificaciones...")
             specs_table.hAlign = 'CENTER'
             story.append(specs_table)
-            story.append(Spacer(1, 30))       
+            story.append(Spacer(1, 30))
+            logger.info("✅ Especificaciones agregadas al story")       
      
             # CUADRO DE PRECIO TOTAL - Cantidad × Precio Unitario
             if price_info.get('quantity') and price_info['quantity'] is not None:
