@@ -11,6 +11,8 @@ from app.services.openai_service import OpenAIService
 from app.services.audio_handler import AudioHandler
 import logging
 import os
+import time
+from typing import Set
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +24,40 @@ interactive_service = None
 pdf_generator = None
 openai_service = None
 whatsapp_sender = None
+
+# Cache para deduplicación de mensajes
+processed_messages: Set[str] = set()
+message_timestamps = {}
+
+def cleanup_old_messages():
+    """
+    Limpia mensajes procesados antiguos (más de 5 minutos)
+    """
+    current_time = time.time()
+    expired_messages = []
+    
+    for message_sid, timestamp in message_timestamps.items():
+        if current_time - timestamp > 300:  # 5 minutos
+            expired_messages.append(message_sid)
+    
+    for message_sid in expired_messages:
+        processed_messages.discard(message_sid)
+        message_timestamps.pop(message_sid, None)
+
+def is_duplicate_message(message_sid: str) -> bool:
+    """
+    Verifica si un mensaje ya fue procesado
+    """
+    cleanup_old_messages()
+    
+    if message_sid in processed_messages:
+        logger.warning(f"🔄 Mensaje duplicado detectado: {message_sid}")
+        return True
+    
+    # Marcar como procesado
+    processed_messages.add(message_sid)
+    message_timestamps[message_sid] = time.time()
+    return False
 
 def get_services():
     """
@@ -54,6 +90,12 @@ async def whatsapp_webhook(
     Endpoint para recibir mensajes de WhatsApp desde Twilio
     """
     try:
+        # Verificar si es un mensaje duplicado
+        if is_duplicate_message(MessageSid):
+            # Retornar respuesta vacía para mensajes duplicados
+            response = MessagingResponse()
+            return PlainTextResponse(str(response), media_type="application/xml")
+        
         logger.info(f"Mensaje recibido de {From}: {Body}")
         logger.info(f"Multimedia: NumMedia={NumMedia}, MediaUrl={MediaUrl0}, ContentType={MediaContentType0}")
         
@@ -114,6 +156,69 @@ async def whatsapp_webhook(
             # Usar OpenAI solo si es más confiable
             if openai_analysis.get('confidence', 0) > ai_analysis.get('confidence', 0):
                 ai_analysis = openai_analysis
+        
+        # PROCESAMIENTO PRIORITARIO DE PROFORMA
+        # Si el análisis detecta una solicitud de proforma, procesarla inmediatamente
+        if ai_analysis and ai_analysis.get('intent') == 'proforma' and ai_analysis.get('confidence', 0) > 0.7:
+            logger.info(f"🎯 Procesando proforma inmediatamente para {user_id}")
+            ai_query = parse_ai_analysis_to_query(ai_analysis)
+            logger.info(f"🤖 Consulta generada por IA: {ai_query}")
+            
+            if ai_query:
+                # Intentar generar cotización automática
+                price_info = pricing_service.get_shrimp_price(ai_query)
+                
+                if price_info:
+                    logger.info(f"✅ Proforma automática generada para: {ai_query}")
+                    
+                    # Generar PDF directamente sin mostrar cotización en texto
+                    logger.info(f"📄 Generando PDF automáticamente para usuario {user_id}")
+                    pdf_path = pdf_generator.generate_quote_pdf(price_info, From)
+                    
+                    if pdf_path:
+                        # Crear URL pública del PDF para envío
+                        filename = os.path.basename(pdf_path)
+                        base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
+                        download_url = f"{base_url}/webhook/download-pdf/{filename}"
+                        
+                        # Intentar enviar el PDF por WhatsApp
+                        pdf_sent = whatsapp_sender.send_pdf_document(
+                            From, 
+                            pdf_path, 
+                            f"Cotización BGR Export - {price_info.get('producto', 'Camarón')} {price_info.get('talla', '')}"
+                        )
+                        
+                        if pdf_sent:
+                            logger.info(f"✅ PDF enviado exitosamente por WhatsApp: {pdf_path}")
+                            
+                            # Mensaje de confirmación con información básica
+                            confirmation_msg = f"✅ **Proforma generada y enviada**\n\n"
+                            confirmation_msg += f"🦐 **{price_info.get('producto', 'Camarón')} {price_info.get('talla', '')}**\n"
+                            
+                            if price_info.get('cliente_nombre'):
+                                confirmation_msg += f"👤 Cliente: {price_info['cliente_nombre'].title()}\n"
+                            
+                            if price_info.get('destination'):
+                                confirmation_msg += f"🌍 Destino: {price_info['destination']}\n"
+                            
+                            # Mostrar precio final
+                            if price_info.get('precio_final_kg'):
+                                if price_info.get('destination', '').lower() == 'houston':
+                                    confirmation_msg += f"💰 Precio FOB: ${price_info['precio_final_kg']:.2f}/kg\n"
+                                else:
+                                    confirmation_msg += f"💰 Precio FOB: ${price_info['precio_final_kg']:.2f}/kg - ${price_info.get('precio_final_lb', 0):.2f}/lb\n"
+                            
+                            confirmation_msg += f"\n📄 **PDF enviado por WhatsApp**"
+                            
+                            response.message(confirmation_msg)
+                        else:
+                            logger.error(f"❌ Error enviando PDF por WhatsApp")
+                            response.message(f"✅ Proforma generada\n📄 Descarga tu PDF: {download_url}")
+                    else:
+                        logger.error(f"❌ Error generando PDF")
+                        response.message("❌ Error generando la proforma. Intenta nuevamente.")
+                    
+                    return PlainTextResponse(str(response), media_type="application/xml")
         
         # Comandos globales que funcionan desde cualquier estado
         message_lower = Body.lower().strip()
@@ -333,69 +438,8 @@ async def whatsapp_webhook(
                     session_manager.set_session_state(user_id, 'quote_ready', {})
                     return PlainTextResponse(str(response), media_type="application/xml")
             
-            # Si no es una consulta válida, verificar si el análisis de IA puede generar una proforma automática
+            # Si no es una consulta válida, usar respuesta inteligente
             logger.info(f"🔍 Llegando a lógica de respuesta inteligente para mensaje: '{Body}'")
-            
-            # Intentar generar proforma automática si el análisis es suficientemente específico
-            if ai_analysis and ai_analysis.get('confidence', 0) > 0.7 and ai_analysis.get('intent') == 'proforma':
-                ai_query = parse_ai_analysis_to_query(ai_analysis)
-                logger.info(f"🤖 Consulta generada por IA: {ai_query}")
-                
-                if ai_query:
-                    # Intentar generar cotización automática
-                    price_info = pricing_service.get_shrimp_price(ai_query)
-                    
-                    if price_info:
-                        logger.info(f"✅ Proforma automática generada para: {ai_query}")
-                        
-                        # Generar PDF directamente sin mostrar cotización en texto
-                        logger.info(f"📄 Generando PDF automáticamente para usuario {user_id}")
-                        pdf_path = pdf_generator.generate_quote_pdf(price_info, From)
-                        
-                        if pdf_path:
-                            # Crear URL pública del PDF para envío
-                            filename = os.path.basename(pdf_path)
-                            base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
-                            download_url = f"{base_url}/webhook/download-pdf/{filename}"
-                            
-                            # Intentar enviar el PDF por WhatsApp
-                            pdf_sent = whatsapp_sender.send_pdf_document(
-                                From, 
-                                pdf_path, 
-                                f"Cotización BGR Export - {price_info.get('producto', 'Camarón')} {price_info.get('talla', '')}"
-                            )
-                            
-                            if pdf_sent:
-                                logger.info(f"✅ PDF enviado exitosamente por WhatsApp: {pdf_path}")
-                                
-                                # Mensaje de confirmación con información básica
-                                confirmation_msg = f"✅ **Proforma generada y enviada**\n\n"
-                                confirmation_msg += f"🦐 **{price_info.get('producto', 'Camarón')} {price_info.get('talla', '')}**\n"
-                                
-                                if price_info.get('cliente_nombre'):
-                                    confirmation_msg += f"👤 Cliente: {price_info['cliente_nombre'].title()}\n"
-                                
-                                if price_info.get('destination'):
-                                    confirmation_msg += f"🌍 Destino: {price_info['destination']}\n"
-                                
-                                # Mostrar precio final
-                                if price_info.get('precio_final_kg'):
-                                    if price_info.get('destination', '').lower() == 'houston':
-                                        confirmation_msg += f"💰 Precio FOB: ${price_info['precio_final_kg']:.2f}/kg\n"
-                                    else:
-                                        confirmation_msg += f"💰 Precio FOB: ${price_info['precio_final_kg']:.2f}/kg - ${price_info.get('precio_final_lb', 0):.2f}/lb\n"
-                                
-                                confirmation_msg += f"\n📄 **PDF enviado por WhatsApp**"
-                                
-                                response.message(confirmation_msg)
-                            else:
-                                logger.error(f"❌ Error enviando PDF por WhatsApp")
-                                response.message(f"✅ Proforma generada\n📄 Descarga tu PDF: {download_url}")
-                        else:
-                            logger.error(f"❌ Error generando PDF")
-                            response.message("❌ Error generando la proforma. Intenta nuevamente.")
-                        
-                        return PlainTextResponse(str(response), media_type="application/xml")
             
             smart_response = None
             
