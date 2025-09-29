@@ -373,8 +373,6 @@ class PDFGenerator:
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                     ('TOPPADDING', (0, 0), (-1, -1), 18),
                     ('BOTTOMPADDING', (0, 0), (-1, -1), 18),
-                ]))
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
                     ('LEFTPADDING', (0, 0), (-1, -1), 8),
                     ('RIGHTPADDING', (0, 0), (-1, -1), 8),
                 ]))
