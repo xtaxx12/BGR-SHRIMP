@@ -58,11 +58,12 @@ class PDFGenerator:
             story = []
             styles = getSampleStyleSheet()
             
-            # Colores corporativos BGR Export
-            azul_marino = colors.HexColor('#1B365D')  # Azul marino corporativo
-            naranja = colors.HexColor('#FF6B35')      # Naranja corporativo
-            gris_claro = colors.HexColor('#F5F5F5')   # Gris claro para fondos
-            gris_medio = colors.HexColor('#E0E0E0')   # Gris medio para bordes
+            # Colores corporativos BGR Export - Actualizados según especificaciones
+            azul_marino = colors.HexColor('#0a2e5d')  # Azul marino corporativo
+            naranja = colors.HexColor('#f36f21')      # Naranja corporativo
+            gris_claro = colors.HexColor('#F8F9FA')   # Gris claro para fondos
+            gris_medio = colors.HexColor('#DEE2E6')   # Gris medio para bordes
+            blanco = colors.white                     # Blanco
             
             # Estilos corporativos personalizados
             company_title_style = ParagraphStyle(
@@ -123,121 +124,177 @@ class PDFGenerator:
                 fontName='Helvetica'
             )
             
-            # ENCABEZADO CORPORATIVO PROFESIONAL
+            # ENCABEZADO CORPORATIVO CON FONDO AZUL MARINO
             logo_path = os.path.join("data", "logoBGR.png")
             
-            # Crear encabezado con logo y datos de empresa
+            # Crear encabezado con fondo azul marino
             if os.path.exists(logo_path):
                 try:
                     # Logo optimizado
-                    logo_img = Image(logo_path, width=2.5*inch, height=1.5*inch)
+                    logo_img = Image(logo_path, width=2.2*inch, height=1.3*inch)
                     
-                    # Datos de la empresa
+                    # Estilos para texto blanco en fondo azul
+                    header_company_style = ParagraphStyle(
+                        'HeaderCompany',
+                        parent=styles['Heading1'],
+                        fontSize=20,
+                        spaceAfter=3,
+                        alignment=TA_RIGHT,
+                        textColor=blanco,
+                        fontName='Helvetica-Bold'
+                    )
+                    
+                    header_slogan_style = ParagraphStyle(
+                        'HeaderSlogan',
+                        parent=styles['Normal'],
+                        fontSize=11,
+                        spaceAfter=8,
+                        alignment=TA_RIGHT,
+                        textColor=blanco,
+                        fontName='Helvetica-Oblique'
+                    )
+                    
+                    header_contact_style = ParagraphStyle(
+                        'HeaderContact',
+                        parent=styles['Normal'],
+                        fontSize=10,
+                        spaceAfter=2,
+                        alignment=TA_RIGHT,
+                        textColor=blanco,
+                        fontName='Helvetica'
+                    )
+                    
+                    # Datos de la empresa con texto blanco
                     company_info = [
-                        Paragraph("BGR EXPORT SHRIMP S.A.", company_title_style),
-                        Paragraph("Camarón Premium del Ecuador para el Mundo", slogan_style),
-                        Paragraph("www.bgrexport.com | info@bgrexport.com", normal_style),
-                        Paragraph("Tel: +593 98-805-7425", normal_style)
+                        Paragraph("BGR EXPORT SHRIMP S.A.", header_company_style),
+                        Paragraph("Camarón Premium del Ecuador para el Mundo", header_slogan_style),
+                        Paragraph("🌐 www.bgrexport.com", header_contact_style),
+                        Paragraph("📧 info@bgrexport.com", header_contact_style),
+                        Paragraph("📞 +593 4 123-4567", header_contact_style)
                     ]
                     
-                    # Tabla del encabezado con logo a la izquierda y datos a la derecha
+                    # Tabla del encabezado con fondo azul marino
                     header_data = [[logo_img, company_info]]
-                    header_table = Table(header_data, colWidths=[3*inch, 4*inch])
+                    header_table = Table(header_data, colWidths=[3*inch, 4.5*inch])
                     header_table.setStyle(TableStyle([
-                        ('ALIGN', (0, 0), (0, 0), 'LEFT'),    # Logo a la izquierda
-                        ('ALIGN', (1, 0), (1, 0), 'LEFT'),    # Datos a la izquierda
-                        ('VALIGN', (0, 0), (-1, -1), 'TOP'),  # Alineación superior
-                        ('TOPPADDING', (0, 0), (-1, -1), 0),
+                        # Fondo azul marino para toda la tabla
+                        ('BACKGROUND', (0, 0), (-1, -1), azul_marino),
+                        ('ALIGN', (0, 0), (0, 0), 'LEFT'),     # Logo a la izquierda
+                        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),    # Datos a la derecha
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'), # Centrado vertical
+                        ('TOPPADDING', (0, 0), (-1, -1), 15),
                         ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
-                        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-                        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+                        ('LEFTPADDING', (0, 0), (-1, -1), 20),
+                        ('RIGHTPADDING', (0, 0), (-1, -1), 20),
+                        # Bordes redondeados simulados
+                        ('GRID', (0, 0), (-1, -1), 0, azul_marino),
                     ]))
                     
                     story.append(header_table)
                     
                 except Exception as logo_error:
                     logger.warning(f"⚠️ Error cargando logo: {logo_error}")
-                    # Fallback elegante sin logo
-                    story.append(Paragraph("BGR EXPORT SHRIMP S.A.", company_title_style))
-                    story.append(Paragraph("Camarón Premium del Ecuador para el Mundo", slogan_style))
-                    story.append(Paragraph("www.bgrexport.com | info@bgrexport.com", normal_style))
-                    story.append(Spacer(1, 15))
+                    # Fallback con fondo azul marino sin logo
+                    fallback_data = [["BGR EXPORT SHRIMP S.A.\nCamarón Premium del Ecuador para el Mundo\n🌐 www.bgrexport.com | 📧 info@bgrexport.com | 📞 +593 4 123-4567"]]
+                    fallback_table = Table(fallback_data, colWidths=[7.5*inch])
+                    fallback_table.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, -1), azul_marino),
+                        ('TEXTCOLOR', (0, 0), (-1, -1), blanco),
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+                        ('FONTSIZE', (0, 0), (-1, -1), 14),
+                        ('TOPPADDING', (0, 0), (-1, -1), 20),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 20),
+                    ]))
+                    story.append(fallback_table)
             else:
                 logger.warning(f"⚠️ Logo no encontrado en: {logo_path}")
-                # Fallback elegante sin logo
-                story.append(Paragraph("BGR EXPORT SHRIMP S.A.", company_title_style))
-                story.append(Paragraph("Camarón Premium del Ecuador para el Mundo", slogan_style))
-                story.append(Paragraph("www.bgrexport.com | info@bgrexport.com", normal_style))
-                story.append(Spacer(1, 15))
+                # Fallback con fondo azul marino sin logo
+                fallback_data = [["BGR EXPORT SHRIMP S.A.\nCamarón Premium del Ecuador para el Mundo\n🌐 www.bgrexport.com | 📧 info@bgrexport.com | 📞 +593 4 123-4567"]]
+                fallback_table = Table(fallback_data, colWidths=[7.5*inch])
+                fallback_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, -1), azul_marino),
+                    ('TEXTCOLOR', (0, 0), (-1, -1), blanco),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 14),
+                    ('TOPPADDING', (0, 0), (-1, -1), 20),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 20),
+                ]))
+                story.append(fallback_table)
             
-            # Línea separadora elegante
-            line_data = [["", ""]]
-            line_table = Table(line_data, colWidths=[7*inch])
-            line_table.setStyle(TableStyle([
-                ('LINEBELOW', (0, 0), (-1, -1), 2, azul_marino),
-                ('TOPPADDING', (0, 0), (-1, -1), 5),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
-            ]))
-            story.append(line_table)
+            # Espaciado después del encabezado
+            story.append(Spacer(1, 25))
             
             # Título principal de cotización
             story.append(Paragraph("COTIZACIÓN DE CAMARÓN", quote_title_style))
             story.append(Spacer(1, 20))
             
-            # DATOS DE LA COTIZACIÓN - Bloque elegante con fondo gris y bordes redondeados
+            # BLOQUE DE DATOS DE LA COTIZACIÓN - Tabla con fondo gris claro y bordes suaves
             fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
             
-            # Crear datos de información
+            # Crear datos de información con íconos visuales
             info_data = [
-                ["📅 Fecha de Cotización:", fecha_actual],
-                ["🦐 Producto:", price_info.get('producto', 'Camarón')],
-                ["📏 Talla:", price_info.get('talla', 'N/A')]
+                ["📅 Fecha de Cotización", fecha_actual],
+                ["🦐 Producto", price_info.get('producto', 'Camarón')],
+                ["📏 Talla", price_info.get('talla', 'N/A')]
             ]
             
             # Agregar cliente si está disponible
             if price_info.get('cliente_nombre'):
-                info_data.append(["👤 Cliente:", price_info['cliente_nombre'].title()])
+                info_data.append(["👤 Cliente", price_info['cliente_nombre'].title()])
             
             if price_info.get('destination'):
-                info_data.append(["🌍 Destino:", price_info['destination']])
+                info_data.append(["🌍 Destino", price_info['destination']])
             
             if price_info.get('quantity'):
-                info_data.append(["📦 Cantidad:", f"{price_info['quantity']} {price_info.get('unit', 'lb')}"])
+                info_data.append(["📦 Cantidad", f"{price_info['quantity']} {price_info.get('unit', 'lb')}"])
             
             # Agregar glaseo si fue especificado por el usuario
             if price_info.get('calculo_dinamico') and price_info.get('factor_glaseo'):
                 glaseo_percent = price_info['factor_glaseo'] * 100
                 if glaseo_percent != 70:  # Solo mostrar si es diferente al estándar
-                    info_data.append(["❄️ Glaseo solicitado:", f"{glaseo_percent:.0f}%"])
+                    info_data.append(["❄️ Glaseo Solicitado", f"{glaseo_percent:.0f}%"])
             
-            # Tabla de información con diseño elegante
-            info_table = Table(info_data, colWidths=[2.8*inch, 3.5*inch])
+            # Tabla de información con diseño corporativo minimalista
+            info_table = Table(info_data, colWidths=[3.2*inch, 3.8*inch])
             info_table.setStyle(TableStyle([
                 # Fondo gris claro para toda la tabla
                 ('BACKGROUND', (0, 0), (-1, -1), gris_claro),
-                # Fondo más oscuro para las etiquetas
-                ('BACKGROUND', (0, 0), (0, -1), gris_medio),
-                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                # Fondo azul marino para las etiquetas
+                ('BACKGROUND', (0, 0), (0, -1), azul_marino),
+                ('TEXTCOLOR', (0, 0), (0, -1), blanco),  # Texto blanco en etiquetas
+                ('TEXTCOLOR', (1, 0), (1, -1), colors.black),  # Texto negro en valores
                 ('ALIGN', (0, 0), (0, -1), 'LEFT'),    # Etiquetas alineadas a la izquierda
                 ('ALIGN', (1, 0), (1, -1), 'LEFT'),    # Valores alineados a la izquierda
                 ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
                 ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
                 ('FONTSIZE', (0, 0), (-1, -1), 11),
-                # Bordes suaves
-                ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+                # Bordes suaves y elegantes
+                ('GRID', (0, 0), (-1, -1), 0.5, gris_medio),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('TOPPADDING', (0, 0), (-1, -1), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-                ('LEFTPADDING', (0, 0), (-1, -1), 12),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+                ('TOPPADDING', (0, 0), (-1, -1), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+                ('LEFTPADDING', (0, 0), (-1, -1), 15),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 15),
             ]))
             
             story.append(info_table)
-            story.append(Spacer(1, 25))     
+            story.append(Spacer(1, 30))     
        
-            # SECCIÓN PRINCIPAL: COTIZACIÓN FOB - Precio destacado
-            story.append(Paragraph("💰 COTIZACIÓN FOB", section_title_style))
-            story.append(Spacer(1, 15))
+            # SECCIÓN DE COTIZACIÓN FOB - Precio destacado, grande, negrita y centrada
+            fob_title_style = ParagraphStyle(
+                'FOBTitle',
+                parent=styles['Heading1'],
+                fontSize=18,
+                spaceAfter=15,
+                spaceBefore=5,
+                alignment=TA_CENTER,
+                textColor=azul_marino,
+                fontName='Helvetica-Bold'
+            )
+            
+            story.append(Paragraph("💰 COTIZACIÓN FOB", fob_title_style))
             
             # Obtener precio final y datos
             if price_info.get('calculo_dinamico') and 'precio_final_kg' in price_info:
@@ -260,67 +317,63 @@ class PDFGenerator:
             destination = price_info.get('destination', '')
             is_houston = destination.lower() == 'houston'
             
-            # Tabla principal de precios con diseño corporativo destacado
+            # TABLA PRINCIPAL DE PRECIOS - Diseño minimalista y elegante
             if is_houston:
+                # Para Houston: Solo kilogramos
                 main_price_data = [
-                    ["PRECIO FOB", "POR KILOGRAMO"],
-                    [f"${precio_kg:.2f}", "USD/KG"]
+                    ["PRECIO FOB USD/KG"],
+                    [f"${precio_kg:.2f}"]
                 ]
-                main_price_table = Table(main_price_data, colWidths=[4*inch, 2.5*inch])
+                main_price_table = Table(main_price_data, colWidths=[5*inch])
                 main_price_table.setStyle(TableStyle([
-                    # Encabezado con colores corporativos
+                    # Encabezado elegante
                     ('BACKGROUND', (0, 0), (-1, 0), azul_marino),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), blanco),
                     ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                     ('FONTSIZE', (0, 0), (-1, 0), 14),
                     
-                    # Fila de precios destacada
-                    ('BACKGROUND', (0, 1), (0, 1), colors.HexColor('#FFF8DC')),  # Fondo crema para precio
-                    ('BACKGROUND', (1, 1), (1, 1), gris_claro),  # Fondo gris para unidad
+                    # Precio destacado - GRANDE, NEGRITA Y CENTRADO
+                    ('BACKGROUND', (0, 1), (-1, 1), blanco),
                     ('TEXTCOLOR', (0, 1), (-1, 1), azul_marino),
-                    ('FONTNAME', (0, 1), (0, 1), 'Helvetica-Bold'),
-                    ('FONTNAME', (1, 1), (1, 1), 'Helvetica'),
-                    ('FONTSIZE', (0, 1), (0, 1), 28),  # Precio muy grande y destacado
-                    ('FONTSIZE', (1, 1), (1, 1), 14),
+                    ('FONTNAME', (0, 1), (-1, 1), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 1), (-1, 1), 36),  # Precio MUY GRANDE
                     ('ALIGN', (0, 1), (-1, 1), 'CENTER'),
                     
-                    # Bordes elegantes
-                    ('GRID', (0, 0), (-1, -1), 2, azul_marino),
+                    # Bordes minimalistas
+                    ('GRID', (0, 0), (-1, -1), 1.5, azul_marino),
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                    ('TOPPADDING', (0, 0), (-1, -1), 15),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
-                    ('LEFTPADDING', (0, 0), (-1, -1), 10),
-                    ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+                    ('TOPPADDING', (0, 0), (-1, -1), 20),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 20),
                 ]))
             else:
+                # Para otros destinos: Kilogramos y libras
                 main_price_data = [
-                    ["PRECIO FOB", "POR KILOGRAMO", "POR LIBRA"],
-                    [f"${precio_kg:.2f}", f"${precio_lb:.2f}", "USD"]
+                    ["PRECIO FOB", "USD/KG", "USD/LB"],
+                    ["", f"${precio_kg:.2f}", f"${precio_lb:.2f}"]
                 ]
-                main_price_table = Table(main_price_data, colWidths=[2.5*inch, 2.2*inch, 1.8*inch])
+                main_price_table = Table(main_price_data, colWidths=[2*inch, 2.5*inch, 2.5*inch])
                 main_price_table.setStyle(TableStyle([
-                    # Encabezado con colores corporativos
+                    # Encabezado elegante
                     ('BACKGROUND', (0, 0), (-1, 0), azul_marino),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), blanco),
                     ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                     ('FONTSIZE', (0, 0), (-1, 0), 12),
                     
-                    # Fila de precios destacada
-                    ('BACKGROUND', (0, 1), (1, 1), colors.HexColor('#FFF8DC')),  # Fondo crema para precios
-                    ('BACKGROUND', (2, 1), (2, 1), gris_claro),  # Fondo gris para moneda
+                    # Precios destacados - GRANDES, NEGRITAS Y CENTRADOS
+                    ('BACKGROUND', (0, 1), (-1, 1), blanco),
                     ('TEXTCOLOR', (0, 1), (-1, 1), azul_marino),
-                    ('FONTNAME', (0, 1), (1, 1), 'Helvetica-Bold'),
-                    ('FONTNAME', (2, 1), (2, 1), 'Helvetica'),
-                    ('FONTSIZE', (0, 1), (1, 1), 22),  # Precios grandes y destacados
-                    ('FONTSIZE', (2, 1), (2, 1), 12),
+                    ('FONTNAME', (1, 1), (2, 1), 'Helvetica-Bold'),
+                    ('FONTSIZE', (1, 1), (2, 1), 28),  # Precios GRANDES
                     ('ALIGN', (0, 1), (-1, 1), 'CENTER'),
                     
-                    # Bordes elegantes
-                    ('GRID', (0, 0), (-1, -1), 2, azul_marino),
+                    # Bordes minimalistas
+                    ('GRID', (0, 0), (-1, -1), 1.5, azul_marino),
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                    ('TOPPADDING', (0, 0), (-1, -1), 15),
+                    ('TOPPADDING', (0, 0), (-1, -1), 18),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 18),
+                ]))
                     ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
                     ('LEFTPADDING', (0, 0), (-1, -1), 8),
                     ('RIGHTPADDING', (0, 0), (-1, -1), 8),
@@ -329,24 +382,34 @@ class PDFGenerator:
             story.append(main_price_table)
             story.append(Spacer(1, 25))
             
-            # ESPECIFICACIONES - Tabla profesional con colores corporativos
-            story.append(Paragraph("📋 ESPECIFICACIONES", section_title_style))
-            story.append(Spacer(1, 12))
+            # ESPECIFICACIONES - Tabla estilizada con colores corporativos e íconos
+            specs_title_style = ParagraphStyle(
+                'SpecsTitle',
+                parent=styles['Heading2'],
+                fontSize=16,
+                spaceAfter=15,
+                spaceBefore=10,
+                alignment=TA_CENTER,
+                textColor=azul_marino,
+                fontName='Helvetica-Bold'
+            )
             
-            # Preparar datos de especificaciones
+            story.append(Paragraph("📋 ESPECIFICACIONES", specs_title_style))
+            
+            # Preparar datos de especificaciones con íconos visuales
             specs_data = [
                 ["Concepto", "Detalle"],
-                ["❄️ Glaseo aplicado", f"{glaseo_factor:.1%}"],
+                ["❄️ Glaseo Aplicado", f"{glaseo_factor:.1%}"],
             ]
             
             # Agregar flete si está incluido
             if price_info.get('calculo_dinamico') and flete > 0:
-                specs_data.append(["🚢 Flete incluido", f"${flete:.2f}/kg"])
+                specs_data.append(["🚢 Flete Incluido", f"${flete:.2f}/kg"])
             
             # Agregar observaciones adicionales si aplica
             if price_info.get('destination'):
                 if is_houston:
-                    specs_data.append(["📍 Destino especial", "Houston - Precios en kilos"])
+                    specs_data.append(["📍 Destino Especial", "Houston - Precios en kilos"])
                 else:
                     specs_data.append(["🌍 Destino", price_info['destination']])
             
@@ -354,45 +417,54 @@ class PDFGenerator:
             if price_info.get('producto') and price_info.get('talla'):
                 specs_data.append(["🦐 Especificación", f"{price_info['producto']} - Talla {price_info['talla']}"])
             
-            # Tabla de especificaciones con estilo corporativo
-            specs_table = Table(specs_data, colWidths=[3.5*inch, 3*inch])
+            # Tabla de especificaciones con diseño corporativo elegante
+            specs_table = Table(specs_data, colWidths=[3.5*inch, 3.5*inch])
             specs_table.setStyle(TableStyle([
-                # Encabezado con colores corporativos
+                # Encabezado con azul marino
                 ('BACKGROUND', (0, 0), (-1, 0), azul_marino),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('ALIGN', (0, 0), (0, 0), 'LEFT'),    # Concepto alineado a la izquierda
-                ('ALIGN', (1, 0), (1, 0), 'CENTER'),  # Detalle centrado
+                ('TEXTCOLOR', (0, 0), (-1, 0), blanco),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, 0), 12),
                 
-                # Filas de datos alternadas
-                ('BACKGROUND', (0, 1), (-1, 1), colors.white),
+                # Filas alternadas elegantes
+                ('BACKGROUND', (0, 1), (-1, 1), blanco),
                 ('BACKGROUND', (0, 2), (-1, 2), gris_claro),
-                ('BACKGROUND', (0, 3), (-1, 3), colors.white),
+                ('BACKGROUND', (0, 3), (-1, 3), blanco),
                 ('BACKGROUND', (0, 4), (-1, 4), gris_claro),
-                ('BACKGROUND', (0, 5), (-1, 5), colors.white),
+                ('BACKGROUND', (0, 5), (-1, 5), blanco),
                 ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
                 ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
                 ('FONTSIZE', (0, 1), (-1, -1), 11),
                 ('ALIGN', (0, 1), (0, -1), 'LEFT'),    # Conceptos alineados a la izquierda
                 ('ALIGN', (1, 1), (1, -1), 'CENTER'),  # Detalles centrados
                 
-                # Bordes suaves y espaciado
-                ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+                # Bordes minimalistas
+                ('GRID', (0, 0), (-1, -1), 0.5, gris_medio),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('TOPPADDING', (0, 0), (-1, -1), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-                ('LEFTPADDING', (0, 0), (-1, -1), 12),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+                ('TOPPADDING', (0, 0), (-1, -1), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+                ('LEFTPADDING', (0, 0), (-1, -1), 15),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 15),
             ]))
             
             story.append(specs_table)
-            story.append(Spacer(1, 25))       
+            story.append(Spacer(1, 30))       
      
-            # CUADRO CON PRECIO TOTAL CALCULADO (si hay cantidad)
+            # CUADRO DE PRECIO TOTAL - Cantidad × Precio Unitario
             if price_info.get('quantity'):
-                story.append(Paragraph("📊 TOTAL ESTIMADO", section_title_style))
-                story.append(Spacer(1, 12))
+                total_title_style = ParagraphStyle(
+                    'TotalTitle',
+                    parent=styles['Heading2'],
+                    fontSize=16,
+                    spaceAfter=15,
+                    spaceBefore=10,
+                    alignment=TA_CENTER,
+                    textColor=azul_marino,
+                    fontName='Helvetica-Bold'
+                )
+                
+                story.append(Paragraph("💰 TOTAL ESTIMADO", total_title_style))
                 
                 try:
                     qty = float(price_info['quantity'].replace(',', ''))
@@ -417,60 +489,60 @@ class PDFGenerator:
                     
                     total = qty * unit_price
                     
-                    # Tabla destacada de total con colores corporativos
+                    # Tabla elegante de total con diseño minimalista
                     total_data = [
-                        ["CANTIDAD", "PRECIO UNITARIO", "TOTAL FOB"],
-                        [f"{price_info['quantity']} {unit}", f"${unit_price:.2f}", f"${total:,.2f}"]
+                        ["CANTIDAD", "PRECIO UNITARIO", "TOTAL FOB USD"],
+                        [f"{price_info['quantity']} {unit.upper()}", f"${unit_price:.2f}", f"${total:,.2f}"]
                     ]
                     
-                    total_table = Table(total_data, colWidths=[2.2*inch, 2.2*inch, 2.2*inch])
+                    total_table = Table(total_data, colWidths=[2.3*inch, 2.3*inch, 2.4*inch])
                     total_table.setStyle(TableStyle([
-                        # Encabezado con colores corporativos
+                        # Encabezado elegante
                         ('BACKGROUND', (0, 0), (-1, 0), azul_marino),
-                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                        ('TEXTCOLOR', (0, 0), (-1, 0), blanco),
                         ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
                         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                         ('FONTSIZE', (0, 0), (-1, 0), 11),
                         
-                        # Fila de totales destacada con naranja corporativo
-                        ('BACKGROUND', (0, 1), (1, 1), colors.HexColor('#FFF8DC')),  # Fondo crema para cantidad y precio
+                        # Fila de totales con naranja corporativo destacado
+                        ('BACKGROUND', (0, 1), (1, 1), blanco),  # Fondo blanco para cantidad y precio
                         ('BACKGROUND', (2, 1), (2, 1), naranja),  # Fondo naranja para total
                         ('TEXTCOLOR', (0, 1), (1, 1), colors.black),
-                        ('TEXTCOLOR', (2, 1), (2, 1), colors.white),
+                        ('TEXTCOLOR', (2, 1), (2, 1), blanco),
                         ('FONTNAME', (0, 1), (-1, 1), 'Helvetica-Bold'),
                         ('FONTSIZE', (0, 1), (1, 1), 14),
-                        ('FONTSIZE', (2, 1), (2, 1), 18),  # Total más grande
+                        ('FONTSIZE', (2, 1), (2, 1), 20),  # Total destacado
                         ('ALIGN', (0, 1), (-1, 1), 'CENTER'),
                         
-                        # Bordes elegantes
-                        ('GRID', (0, 0), (-1, -1), 2, azul_marino),
+                        # Bordes minimalistas
+                        ('GRID', (0, 0), (-1, -1), 1.5, azul_marino),
                         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                        ('TOPPADDING', (0, 0), (-1, -1), 12),
-                        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-                        ('LEFTPADDING', (0, 0), (-1, -1), 8),
-                        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                        ('TOPPADDING', (0, 0), (-1, -1), 15),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
+                        ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
                     ]))
                     
                     story.append(total_table)
-                    story.append(Spacer(1, 30))
+                    story.append(Spacer(1, 35))
                     
                 except:
                     pass
             
-            # PIE DE PÁGINA CORPORATIVO
-            story.append(Spacer(1, 40))
+            # PIE DE PÁGINA CORPORATIVO ELEGANTE
+            story.append(Spacer(1, 45))
             
-            # Línea separadora antes del pie
-            line_data = [["", ""]]
-            line_table = Table(line_data, colWidths=[7*inch])
-            line_table.setStyle(TableStyle([
-                ('LINEABOVE', (0, 0), (-1, -1), 1, colors.grey),
-                ('TOPPADDING', (0, 0), (-1, -1), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            # Línea divisoria elegante
+            divider_data = [["", ""]]
+            divider_table = Table(divider_data, colWidths=[7*inch])
+            divider_table.setStyle(TableStyle([
+                ('LINEABOVE', (0, 0), (-1, -1), 2, azul_marino),
+                ('TOPPADDING', (0, 0), (-1, -1), 15),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
             ]))
-            story.append(line_table)
+            story.append(divider_table)
             
-            # Disclaimer en letra pequeña
+            # Disclaimer profesional
             disclaimer_style = ParagraphStyle(
                 'Disclaimer',
                 parent=styles['Normal'],
@@ -478,25 +550,36 @@ class PDFGenerator:
                 alignment=TA_CENTER,
                 textColor=colors.grey,
                 fontName='Helvetica-Oblique',
-                spaceAfter=8
+                spaceAfter=10
             )
             
+            # Contacto corporativo
             contact_style = ParagraphStyle(
                 'Contact',
                 parent=styles['Normal'],
-                fontSize=9,
+                fontSize=10,
                 alignment=TA_CENTER,
                 textColor=azul_marino,
-                fontName='Helvetica',
+                fontName='Helvetica-Bold',
                 spaceAfter=3
             )
             
-            story.append(Paragraph("Precios FOB sujetos a confirmación final. BGR Export Shrimp – Garantía de calidad y frescura.", disclaimer_style))
-            story.append(Spacer(1, 8))
+            company_footer_style = ParagraphStyle(
+                'CompanyFooter',
+                parent=styles['Normal'],
+                fontSize=9,
+                alignment=TA_CENTER,
+                textColor=colors.grey,
+                fontName='Helvetica',
+                spaceAfter=0
+            )
             
-            # Datos de contacto en el pie
-            story.append(Paragraph("📞 Tel: +593 4 123-4567 | 📧 info@bgrexport.com | 🌐 www.bgrexport.com", contact_style))
-            story.append(Paragraph("BGR EXPORT SHRIMP S.A. - Camarón Premium del Ecuador", contact_style))
+            # Disclaimer exacto como solicitaste
+            story.append(Paragraph("Precios FOB sujetos a confirmación final. BGR Export Shrimp – Garantía de calidad y frescura.", disclaimer_style))
+            
+            # Contacto de la empresa alineado al centro
+            story.append(Paragraph("📞 +593 4 123-4567 | 📧 info@bgrexport.com | 🌐 www.bgrexport.com", contact_style))
+            story.append(Paragraph("BGR EXPORT SHRIMP S.A. - Camarón Premium del Ecuador", company_footer_style))
             
             # Generar PDF
             doc.build(story)
