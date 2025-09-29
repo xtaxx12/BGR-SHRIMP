@@ -33,15 +33,21 @@ class PDFGenerator:
         Genera un PDF profesional con la cotización corporativa
         """
         try:
+            logger.info(f"🔍 Iniciando generación PDF con datos: {price_info}")
+            logger.info(f"📱 Teléfono usuario: {user_phone}")
             # Generar nombre único para el archivo
+            logger.info("🔍 Generando nombre de archivo...")
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             if user_phone:
                 cleaned_phone = user_phone.replace("+", "").replace(":", "")
                 phone_suffix = cleaned_phone[-4:] if len(cleaned_phone) >= 4 else cleaned_phone.zfill(4)
+                logger.info(f"📱 Teléfono procesado: {cleaned_phone} -> {phone_suffix}")
             else:
                 phone_suffix = "0000"
+                logger.info("📱 Sin teléfono, usando 0000")
             filename = f"cotizacion_BGR_{timestamp}_{phone_suffix}.pdf"
             filepath = os.path.join(self.output_dir, filename)
+            logger.info(f"📄 Archivo: {filename}")
             
             logger.info(f"📁 Directorio de salida: {self.output_dir}")
             logger.info(f"📄 Nombre del archivo: {filename}")
@@ -247,6 +253,7 @@ class PDFGenerator:
             story.append(Spacer(1, 20))
             
             # BLOQUE DE DATOS DE LA COTIZACIÓN - Tabla con fondo gris claro y bordes suaves
+            logger.info("🔍 Creando datos de cotización...")
             fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
             
             # Crear datos de información con íconos visuales
@@ -255,6 +262,7 @@ class PDFGenerator:
                 ["Producto", price_info.get('producto', 'Camarón')],
                 ["Talla", price_info.get('talla', 'N/A')]
             ]
+            logger.info(f"📋 Datos base creados: {len(info_data)} filas")
             
             # Agregar cliente si está disponible
             if price_info.get('cliente_nombre'):
@@ -314,33 +322,40 @@ class PDFGenerator:
             story.append(Paragraph("COTIZACIÓN FOB", fob_title_style))
             
             # Obtener precio final y datos
+            logger.info("🔍 Obteniendo precios...")
             if price_info.get('calculo_dinamico') and 'precio_final_kg' in price_info:
                 precio_kg = price_info['precio_final_kg']
                 precio_lb = price_info['precio_final_lb']
                 glaseo_factor = price_info.get('factor_glaseo', 0)
                 flete = price_info.get('flete', 0)
+                logger.info(f"💰 Precios dinámicos: kg=${precio_kg}, lb=${precio_lb}")
             elif 'precio_flete_kg' in price_info:
                 precio_kg = price_info['precio_flete_kg']
                 precio_lb = price_info['precio_flete_lb']
                 glaseo_factor = 0.7  # Default
                 flete = 0.22  # Default
+                logger.info(f"💰 Precios con flete: kg=${precio_kg}, lb=${precio_lb}")
             else:
                 precio_kg = price_info.get('precio_kg', 0)
                 precio_lb = price_info.get('precio_lb', 0)
                 glaseo_factor = 0.7
                 flete = 0.22
+                logger.info(f"💰 Precios básicos: kg=${precio_kg}, lb=${precio_lb}")
             
             # Verificar si es Houston (solo kilos)
             destination = price_info.get('destination', '')
             is_houston = destination.lower() == 'houston'
             
             # TABLA PRINCIPAL DE PRECIOS - Diseño minimalista y elegante
+            logger.info("🔍 Creando tabla de precios...")
             if is_houston:
                 # Para Houston: Solo kilogramos
+                logger.info("🏢 Configurando tabla para Houston")
                 main_price_data = [
                     ["PRECIO FOB USD/KG"],
                     [f"${precio_kg:.2f}"]
                 ]
+                logger.info(f"📊 Datos de tabla Houston: {main_price_data}")
                 main_price_table = Table(main_price_data, colWidths=[5*inch])
                 main_price_table.setStyle(TableStyle([
                     # Encabezado elegante
