@@ -79,7 +79,6 @@ class PDFGenerator:
                     "destino": "Destino",
                     "glaseo_solicitado": "Glaseo Solicitado",
                     "precio_header": f"PRECIO {tipo_cotizacion} USD/KG",
-                    "flete_incluido": "Flete Incluido",
                     "concepto": "Concepto",
                     "detalle": "Detalle",
                     "glaseo_aplicado": "Glaseo Aplicado",
@@ -94,7 +93,6 @@ class PDFGenerator:
                     "destino": "Destination",
                     "glaseo_solicitado": "Requested Glazing",
                     "precio_header": f"{tipo_cotizacion} PRICE USD/KG",
-                    "flete_incluido": "Freight Included",
                     "concepto": "Concept",
                     "detalle": "Detail",
                     "glaseo_aplicado": "Applied Glazing",
@@ -142,10 +140,7 @@ class PDFGenerator:
                 [t["glaseo_solicitado"], f"{glaseo_percentage}%" if glaseo_percentage else f"{int(glaseo_factor * 100)}%"]
             ]
             
-            # Si es CFR, agregar información del flete
-            if flete_incluido:
-                flete_valor = price_info.get('flete', 0)
-                info_data.append([t["flete_incluido"], f"${flete_valor:.2f}/kg"])
+            # Nota: Información de flete eliminada por solicitud del usuario
             
             info_table = Table(info_data, colWidths=[2.5*inch, 3*inch])
             info_table.setStyle(TableStyle([
