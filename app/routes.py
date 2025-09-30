@@ -299,12 +299,7 @@ async def whatsapp_webhook(
             return PlainTextResponse(response_xml, media_type="application/xml")
         
         # Procesar según el estado de la sesión
-        if session['state'] == 'conversational':
-            # Estado conversacional - no usar menús numerados, solo respuestas naturales
-            # El flujo ya se manejó arriba con la respuesta inteligente
-            return PlainTextResponse(str(response), media_type="application/xml")
-        
-        elif session['state'] == 'main_menu':
+        if session['state'] == 'main_menu':
             # Usuario está en el menú principal simplificado
             new_state, message, options = interactive_service.handle_menu_selection(Body, "main")
             
@@ -422,8 +417,13 @@ async def whatsapp_webhook(
                                "3. Escribe 'confirmar' para generar PDF\n\n"
                                "🌊 ¡Estoy aquí para ayudarte!")
                 return PlainTextResponse(str(response), media_type="application/xml")
+        
+        elif session['state'] in ['conversational', 'idle']:
+            # Estado conversacional o inicial - procesar con respuesta inteligente
+            # Continuar con la lógica de respuesta inteligente abajo
+            pass
             
-            # Intentar parsear como consulta de precio directa
+        # Intentar parsear como consulta de precio directa
             user_input = parse_user_message(Body)
             logger.debug(f"🔍 Parse result para '{Body}': {user_input}")
             
