@@ -117,6 +117,7 @@ class PricingService:
             # Extraer parámetros dinámicos del usuario
             glaseo_factor = user_params.get('glaseo_factor')
             flete_custom = user_params.get('flete_custom')
+            flete_solicitado = user_params.get('flete_solicitado', False)
             usar_libras = user_params.get('usar_libras', False)
             destination = user_params.get('destination', '')
             

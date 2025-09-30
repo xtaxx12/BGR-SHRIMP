@@ -402,36 +402,58 @@ Formato de respuesta: texto directo sin JSON.
             for pattern in glaseo_patterns:
                 match = re.search(pattern, message_lower)
                 if match:
-                    glaseo_factor = float(match.group(1)) / 100
-                    break
-            
-            # Detectar destinos con patrones más amplios
-            destination_patterns = {
-                'Houston': ['houston', 'houton', 'huston'],
-                'Miami': ['miami', 'maiami', 'florida'],
-                'New York': ['new york', 'nueva york', 'ny', 'newyork'],
-                'Los Angeles': ['los angeles', 'la', 'california'],
-                'Chicago': ['chicago', 'chicaco'],
-                'Dallas': ['dallas', 'dalas']
-            }
-            
-            # Buscar destinos USA
-            for dest_name, patterns in destination_patterns.items():
-                if any(pattern in message_lower for pattern in patterns):
-                    if dest_name == 'Houston':
-                        usar_libras = False  # Houston es excepción: USA pero usa kilos
+                    glaseo_percentage = int(match.group(1))
+                    # Convertir porcentaje a factor según reglas del negocio
+                    if glaseo_percentage == 10:
+                        glaseo_factor = 0.90
+                    elif glaseo_percentage == 20:
+                        glaseo_factor = 0.80
+                    elif glaseo_percentage == 30:
+                        glaseo_factor = 0.70
                     else:
-                        usar_libras = True  # Otras ciudades USA usan libras
-                    destination = dest_name
+                        glaseo_factor = glaseo_percentage / 100  # Para otros valores
                     break
             
-            # También detectar patrones de envío
-            envio_patterns = [
-                r'envio a (\w+)', r'enviar a (\w+)', r'destino (\w+)', 
-                r'para (\w+)', r'shipping to (\w+)', r'con envio a (\w+)'
-            ]
+            # Solo detectar destinos si se menciona flete explícitamente
+            flete_keywords = ['flete', 'freight', 'envio', 'envío', 'shipping', 'transporte']
+            menciona_flete = any(keyword in message_lower for keyword in flete_keywords)
             
-            if not destination:
+            if menciona_flete:
+                destination_patterns = {
+                    'Houston': ['houston', 'houton', 'huston'],
+                    'Miami': ['miami', 'maiami', 'florida'],
+                    'New York': ['new york', 'nueva york', 'ny', 'newyork'],
+                    'Los Angeles': ['los angeles', 'la', 'california'],
+                    'Chicago': ['chicago', 'chicaco'],
+                    'Dallas': ['dallas', 'dalas']
+                }
+                
+                # Buscar destinos USA solo si menciona flete
+                for dest_name, patterns in destination_patterns.items():
+                    if any(pattern in message_lower for pattern in patterns):
+                        if dest_name == 'Houston':
+                            usar_libras = False  # Houston es excepción: USA pero usa kilos
+                        else:
+                            usar_libras = True  # Otras ciudades USA usan libras
+                        destination = dest_name
+                        break
+            
+            # También detectar patrones de envío (solo si ya menciona flete)
+            if menciona_flete and not destination:
+                envio_patterns = [
+                    r'flete a (\w+)', r'envio a (\w+)', r'enviar a (\w+)', 
+                    r'shipping to (\w+)', r'con flete a (\w+)'
+                ]
+                
+                destination_patterns = {
+                    'Houston': ['houston', 'houton', 'huston'],
+                    'Miami': ['miami', 'maiami', 'florida'],
+                    'New York': ['new york', 'nueva york', 'ny', 'newyork'],
+                    'Los Angeles': ['los angeles', 'la', 'california'],
+                    'Chicago': ['chicago', 'chicaco'],
+                    'Dallas': ['dallas', 'dalas']
+                }
+                
                 for pattern in envio_patterns:
                     match = re.search(pattern, message_lower)
                     if match:

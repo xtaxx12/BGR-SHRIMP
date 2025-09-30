@@ -426,38 +426,22 @@ class GoogleSheetsService:
     
     def get_costo_fijo_value(self) -> float:
         """
-        Obtiene el valor del costo fijo desde la celda AA28 de Google Sheets
+        Obtiene el valor del costo fijo - usando valor fijo por ahora
         """
         try:
-            if not self.sheet:
-                logger.warning("Google Sheets no configurado, usando costo fijo por defecto")
-                return 0.29  # Valor por defecto
+            # Por ahora usar valor fijo hasta que se configure correctamente la hoja
+            logger.info("📊 Usando costo fijo por defecto: $0.29")
+            return 0.29
             
-            # Obtener la hoja de trabajo correcta (evitar gráficos)
-            worksheets = self.sheet.worksheets()
-            worksheet = None
+            # TODO: Implementar lectura desde Google Sheets cuando esté configurado
+            # if not self.sheet:
+            #     return 0.29
+            # 
+            # # Código para leer desde Sheets...
             
-            # Buscar una hoja que no sea un gráfico
-            for ws in worksheets:
-                if 'gráfico' not in ws.title.lower() and 'chart' not in ws.title.lower():
-                    worksheet = ws
-                    break
-            
-            if not worksheet:
-                worksheet = worksheets[0]  # Fallback
-            
-            logger.info(f"📊 Leyendo costo fijo de hoja: {worksheet.title}")
-            
-            # Leer celda AA28 (columna 27, fila 28)
-            costo_fijo_value = worksheet.cell(28, 27).value
-            
-            if costo_fijo_value and self._is_number(costo_fijo_value):
-                costo_fijo = self._clean_price(costo_fijo_value)
-                logger.info(f"📊 Costo fijo obtenido de AA28: ${costo_fijo}")
-                return costo_fijo
-            else:
-                logger.warning(f"⚠️ Valor de costo fijo inválido en AA28: {costo_fijo_value}, usando por defecto")
-                return 0.29
+        except Exception as e:
+            logger.error(f"❌ Error obteniendo costo fijo: {str(e)}")
+            return 0.29
                 
         except Exception as e:
             logger.error(f"❌ Error obteniendo costo fijo de AA28: {str(e)}")
