@@ -154,9 +154,19 @@ async def whatsapp_webhook(
             openai_analysis = openai_service.analyze_user_intent(Body, session)
             logger.debug(f"🤖 Análisis OpenAI complementario para {user_id}: {openai_analysis}")
             
-            # Usar OpenAI solo si es más confiable
+            # Combinar resultados: usar OpenAI si es más confiable, pero preservar datos específicos del fallback
             if openai_analysis.get('confidence', 0) > ai_analysis.get('confidence', 0):
+                # Preservar datos importantes del análisis básico si OpenAI no los tiene
+                basic_destination = ai_analysis.get('destination')
+                basic_glaseo_percentage = ai_analysis.get('glaseo_percentage')
+                
                 ai_analysis = openai_analysis
+                
+                # Restaurar datos del análisis básico si OpenAI no los detectó
+                if not ai_analysis.get('destination') and basic_destination:
+                    ai_analysis['destination'] = basic_destination
+                if not ai_analysis.get('glaseo_percentage') and basic_glaseo_percentage:
+                    ai_analysis['glaseo_percentage'] = basic_glaseo_percentage
         
         # PROCESAMIENTO PRIORITARIO DE PROFORMA
         # Si el análisis detecta una solicitud de proforma, procesarla inmediatamente
