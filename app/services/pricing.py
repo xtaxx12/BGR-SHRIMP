@@ -125,7 +125,7 @@ class PricingService:
             costo_fijo_sheets = self.sheets_service.get_costo_fijo_value()
             
             # Determinar costo fijo según destino
-            if destination.lower() == 'houston':
+            if destination and destination.lower() == 'houston':
                 costo_fijo = costo_fijo_sheets
             elif usar_libras:
                 costo_fijo = costo_fijo_sheets / 2.2
@@ -162,7 +162,7 @@ class PricingService:
             precio_final_kg = precio_glaseo_kg + costo_fijo + flete_value
             
             # Calcular precios en libras
-            if usar_libras and destination.lower() != 'houston':
+            if usar_libras and destination and destination.lower() != 'houston':
                 # Para ciudades USA (excepto Houston): recalcular con costo fijo en libras
                 costo_fijo_lb = costo_fijo_sheets / 2.2
                 base_price_lb = base_price_kg / 2.2

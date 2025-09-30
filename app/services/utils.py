@@ -199,7 +199,7 @@ def format_price_response(price_info: Dict) -> str:
         
         # Determinar si es Houston (solo kilos) o otras ciudades USA (libras)
         destination = price_info.get('destination', '')
-        is_houston = destination.lower() == 'houston'
+        is_houston = destination and destination.lower() == 'houston'
         
         # Precios FOB
         if 'precio_fob_kg' in price_info:
@@ -278,7 +278,7 @@ def format_price_response(price_info: Dict) -> str:
             
             if flete_especificado:
                 response += f"• Flete: ${flete_value:.2f} (especificado por usuario)\n"
-            elif destination.lower() == 'houston':
+            elif destination and destination.lower() == 'houston':
                 response += f"• Flete: ${flete_value:.2f} (Houston - desde Sheets)\n"
             elif usar_libras:
                 response += f"• Flete: ${flete_value:.2f} (USA - desde Sheets)\n"
