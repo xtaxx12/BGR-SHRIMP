@@ -204,7 +204,8 @@ async def whatsapp_webhook(
                             
                             # Mostrar precio final
                             if price_info.get('precio_final_kg'):
-                                if price_info.get('destination', '').lower() == 'houston':
+                                destination = price_info.get('destination') or ''
+                                if destination.lower() == 'houston':
                                     confirmation_msg += f"💰 Precio FOB: ${price_info['precio_final_kg']:.2f}/kg\n"
                                 else:
                                     confirmation_msg += f"💰 Precio FOB: ${price_info['precio_final_kg']:.2f}/kg - ${price_info.get('precio_final_lb', 0):.2f}/lb\n"

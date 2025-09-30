@@ -116,6 +116,7 @@ class PricingService:
         try:
             # Extraer parámetros dinámicos del usuario
             glaseo_factor = user_params.get('glaseo_factor')
+            glaseo_percentage = user_params.get('glaseo_percentage')  # Porcentaje original
             flete_custom = user_params.get('flete_custom')
             flete_solicitado = user_params.get('flete_solicitado', False)
             usar_libras = user_params.get('usar_libras', False)
@@ -200,6 +201,7 @@ class PricingService:
                 'precio_final_lb': precio_final_lb,
                 'costo_fijo': costo_fijo,
                 'factor_glaseo': glaseo_factor,
+                'glaseo_percentage': glaseo_percentage,  # Porcentaje original solicitado
                 'flete': flete_value,
                 'flete_base': 0.29 if not usar_libras else 0.13,
                 'usar_libras': usar_libras,

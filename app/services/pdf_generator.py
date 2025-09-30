@@ -128,7 +128,8 @@ class PDFGenerator:
             talla = price_info.get('talla', 'N/A')
             cliente = price_info.get('cliente_nombre', 'Cliente')
             destino = price_info.get('destino', 'N/A')
-            glaseo = price_info.get('glaseo_factor', 0.7)
+            glaseo_factor = price_info.get('glaseo_factor', 0.7)
+            glaseo_percentage = price_info.get('glaseo_percentage')  # Porcentaje original
             fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
             
             # Tabla de información general (multiidioma)
@@ -138,7 +139,7 @@ class PDFGenerator:
                 [t["talla"], talla],
                 [t["cliente"], cliente],
                 [t["destino"], destino],
-                [t["glaseo_solicitado"], f"{int(glaseo * 100)}%"]
+                [t["glaseo_solicitado"], f"{glaseo_percentage}%" if glaseo_percentage else f"{int(glaseo_factor * 100)}%"]
             ]
             
             # Si es CFR, agregar información del flete

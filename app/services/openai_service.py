@@ -399,19 +399,20 @@ Formato de respuesta: texto directo sin JSON.
                 r'(\d+)\s*porciento\s*glaseo'
             ]
             
+            glaseo_percentage_original = None
             for pattern in glaseo_patterns:
                 match = re.search(pattern, message_lower)
                 if match:
-                    glaseo_percentage = int(match.group(1))
+                    glaseo_percentage_original = int(match.group(1))
                     # Convertir porcentaje a factor según reglas del negocio
-                    if glaseo_percentage == 10:
+                    if glaseo_percentage_original == 10:
                         glaseo_factor = 0.90
-                    elif glaseo_percentage == 20:
+                    elif glaseo_percentage_original == 20:
                         glaseo_factor = 0.80
-                    elif glaseo_percentage == 30:
+                    elif glaseo_percentage_original == 30:
                         glaseo_factor = 0.70
                     else:
-                        glaseo_factor = glaseo_percentage / 100  # Para otros valores
+                        glaseo_factor = glaseo_percentage_original / 100  # Para otros valores
                     break
             
             # Solo detectar destinos si se menciona flete explícitamente
@@ -526,6 +527,7 @@ Formato de respuesta: texto directo sin JSON.
                 "quantity": quantity,
                 "destination": destination,
                 "glaseo_factor": glaseo_factor,
+                "glaseo_percentage": glaseo_percentage_original,  # Porcentaje original solicitado
                 "usar_libras": usar_libras,
                 "cliente_nombre": cliente_nombre,
                 "wants_proforma": True,

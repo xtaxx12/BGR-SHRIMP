@@ -34,6 +34,7 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
     quantity = ai_analysis.get('quantity')
     destination = ai_analysis.get('destination')
     glaseo_factor = ai_analysis.get('glaseo_factor')
+    glaseo_percentage = ai_analysis.get('glaseo_percentage')  # Porcentaje original
     flete_custom = ai_analysis.get('flete_custom')
     usar_libras = ai_analysis.get('usar_libras', False)
     cliente_nombre = ai_analysis.get('cliente_nombre')
@@ -86,6 +87,7 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
         'destination': destination,
         'unit': unit,
         'glaseo_factor': glaseo_value,
+        'glaseo_percentage': glaseo_percentage,  # Porcentaje original solicitado
         'flete_custom': flete_value,  # Solo si se especificó
         'flete_solicitado': flete_solicitado,  # Flag para saber si pidió flete
         'usar_libras': usar_libras,
