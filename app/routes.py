@@ -418,69 +418,69 @@ async def whatsapp_webhook(
                                "🌊 ¡Estoy aquí para ayudarte!")
                 return PlainTextResponse(str(response), media_type="application/xml")
         
-        elif session['state'] in ['conversational', 'idle']:
-            # Estado conversacional o inicial - procesar con respuesta inteligente
+        # Para estados conversacionales o iniciales, procesar con respuesta inteligente
+        if session['state'] in ['conversational', 'idle']:
             # Continuar con la lógica de respuesta inteligente abajo
             pass
             
         # Intentar parsear como consulta de precio directa
-            user_input = parse_user_message(Body)
-            logger.debug(f"🔍 Parse result para '{Body}': {user_input}")
+        user_input = parse_user_message(Body)
+        logger.debug(f"🔍 Parse result para '{Body}': {user_input}")
+        
+        if user_input:
+            # Obtener precio del camarón
+            price_info = pricing_service.get_shrimp_price(user_input)
             
-            if user_input:
-                # Obtener precio del camarón
-                price_info = pricing_service.get_shrimp_price(user_input)
+            if price_info:
+                formatted_response = format_price_response(price_info)
                 
-                if price_info:
-                    formatted_response = format_price_response(price_info)
-                    
-                    # Agregar instrucción para confirmar
-                    formatted_response += "\n\n✅ **Para generar PDF:** Escribe 'confirmar'"
-                    
-                    response.message(formatted_response)
-                    
-                    # Almacenar cotización para posible confirmación
-                    session_manager.set_last_quote(user_id, price_info)
-                    session_manager.set_session_state(user_id, 'quote_ready', {})
-                    return PlainTextResponse(str(response), media_type="application/xml")
-            
-            # Respuesta rápida para casos simples
-            logger.debug(f"🔍 Procesando respuesta para mensaje: '{Body}'")
-            
-            smart_response = None
-            
-            # Para saludos y casos simples, usar respuesta rápida
-            if ai_analysis and ai_analysis.get('intent') in ['greeting', 'menu_request']:
-                smart_response = openai_service.get_smart_fallback_response(Body, ai_analysis)
-                logger.debug(f"🧠 Respuesta rápida obtenida: {smart_response}")
-            
-            # Solo usar OpenAI para casos complejos
-            elif openai_service.is_available() and ai_analysis and ai_analysis.get('confidence', 0) > 0.7:
-                logger.debug(f"🤖 Intentando respuesta OpenAI para confianza: {ai_analysis.get('confidence', 0)}")
-                smart_response = openai_service.generate_smart_response(Body, session)
-                logger.debug(f"🤖 Respuesta OpenAI obtenida: {smart_response}")
-            
-            # Fallback para otros casos
-            elif ai_analysis and ai_analysis.get('confidence', 0) > 0.5:
-                smart_response = openai_service.get_smart_fallback_response(Body, ai_analysis)
-                logger.debug(f"🧠 Respuesta fallback obtenida: {smart_response}")
-            
-            if smart_response:
-                # Usar respuesta inteligente (IA o fallback)
-                logger.debug(f"✅ Usando respuesta inteligente: {smart_response}")
-                response.message(smart_response)
-                logger.debug(f"📤 Respuesta configurada en objeto response")
-                # Mantener en estado conversacional sin menú numerado
-                session_manager.set_session_state(user_id, 'conversational', {})
-                logger.debug(f"🔄 Estado actualizado a conversational")
-            else:
-                # Fallback final al menú de bienvenida tradicional
-                logger.info("⚠️ No hay respuesta inteligente, usando menú tradicional")
-                welcome_msg = interactive_service.create_welcome_message()
-                menu_msg, options = interactive_service.create_main_menu()
-                full_message = f"{welcome_msg}\n\n{menu_msg}"
-                response.message(full_message)
-                session_manager.set_session_state(user_id, 'main_menu', {'options': options})
+                # Agregar instrucción para confirmar
+                formatted_response += "\n\n✅ **Para generar PDF:** Escribe 'confirmar'"
+                
+                response.message(formatted_response)
+                
+                # Almacenar cotización para posible confirmación
+                session_manager.set_last_quote(user_id, price_info)
+                session_manager.set_session_state(user_id, 'quote_ready', {})
+                return PlainTextResponse(str(response), media_type="application/xml")
+        
+        # Respuesta rápida para casos simples
+        logger.debug(f"🔍 Procesando respuesta para mensaje: '{Body}'")
+        
+        smart_response = None
+        
+        # Para saludos y casos simples, usar respuesta rápida
+        if ai_analysis and ai_analysis.get('intent') in ['greeting', 'menu_request']:
+            smart_response = openai_service.get_smart_fallback_response(Body, ai_analysis)
+            logger.debug(f"🧠 Respuesta rápida obtenida: {smart_response}")
+        
+        # Solo usar OpenAI para casos complejos
+        elif openai_service.is_available() and ai_analysis and ai_analysis.get('confidence', 0) > 0.7:
+            logger.debug(f"🤖 Intentando respuesta OpenAI para confianza: {ai_analysis.get('confidence', 0)}")
+            smart_response = openai_service.generate_smart_response(Body, session)
+            logger.debug(f"🤖 Respuesta OpenAI obtenida: {smart_response}")
+        
+        # Fallback para otros casos
+        elif ai_analysis and ai_analysis.get('confidence', 0) > 0.5:
+            smart_response = openai_service.get_smart_fallback_response(Body, ai_analysis)
+            logger.debug(f"🧠 Respuesta fallback obtenida: {smart_response}")
+        
+        if smart_response:
+            # Usar respuesta inteligente (IA o fallback)
+            logger.debug(f"✅ Usando respuesta inteligente: {smart_response}")
+            response.message(smart_response)
+            logger.debug(f"📤 Respuesta configurada en objeto response")
+            # Mantener en estado conversacional sin menú numerado
+            session_manager.set_session_state(user_id, 'conversational', {})
+            logger.debug(f"🔄 Estado actualizado a conversational")
+        else:
+            # Fallback final al menú de bienvenida tradicional
+            logger.info("⚠️ No hay respuesta inteligente, usando menú tradicional")
+            welcome_msg = interactive_service.create_welcome_message()
+            menu_msg, options = interactive_service.create_main_menu()
+            full_message = f"{welcome_msg}\n\n{menu_msg}"
+            response.message(full_message)
+            session_manager.set_session_state(user_id, 'main_menu', {'options': options})
         
         response_xml = str(response)
         logger.debug(f"Enviando respuesta XML: {response_xml}")
