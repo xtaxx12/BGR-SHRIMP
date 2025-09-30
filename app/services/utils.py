@@ -51,16 +51,17 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
     
     # Procesar flete personalizado del usuario
     flete_value = None
+    flete_solicitado = False
+    
     if flete_custom:
         try:
             flete_value = float(flete_custom)
+            flete_solicitado = True
         except:
             pass
     
-    # Si no hay flete personalizado, usar valor por defecto
-    # NO cambiar automáticamente por destino - debe venir de Google Sheets
-    if not flete_value:
-        flete_value = 0.20  # Valor por defecto (debería venir de Sheets)
+    # Solo aplicar flete si el usuario lo menciona explícitamente
+    # NO asignar flete automáticamente
     
     # Procesar factor de glaseo
     glaseo_value = None
@@ -85,7 +86,8 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
         'destination': destination,
         'unit': unit,
         'glaseo_factor': glaseo_value,
-        'flete_value': flete_value,
+        'flete_custom': flete_value,  # Solo si se especificó
+        'flete_solicitado': flete_solicitado,  # Flag para saber si pidió flete
         'usar_libras': usar_libras,
         'cliente_nombre': cliente_nombre,
         'custom_calculation': True  # Indica que usa cálculos personalizados

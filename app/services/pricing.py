@@ -132,10 +132,14 @@ class PricingService:
                 costo_fijo = costo_fijo_sheets
             
             # Para el flete, usar valor personalizado del usuario o desde Google Sheets
-            if flete_custom is not None:
-                flete_value = flete_custom
+            # Solo si se solicitó flete explícitamente
+            if flete_solicitado:
+                if flete_custom is not None:
+                    flete_value = flete_custom
+                else:
+                    flete_value = self.sheets_service.get_flete_value()
             else:
-                flete_value = self.sheets_service.get_flete_value()
+                flete_value = 0  # No aplicar flete si no se solicitó
             
             # Usar glaseo especificado o valor por defecto
             if glaseo_factor is None:
@@ -176,7 +180,9 @@ class PricingService:
                 base_price_lb = base_price_kg / 2.2
             
             # Determinar si se debe mostrar precio CFR o precio con glaseo
-            incluye_flete = flete_custom is not None or destination
+            # Solo incluir flete si el usuario EXPLÍCITAMENTE lo menciona
+            flete_solicitado = user_params.get('flete_solicitado', False)
+            incluye_flete = flete_solicitado or flete_custom is not None
             
             result = {
                 'size': size,

@@ -79,7 +79,7 @@ OTROS DESTINOS (usan kilos): Europa, China, Japón, etc.
 
 PARÁMETROS CRÍTICOS A EXTRAER (TODOS DINÁMICOS):
 - Glaseo: "10 de glaseo", "glaseo 10%", "glaseo 0.15", "con 15 glaseo" → extraer valor decimal exacto
-- Flete: "flete 0.25", "con flete 0.30", "flete Houston" → extraer valor numérico si se especifica
+- Flete: SOLO si menciona explícitamente "flete", "freight", "envío" → extraer valor numérico
 - Precio base: "precio base 5.50", "base 6.20", "precio 4.80" → extraer valor si se menciona
 - Cantidad: "15000 lb", "10 toneladas", "5000 kilos" → extraer número y unidad
 - Cliente: "para [nombre]", "cliente [nombre]", "empresa [nombre]"
@@ -87,8 +87,8 @@ PARÁMETROS CRÍTICOS A EXTRAER (TODOS DINÁMICOS):
 REGLAS IMPORTANTES:
 - El usuario puede especificar TODOS los valores: glaseo, flete, precio base
 - Si menciona "proforma" o "cotización" → intent: "proforma"
-- Si destino es USA → usar_libras: true, aplicar flete_base: 0.13 (0.29/2.2)
-- Si destino NO es USA → usar_libras: false, aplicar flete_base: 0.29
+- IMPORTANTE: Solo extraer "destination" si menciona EXPLÍCITAMENTE flete/envío
+- NO asumir destino automáticamente - solo si dice "flete a [lugar]" o "envío a [lugar]"
 - Extraer valores numéricos EXACTOS que mencione el usuario
 - Si no especifica un valor → null (el sistema NO usará defaults fijos)
 
@@ -98,10 +98,11 @@ FACTORES DE GLASEO ESTÁNDAR:
 - 30% glaseo → glaseo_factor: 0.70
 
 EJEMPLOS DE EXTRACCIÓN:
-"Proforma 20/30 HOSO glaseo 10% flete Houston" → glaseo_factor: 0.90, usar_libras: true
+"Proforma 20/30 HOSO glaseo 10% flete Houston" → glaseo_factor: 0.90, destination: "Houston", usar_libras: true
 "Cotización con glaseo 20% y flete 0.25" → glaseo_factor: 0.80, flete_custom: 0.25
-"Precio base 5.50 con glaseo 30%" → precio_base_custom: 5.50, glaseo_factor: 0.70
-"HLSO 16/20 glaseo 20% flete 0.20" → glaseo_factor: 0.80, flete_custom: 0.20
+"Precio base 5.50 con glaseo 30%" → precio_base_custom: 5.50, glaseo_factor: 0.70, destination: null
+"HLSO 16/20 glaseo 20%" → glaseo_factor: 0.80, destination: null, flete_custom: null
+"16/20 sin cabeza con 20 de glaseo" → glaseo_factor: 0.80, destination: null, flete_custom: null
 
 Responde SOLO en formato JSON válido:
 {
