@@ -38,7 +38,7 @@ class SessionManager:
         if data:
             session['data'].update(data)
         
-        logger.info(f"Usuario {user_id} - Estado: {state}, Datos: {session['data']}")
+        logger.debug(f"Usuario {user_id} - Estado: {state}, Datos: {session['data']}")
     
     def set_last_quote(self, user_id: str, quote_data: Dict):
         """
@@ -46,7 +46,7 @@ class SessionManager:
         """
         session = self.get_session(user_id)
         session['last_quote'] = quote_data
-        logger.info(f"Cotización almacenada para usuario {user_id}")
+        logger.debug(f"Cotización almacenada para usuario {user_id}")
     
     def get_last_quote(self, user_id: str) -> Optional[Dict]:
         """

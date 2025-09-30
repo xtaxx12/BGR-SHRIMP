@@ -143,15 +143,16 @@ async def whatsapp_webhook(
         user_id = From.replace("whatsapp:", "")
         session = session_manager.get_session(user_id)
         
-        # Análisis de intención con OpenAI (si está disponible)
-        # Siempre usar análisis básico primero (más confiable)
+        # Análisis rápido de intención
         ai_analysis = openai_service._basic_intent_analysis(Body)
-        logger.info(f"🔍 Análisis básico para {user_id}: {ai_analysis}")
+        logger.debug(f"🔍 Análisis básico para {user_id}: {ai_analysis}")
         
-        # Si el análisis básico no es confiable, intentar con OpenAI
-        if ai_analysis.get('confidence', 0) < 0.7 and openai_service.is_available():
+        # Solo usar OpenAI para casos complejos (no para saludos simples)
+        if (ai_analysis.get('confidence', 0) < 0.7 and 
+            ai_analysis.get('intent') not in ['greeting', 'menu_request'] and 
+            openai_service.is_available()):
             openai_analysis = openai_service.analyze_user_intent(Body, session)
-            logger.info(f"🤖 Análisis OpenAI complementario para {user_id}: {openai_analysis}")
+            logger.debug(f"🤖 Análisis OpenAI complementario para {user_id}: {openai_analysis}")
             
             # Usar OpenAI solo si es más confiable
             if openai_analysis.get('confidence', 0) > ai_analysis.get('confidence', 0):
@@ -298,7 +299,12 @@ async def whatsapp_webhook(
             return PlainTextResponse(response_xml, media_type="application/xml")
         
         # Procesar según el estado de la sesión
-        if session['state'] == 'main_menu':
+        if session['state'] == 'conversational':
+            # Estado conversacional - no usar menús numerados, solo respuestas naturales
+            # El flujo ya se manejó arriba con la respuesta inteligente
+            return PlainTextResponse(str(response), media_type="application/xml")
+        
+        elif session['state'] == 'main_menu':
             # Usuario está en el menú principal simplificado
             new_state, message, options = interactive_service.handle_menu_selection(Body, "main")
             
@@ -419,7 +425,7 @@ async def whatsapp_webhook(
             
             # Intentar parsear como consulta de precio directa
             user_input = parse_user_message(Body)
-            logger.info(f"🔍 Parse result para '{Body}': {user_input}")
+            logger.debug(f"🔍 Parse result para '{Body}': {user_input}")
             
             if user_input:
                 # Obtener precio del camarón
@@ -438,32 +444,35 @@ async def whatsapp_webhook(
                     session_manager.set_session_state(user_id, 'quote_ready', {})
                     return PlainTextResponse(str(response), media_type="application/xml")
             
-            # Si no es una consulta válida, usar respuesta inteligente
-            logger.info(f"🔍 Llegando a lógica de respuesta inteligente para mensaje: '{Body}'")
+            # Respuesta rápida para casos simples
+            logger.debug(f"🔍 Procesando respuesta para mensaje: '{Body}'")
             
             smart_response = None
             
-            # Intentar respuesta con OpenAI primero
-            if openai_service.is_available() and ai_analysis and ai_analysis.get('confidence', 0) > 0.7:
-                logger.info(f"🤖 Intentando respuesta OpenAI para confianza: {ai_analysis.get('confidence', 0)}")
-                smart_response = openai_service.generate_smart_response(Body, session)
-                logger.info(f"🤖 Respuesta OpenAI obtenida: {smart_response}")
-            
-            # Si OpenAI no está disponible o falló, usar fallback inteligente
-            if not smart_response and ai_analysis and ai_analysis.get('confidence', 0) > 0.5:
-                logger.info(f"🧠 Usando fallback inteligente para confianza: {ai_analysis.get('confidence', 0)}")
+            # Para saludos y casos simples, usar respuesta rápida
+            if ai_analysis and ai_analysis.get('intent') in ['greeting', 'menu_request']:
                 smart_response = openai_service.get_smart_fallback_response(Body, ai_analysis)
-                logger.info(f"🧠 Respuesta fallback obtenida: {smart_response}")
+                logger.debug(f"🧠 Respuesta rápida obtenida: {smart_response}")
+            
+            # Solo usar OpenAI para casos complejos
+            elif openai_service.is_available() and ai_analysis and ai_analysis.get('confidence', 0) > 0.7:
+                logger.debug(f"🤖 Intentando respuesta OpenAI para confianza: {ai_analysis.get('confidence', 0)}")
+                smart_response = openai_service.generate_smart_response(Body, session)
+                logger.debug(f"🤖 Respuesta OpenAI obtenida: {smart_response}")
+            
+            # Fallback para otros casos
+            elif ai_analysis and ai_analysis.get('confidence', 0) > 0.5:
+                smart_response = openai_service.get_smart_fallback_response(Body, ai_analysis)
+                logger.debug(f"🧠 Respuesta fallback obtenida: {smart_response}")
             
             if smart_response:
                 # Usar respuesta inteligente (IA o fallback)
                 logger.debug(f"✅ Usando respuesta inteligente: {smart_response}")
                 response.message(smart_response)
                 logger.debug(f"📤 Respuesta configurada en objeto response")
-                # Mantener en menú principal para seguir la conversación
-                menu_msg, options = interactive_service.create_main_menu()
-                session_manager.set_session_state(user_id, 'main_menu', {'options': options})
-                logger.info(f"🔄 Estado actualizado a main_menu")
+                # Mantener en estado conversacional sin menú numerado
+                session_manager.set_session_state(user_id, 'conversational', {})
+                logger.debug(f"🔄 Estado actualizado a conversational")
             else:
                 # Fallback final al menú de bienvenida tradicional
                 logger.info("⚠️ No hay respuesta inteligente, usando menú tradicional")
@@ -474,7 +483,7 @@ async def whatsapp_webhook(
                 session_manager.set_session_state(user_id, 'main_menu', {'options': options})
         
         response_xml = str(response)
-        logger.info(f"Enviando respuesta XML: {response_xml}")
+        logger.debug(f"Enviando respuesta XML: {response_xml}")
         
         # Validar que el XML sea válido
         try:

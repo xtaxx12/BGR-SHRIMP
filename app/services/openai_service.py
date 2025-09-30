@@ -549,13 +549,8 @@ Formato de respuesta: texto directo sin JSON.
         message_lower = user_message.lower().strip()
         
         if intent == 'greeting':
-            responses = [
-                "¡Hola! 🦐 Soy ShrimpBot de BGR Export. ¿Qué producto de camarón necesitas? Puedo generar tu proforma al instante 📋",
-                "¡Excelente! 🤖 Te ayudo con cotizaciones de camarón premium. ¿HLSO, P&D IQF o qué producto te interesa? 💰",
-                "¡Hola! 👋 Listo para crear tu proforma de camarón. ¿Qué talla necesitas? Escribe 'precios' para ver todas 📊"
-            ]
-            # Seleccionar respuesta basada en el hash del mensaje para consistencia
-            return responses[hash(message_lower) % len(responses)]
+            # Respuesta rápida y directa para saludos
+            return "¡Hola! 🦐 ¿Qué producto de camarón necesitas? Te genero la cotización al instante 💰"
         
         elif intent == 'pricing':
             return "💰 ¡Perfecto! ¿Qué producto necesitas? HLSO es muy popular. Escribe 'precios' para ver tallas y crear tu proforma 📋"
