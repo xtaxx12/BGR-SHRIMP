@@ -13,7 +13,21 @@ import logging
 
 # Configurar logging
 log_level = logging.DEBUG if settings.DEBUG else logging.INFO
-logging.basicConfig(level=log_level)
+logging.basicConfig(
+    level=log_level,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+# Configurar loggers específicos para reducir verbosidad
+logging.getLogger('twilio.http_client').setLevel(logging.WARNING)
+logging.getLogger('app.services.google_sheets').setLevel(logging.INFO)
+logging.getLogger('app.services.whatsapp_sender').setLevel(logging.INFO)
+logging.getLogger('app.services.pricing').setLevel(logging.INFO)
+logging.getLogger('app.services.pdf_generator').setLevel(logging.INFO)
+logging.getLogger('app.services.excel_local_calculator').setLevel(logging.INFO)
+logging.getLogger('app.services.audio_handler').setLevel(logging.INFO)
+logging.getLogger('app.services.excel').setLevel(logging.INFO)
+
 logger = logging.getLogger(__name__)
 
 app = FastAPI(

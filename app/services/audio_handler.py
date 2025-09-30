@@ -31,7 +31,7 @@ class AudioHandler:
                     temp_file.write(response.content)
                     temp_path = temp_file.name
                 
-                logger.info(f"✅ Audio descargado en: {temp_path}")
+                logger.debug(f"✅ Audio descargado en: {temp_path}")
                 return temp_path
             else:
                 logger.error(f"❌ Error descargando audio: {response.status_code}")

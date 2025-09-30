@@ -43,7 +43,7 @@ class ExcelLocalCalculatorService:
                     'flete': float(flete) if self._is_number(flete) else 0.2
                 }
                 
-                logger.info(f"✅ Factores cargados desde Excel: {self.factores}")
+                logger.debug(f"✅ Factores cargados desde Excel: {self.factores}")
                 
             except Exception as e:
                 logger.warning(f"Error leyendo factores del Excel, usando valores por defecto: {e}")
@@ -122,9 +122,9 @@ class ExcelLocalCalculatorService:
                 'calculado_con': 'Excel Local (Fórmulas)'
             }
             
-            logger.info(f"✅ Cálculo completado:")
-            logger.info(f"   📊 Base: ${precio_kg:.2f}/kg")
-            logger.info(f"   🚢 FOB: ${precio_fob_kg:.2f}/kg")
+            logger.debug(f"✅ Cálculo completado:")
+            logger.debug(f"   📊 Base: ${precio_kg:.2f}/kg")
+            logger.debug(f"   🚢 FOB: ${precio_fob_kg:.2f}/kg")
             logger.info(f"   ❄️ Glaseo: ${precio_glaseo_kg:.2f}/kg")
             logger.info(f"   ✈️ Final: ${precio_flete_kg:.2f}/kg")
             

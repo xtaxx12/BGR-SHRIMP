@@ -69,7 +69,7 @@ class PricingService:
             )
             
             if calculated_prices:
-                logger.info(f"✅ Precio calculado dinámicamente para {product} {size}: ${calculated_prices.get('precio_final_kg', 0):.2f}/kg")
+                logger.debug(f"✅ Precio calculado dinámicamente para {product} {size}: ${calculated_prices.get('precio_final_kg', 0):.2f}/kg")
                 return calculated_prices
             
             return None
@@ -187,7 +187,7 @@ class PricingService:
                 }
             }
             
-            logger.info(f"✅ Cálculo dinámico completado: Base=${base_price_kg:.2f} → Final=${precio_final_kg:.2f}/kg")
+            logger.debug(f"✅ Cálculo dinámico completado: Base=${base_price_kg:.2f} → Final=${precio_final_kg:.2f}/kg")
             return result
             
         except Exception as e:

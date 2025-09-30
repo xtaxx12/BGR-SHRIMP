@@ -72,7 +72,7 @@ def get_services():
         pdf_generator = PDFGenerator()
         whatsapp_sender = WhatsAppSender()
         openai_service = OpenAIService()
-        logger.info("✅ Servicios inicializados")
+        logger.debug("✅ Servicios inicializados")
     
     return pricing_service, interactive_service, pdf_generator, whatsapp_sender, openai_service
 
@@ -169,7 +169,7 @@ async def whatsapp_webhook(
                 price_info = pricing_service.get_shrimp_price(ai_query)
                 
                 if price_info:
-                    logger.info(f"✅ Proforma automática generada para: {ai_query}")
+                    logger.debug(f"✅ Proforma automática generada para: {ai_query}")
                     
                     # Generar PDF directamente sin mostrar cotización en texto
                     logger.info(f"📄 Generando PDF automáticamente para usuario {user_id}")
@@ -189,7 +189,7 @@ async def whatsapp_webhook(
                         )
                         
                         if pdf_sent:
-                            logger.info(f"✅ PDF enviado exitosamente por WhatsApp: {pdf_path}")
+                            logger.debug(f"✅ PDF enviado exitosamente por WhatsApp: {pdf_path}")
                             
                             # Mensaje de confirmación con información básica
                             confirmation_msg = f"✅ **Proforma generada y enviada**\n\n"
@@ -260,7 +260,7 @@ async def whatsapp_webhook(
                     if pdf_sent:
                         # Si se envió exitosamente por WhatsApp, solo confirmar
                         response.message("✅ ¡Cotización confirmada!\n\n📄 Tu PDF ha sido enviado por WhatsApp.")
-                        logger.info(f"✅ PDF enviado exitosamente por WhatsApp: {pdf_path}")
+                        logger.debug(f"✅ PDF enviado exitosamente por WhatsApp: {pdf_path}")
                     else:
                         # Si no se pudo enviar por WhatsApp, usar TwiML como respaldo
                         logger.info(f"⚠️ Enviando PDF via TwiML como respaldo: {download_url}")
@@ -457,9 +457,9 @@ async def whatsapp_webhook(
             
             if smart_response:
                 # Usar respuesta inteligente (IA o fallback)
-                logger.info(f"✅ Usando respuesta inteligente: {smart_response}")
+                logger.debug(f"✅ Usando respuesta inteligente: {smart_response}")
                 response.message(smart_response)
-                logger.info(f"📤 Respuesta configurada en objeto response")
+                logger.debug(f"📤 Respuesta configurada en objeto response")
                 # Mantener en menú principal para seguir la conversación
                 menu_msg, options = interactive_service.create_main_menu()
                 session_manager.set_session_state(user_id, 'main_menu', {'options': options})
@@ -480,7 +480,7 @@ async def whatsapp_webhook(
         try:
             import xml.etree.ElementTree as ET
             ET.fromstring(response_xml)
-            logger.info("✅ XML válido")
+            logger.debug("✅ XML válido")
         except Exception as xml_error:
             logger.error(f"❌ XML inválido: {xml_error}")
             # Crear respuesta de emergencia
@@ -739,7 +739,7 @@ async def download_pdf(filename: str):
             logger.error("❌ Directorio generated_pdfs no existe")
         
         if os.path.exists(pdf_path):
-            logger.info(f"✅ PDF encontrado: {pdf_path}")
+            logger.debug(f"✅ PDF encontrado: {pdf_path}")
             return FileResponse(
                 path=pdf_path,
                 filename=filename,

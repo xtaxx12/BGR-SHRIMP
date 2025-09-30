@@ -55,7 +55,7 @@ class GoogleSheetsService:
             logger.debug(f"Abriendo hoja con ID: {sheet_id}")
             self.sheet = self.gc.open_by_key(sheet_id)
             
-            logger.info("Conexión con Google Sheets establecida exitosamente")
+            logger.debug("Conexión con Google Sheets establecida exitosamente")
             self.load_sheets_data()
             
         except Exception as e:
@@ -97,7 +97,7 @@ class GoogleSheetsService:
             
             # Obtener todos los valores
             all_values = worksheet.get_all_values()
-            logger.info(f"Datos leídos: {len(all_values)} filas")
+            logger.debug(f"Datos leídos: {len(all_values)} filas")
             
             # Mostrar las primeras filas para debug
             if all_values:
@@ -167,7 +167,7 @@ class GoogleSheetsService:
                 pass  # Usar valores por defecto
             
             # Procesar sección superior (filas 15-25, índices 14-24)
-            logger.info("Procesando sección superior (filas 15-25)...")
+            logger.debug("Procesando sección superior (filas 15-25)...")
             for i in range(14, min(25, len(df))):
                 for product, cols in fob_product_columns.items():
                     try:
@@ -211,7 +211,7 @@ class GoogleSheetsService:
                         continue
             
             # Procesar sección inferior (filas 28-38, índices 27-37)
-            logger.info("Procesando sección inferior (filas 28-38)...")
+            logger.debug("Procesando sección inferior (filas 28-38)...")
             for i in range(27, min(38, len(df))):
                 for product, cols in ez_peel_columns.items():
                     try:
@@ -260,7 +260,7 @@ class GoogleSheetsService:
             
             # Debug: mostrar algunos productos para verificar
             for product, tallas in self.prices_data.items():
-                logger.info(f"  {product}: {len(tallas)} tallas")
+                logger.debug(f"  {product}: {len(tallas)} tallas")
             
             return True
             

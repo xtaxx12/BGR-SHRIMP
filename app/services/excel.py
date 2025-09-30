@@ -27,7 +27,7 @@ class ExcelService:
                 # Intentar cargar desde Google Sheets
                 if self.google_sheets_service.prices_data:
                     self.prices_data = self.google_sheets_service.prices_data
-                    logger.info("✅ Datos cargados desde Google Sheets")
+                    logger.debug("✅ Datos cargados desde Google Sheets")
                     return True
                 else:
                     logger.warning("⚠️ Google Sheets configurado pero sin datos, usando Excel local...")

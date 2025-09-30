@@ -642,8 +642,8 @@ class PDFGenerator:
             # Verificar que el archivo se creó correctamente
             if os.path.exists(filepath):
                 file_size = os.path.getsize(filepath)
-                logger.info(f"✅ PDF generado exitosamente: {filepath}")
-                logger.info(f"📊 Tamaño del archivo: {file_size} bytes")
+                logger.debug(f"✅ PDF generado exitosamente: {filepath}")
+                logger.debug(f"📊 Tamaño del archivo: {file_size} bytes")
                 return filepath
             else:
                 logger.error(f"❌ PDF no se creó en la ruta esperada: {filepath}")

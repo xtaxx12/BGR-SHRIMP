@@ -16,7 +16,7 @@ class WhatsAppSender:
                 self.client = Client(self.account_sid, self.auth_token)
                 # Probar conexión
                 account = self.client.api.accounts(self.account_sid).fetch()
-                logger.info(f"✅ Cliente de Twilio inicializado - Cuenta: {account.friendly_name}")
+                logger.debug(f"✅ Cliente de Twilio inicializado - Cuenta: {account.friendly_name}")
             except Exception as e:
                 self.client = None
                 logger.error(f"❌ Error inicializando Twilio: {str(e)}")
@@ -54,7 +54,7 @@ class WhatsAppSender:
                         body=message_text,
                         media_url=[pdf_url]
                     )
-                    logger.info(f"✅ PDF enviado exitosamente via URL a {to_number}, SID: {message.sid}")
+                    logger.debug(f"✅ PDF enviado exitosamente via URL a {to_number}, SID: {message.sid}")
                     return True
                 except Exception as url_error:
                     logger.warning(f"⚠️ Error enviando via URL: {url_error}")
@@ -73,7 +73,7 @@ class WhatsAppSender:
                     media_url=[local_url]
                 )
                 
-                logger.info(f"✅ PDF enviado exitosamente a {to_number}, SID: {message.sid}")
+                logger.debug(f"✅ PDF enviado exitosamente a {to_number}, SID: {message.sid}")
                 return True
                 
             except Exception as e:
@@ -99,7 +99,7 @@ class WhatsAppSender:
                 body=message_text
             )
             
-            logger.info(f"✅ Mensaje enviado exitosamente a {to_number}, SID: {message.sid}")
+            logger.debug(f"✅ Mensaje enviado exitosamente a {to_number}, SID: {message.sid}")
             return True
             
         except Exception as e:
