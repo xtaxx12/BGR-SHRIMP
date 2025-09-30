@@ -54,15 +54,18 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
     flete_value = None
     flete_solicitado = False
     
+    # Marcar flete solicitado si hay valor personalizado O si hay destino
     if flete_custom:
         try:
             flete_value = float(flete_custom)
             flete_solicitado = True
         except:
             pass
+    elif destination:
+        # Si menciona destino (como "houston"), significa que solicitó flete
+        flete_solicitado = True
     
     # Solo aplicar flete si el usuario lo menciona explícitamente
-    # NO asignar flete automáticamente
     
     # Procesar factor de glaseo
     glaseo_value = None

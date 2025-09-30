@@ -442,8 +442,8 @@ Formato de respuesta: texto directo sin JSON.
             # También detectar patrones de envío (solo si ya menciona flete)
             if menciona_flete and not destination:
                 envio_patterns = [
-                    r'flete a (\w+)', r'envio a (\w+)', r'enviar a (\w+)', 
-                    r'shipping to (\w+)', r'con flete a (\w+)'
+                    r'flete a ([a-zA-Z\s]+)', r'envio a ([a-zA-Z\s]+)', r'enviar a ([a-zA-Z\s]+)', 
+                    r'shipping to ([a-zA-Z\s]+)', r'con flete a ([a-zA-Z\s]+)'
                 ]
                 
                 destination_patterns = {
@@ -458,10 +458,10 @@ Formato de respuesta: texto directo sin JSON.
                 for pattern in envio_patterns:
                     match = re.search(pattern, message_lower)
                     if match:
-                        dest_word = match.group(1).lower()
+                        dest_word = match.group(1).lower().strip()
                         # Verificar si es una ciudad USA conocida
                         for dest_name, patterns in destination_patterns.items():
-                            if dest_word in patterns:
+                            if any(p in dest_word for p in patterns):
                                 if dest_name == 'Houston':
                                     usar_libras = False  # Houston usa kilos
                                 else:

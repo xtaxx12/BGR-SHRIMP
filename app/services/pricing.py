@@ -3,8 +3,15 @@ from app.services.excel_local_calculator import ExcelLocalCalculatorService
 from app.services.google_sheets import GoogleSheetsService
 from typing import Dict, Optional
 import logging
+from decimal import Decimal, ROUND_HALF_UP
 
 logger = logging.getLogger(__name__)
+
+def precise_round(value: float, decimals: int = 2) -> float:
+    """
+    Redondeo preciso usando Decimal para evitar problemas de punto flotante
+    """
+    return float(Decimal(str(value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
 
 class PricingService:
     def __init__(self):
@@ -155,12 +162,12 @@ class PricingService:
             precio_fob_kg = base_price_kg
             
             # 2. Precio con Glaseo = (Precio FOB - Costo fijo) × Factor glaseo
-            # Según imagen: (8.59) × 0.8 = 6.88
+            # Según imagen: (8.59) × 0.8 = 6.8756304 → 6.88 (redondeado)
             precio_fob_menos_costo = precio_fob_kg - costo_fijo  # 8.88 - 0.29 = 8.59
-            precio_glaseo_kg = precio_fob_menos_costo * glaseo_factor  # 8.59 × 0.8 = 6.88
+            precio_glaseo_kg = precise_round(precio_fob_menos_costo * glaseo_factor)  # 8.59 × 0.8 = 6.88
             
             # 3. Precio Final CFR = Precio glaseo + Costo fijo + Flete
-            precio_final_kg = precio_glaseo_kg + costo_fijo + flete_value
+            precio_final_kg = precise_round(precio_glaseo_kg + costo_fijo + flete_value)
             
             # Calcular precios en libras
             if usar_libras and destination and destination.lower() != 'houston':
@@ -172,14 +179,14 @@ class PricingService:
                 # Recalcular todo en libras usando fórmula correcta
                 precio_fob_lb = base_price_lb
                 precio_fob_menos_costo_lb = base_price_lb - costo_fijo_lb
-                precio_glaseo_lb = precio_fob_menos_costo_lb * glaseo_factor
-                precio_final_lb = precio_glaseo_lb + costo_fijo_lb + flete_value_lb
+                precio_glaseo_lb = precise_round(precio_fob_menos_costo_lb * glaseo_factor)
+                precio_final_lb = precise_round(precio_glaseo_lb + costo_fijo_lb + flete_value_lb)
             else:
                 # Para Houston e internacionales: solo convertir dividiendo por 2.2
-                precio_fob_lb = precio_fob_kg / 2.2
-                precio_glaseo_lb = precio_glaseo_kg / 2.2
-                precio_final_lb = precio_final_kg / 2.2
-                base_price_lb = base_price_kg / 2.2
+                precio_fob_lb = precise_round(precio_fob_kg / 2.2)
+                precio_glaseo_lb = precise_round(precio_glaseo_kg / 2.2)
+                precio_final_lb = precise_round(precio_final_kg / 2.2)
+                base_price_lb = precise_round(base_price_kg / 2.2)
             
             # Determinar si se debe mostrar precio CFR o precio con glaseo
             # Solo incluir flete si el usuario EXPLÍCITAMENTE lo menciona

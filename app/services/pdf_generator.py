@@ -64,8 +64,8 @@ class PDFGenerator:
             gris_claro = colors.HexColor('#f8fafc')   # Gris muy claro
             
             # === REGLAS DE NEGOCIO ===
-            # Determinar si es FOB o CFR basado en si hay flete incluido
-            flete_incluido = price_info.get('flete', 0) > 0
+            # Determinar si es FOB o CFR basado en si se solicitó flete
+            flete_incluido = price_info.get('incluye_flete', False)
             tipo_cotizacion = "CFR" if flete_incluido else "FOB"
             
             # === TRADUCCIONES ===
@@ -127,7 +127,7 @@ class PDFGenerator:
             producto = price_info.get('producto', 'N/A')
             talla = price_info.get('talla', 'N/A')
             cliente = price_info.get('cliente_nombre', 'Cliente')
-            destino = price_info.get('destino', 'N/A')
+            destino = price_info.get('destination', 'N/A')
             glaseo_factor = price_info.get('glaseo_factor', 0.7)
             glaseo_percentage = price_info.get('glaseo_percentage')  # Porcentaje original
             fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
