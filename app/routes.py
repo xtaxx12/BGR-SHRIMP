@@ -238,12 +238,30 @@ async def whatsapp_webhook(
             return PlainTextResponse(response_xml, media_type="application/xml")
         
         elif message_lower in ['confirmar', 'confirm', 'generar pdf', 'pdf']:
-            # Generar y enviar PDF con la última cotización
+            # Verificar si hay cotización pendiente
             last_quote = session_manager.get_last_quote(user_id)
-            
             if last_quote:
-                logger.info(f"Generando PDF para usuario {user_id}")
-                pdf_path = pdf_generator.generate_quote_pdf(last_quote, From)
+                # Mostrar opciones de idioma para el PDF
+                language_options = pdf_generator.get_language_options()
+                response.message(language_options)
+                session_manager.set_session_state(user_id, 'selecting_language', {'quote_data': last_quote})
+                return PlainTextResponse(str(response), media_type="application/xml")
+            else:
+                response.message("❌ No hay cotización pendiente para confirmar.\n\n💡 Primero solicita una cotización de precios y luego escribe 'confirmar'.")
+            
+            response_xml = str(response)
+            logger.debug(f"Enviando respuesta XML: {response_xml}")
+            return PlainTextResponse(response_xml, media_type="application/xml")
+        
+        elif session['state'] == 'selecting_language':
+            # Usuario está seleccionando idioma para el PDF
+            selected_language = pdf_generator.parse_language_selection(Body)
+            quote_data = session['data'].get('quote_data')
+            
+            if selected_language and quote_data:
+                # Generar PDF en el idioma seleccionado
+                logger.info(f"Generando PDF en idioma {selected_language} para usuario {user_id}")
+                pdf_path = pdf_generator.generate_quote_pdf(quote_data, From, selected_language)
                 
                 if pdf_path:
                     # Crear URL pública del PDF para envío
@@ -270,20 +288,20 @@ async def whatsapp_webhook(
                         pdf_message = response.message()
                         pdf_message.body("📄 Aquí tienes tu cotización oficial de BGR Export.\n\n💼 Documento válido para procesos comerciales.\n\n📞 Para cualquier consulta, contáctanos.")
                         pdf_message.media(download_url)
-                        
-                        # También enviar enlace de descarga como respaldo
-                        #response.message(f"📎 También puedes descargar el PDF desde:\n{download_url}")
                     
                     # Limpiar la cotización después de confirmar
                     session_manager.clear_session(user_id)
                 else:
                     response.message("❌ Error generando el PDF. Por favor intenta nuevamente o contacta soporte.")
             else:
-                response.message("❌ No hay cotización pendiente para confirmar.\n\n💡 Primero solicita una cotización de precios y luego escribe 'confirmar'.")
+                # Idioma no válido
+                response.message("❌ Selección no válida.\n\n" + pdf_generator.get_language_options())
             
             response_xml = str(response)
-            logger.info(f"Enviando respuesta de confirmación XML: {response_xml}")
+            logger.debug(f"Enviando respuesta XML: {response_xml}")
             return PlainTextResponse(response_xml, media_type="application/xml")
+                
+
         
         elif message_lower in ['menu', 'inicio', 'start', 'reiniciar', 'reset']:
             # Limpiar sesión y mostrar menú principal

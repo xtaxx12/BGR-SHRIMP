@@ -92,11 +92,16 @@ REGLAS IMPORTANTES:
 - Extraer valores numéricos EXACTOS que mencione el usuario
 - Si no especifica un valor → null (el sistema NO usará defaults fijos)
 
+FACTORES DE GLASEO ESTÁNDAR:
+- 10% glaseo → glaseo_factor: 0.90
+- 20% glaseo → glaseo_factor: 0.80  
+- 30% glaseo → glaseo_factor: 0.70
+
 EJEMPLOS DE EXTRACCIÓN:
-"Proforma 20/30 HOSO glaseo 10% flete Houston" → glaseo_factor: 0.10, usar_libras: true
-"Cotización con glaseo 15% y flete 0.25" → glaseo_factor: 0.15, flete_custom: 0.25
-"Precio base 5.50 con glaseo 0.12" → precio_base_custom: 5.50, glaseo_factor: 0.12
-"HLSO 16/20 glaseo 8% flete 0.20" → glaseo_factor: 0.08, flete_custom: 0.20
+"Proforma 20/30 HOSO glaseo 10% flete Houston" → glaseo_factor: 0.90, usar_libras: true
+"Cotización con glaseo 20% y flete 0.25" → glaseo_factor: 0.80, flete_custom: 0.25
+"Precio base 5.50 con glaseo 30%" → precio_base_custom: 5.50, glaseo_factor: 0.70
+"HLSO 16/20 glaseo 20% flete 0.20" → glaseo_factor: 0.80, flete_custom: 0.20
 
 Responde SOLO en formato JSON válido:
 {

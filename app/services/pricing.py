@@ -16,23 +16,36 @@ class PricingService:
                             glaseo_factor: float, freight: float) -> float:
         """
         Calcula el precio final aplicando la lógica de la calculadora Excel:
-        Precio final = (Precio base + Costo fijo) / Factor glaseo + Flete
+        Precio con glaseo = (precio_base - costo_fijo) × glaseo_factor
+        CFR = Precio con glaseo + Costo fijo + Flete
         """
         try:
-            # Aplicar costo fijo
-            price_with_fixed = base_price + fixed_cost
+            # Calcular precio con glaseo según imagen
+            price_fob_minus_fixed = base_price - fixed_cost
+            price_with_glaseo = price_fob_minus_fixed * glaseo_factor
             
-            # Aplicar factor de glaseo (rendimiento)
-            price_with_glaseo = price_with_fixed / glaseo_factor
-            
-            # Agregar flete
-            final_price = price_with_glaseo + freight
+            # Precio final CFR
+            final_price = price_with_glaseo + fixed_cost + freight
             
             return round(final_price, 2)
             
         except Exception as e:
             logger.error(f"Error calculando precio: {str(e)}")
             return 0.0
+    
+    def get_glaseo_factor(self, glaseo_percentage: int) -> float:
+        """
+        Convierte porcentaje de glaseo a factor según las reglas del negocio:
+        - 10% glaseo → Factor = 0.90
+        - 20% glaseo → Factor = 0.80  
+        - 30% glaseo → Factor = 0.70
+        """
+        glaseo_factors = {
+            10: 0.90,
+            20: 0.80,
+            30: 0.70
+        }
+        return glaseo_factors.get(glaseo_percentage, 0.70)  # Default 30%
     
     def get_shrimp_price(self, user_input: Dict) -> Optional[Dict]:
         """
@@ -128,16 +141,19 @@ class PricingService:
             if glaseo_factor is None:
                 glaseo_factor = 0.70
             
-            # Aplicar fórmulas según la hoja de Google Sheets
-            # Fórmula: Precio Final = Precio Glaseo (AC33) + Costo Fijo (AA28) + Flete (AE28)
+            # Aplicar fórmula correcta según Excel mostrado en imagen:
+            # Precio con glaseo = (precio fob - costo fijo) × factor glaseo
+            # CFR = Precio con glaseo + Costo fijo + Flete
             
-            # 1. Precio FOB = Precio Base - Costo Fijo (para mostrar)
-            precio_fob_kg = base_price_kg - costo_fijo
+            # 1. Precio FOB = Precio Base
+            precio_fob_kg = base_price_kg
             
-            # 2. Precio con Glaseo = Precio FOB × Factor Glaseo (AC33)
-            precio_glaseo_kg = precio_fob_kg * glaseo_factor
+            # 2. Precio con Glaseo = (Precio FOB - Costo fijo) × Factor glaseo
+            # Según imagen: (8.59) × 0.8 = 6.88
+            precio_fob_menos_costo = precio_fob_kg - costo_fijo  # 8.88 - 0.29 = 8.59
+            precio_glaseo_kg = precio_fob_menos_costo * glaseo_factor  # 8.59 × 0.8 = 6.88
             
-            # 3. Precio Final = Precio Glaseo + Costo Fijo + Flete
+            # 3. Precio Final CFR = Precio glaseo + Costo fijo + Flete
             precio_final_kg = precio_glaseo_kg + costo_fijo + flete_value
             
             # Calcular precios en libras
@@ -147,9 +163,10 @@ class PricingService:
                 base_price_lb = base_price_kg / 2.2
                 flete_value_lb = flete_value / 2.2
                 
-                # Recalcular todo en libras
-                precio_fob_lb = base_price_lb - costo_fijo_lb
-                precio_glaseo_lb = precio_fob_lb * glaseo_factor
+                # Recalcular todo en libras usando fórmula correcta
+                precio_fob_lb = base_price_lb
+                precio_fob_menos_costo_lb = base_price_lb - costo_fijo_lb
+                precio_glaseo_lb = precio_fob_menos_costo_lb * glaseo_factor
                 precio_final_lb = precio_glaseo_lb + costo_fijo_lb + flete_value_lb
             else:
                 # Para Houston e internacionales: solo convertir dividiendo por 2.2
@@ -157,6 +174,9 @@ class PricingService:
                 precio_glaseo_lb = precio_glaseo_kg / 2.2
                 precio_final_lb = precio_final_kg / 2.2
                 base_price_lb = base_price_kg / 2.2
+            
+            # Determinar si se debe mostrar precio CFR o precio con glaseo
+            incluye_flete = flete_custom is not None or destination
             
             result = {
                 'size': size,
@@ -180,6 +200,7 @@ class PricingService:
                 'quantity': user_params.get('quantity', ''),
                 'cliente_nombre': user_params.get('cliente_nombre', ''),
                 'calculo_dinamico': True,
+                'incluye_flete': incluye_flete,  # Flag para determinar qué precio mostrar
                 'valores_usuario': {
                     'glaseo_especificado': glaseo_factor,
                     'flete_especificado': flete_custom,

@@ -23,9 +23,14 @@ class PDFGenerator:
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
     
-    def generate_quote_pdf(self, price_info: Dict, user_phone: str = None) -> str:
+    def generate_quote_pdf(self, price_info: Dict, user_phone: str = None, language: str = "es") -> str:
         """
-        Genera un PDF limpio y profesional según el diseño especificado
+        Genera un PDF dinámico (FOB/CFR) y multiidioma según las reglas de negocio
+        
+        Args:
+            price_info: Datos de la cotización
+            user_phone: Teléfono del usuario
+            language: Idioma del PDF ("es" para español, "en" para inglés)
         """
         try:
             logger.debug(f"🔍 Iniciando generación PDF con datos: {price_info}")
@@ -58,6 +63,48 @@ class PDFGenerator:
             naranja = colors.HexColor('#ea580c')      # Naranja
             gris_claro = colors.HexColor('#f8fafc')   # Gris muy claro
             
+            # === REGLAS DE NEGOCIO ===
+            # Determinar si es FOB o CFR basado en si hay flete incluido
+            flete_incluido = price_info.get('flete', 0) > 0
+            tipo_cotizacion = "CFR" if flete_incluido else "FOB"
+            
+            # === TRADUCCIONES ===
+            translations = {
+                "es": {
+                    "cotizacion": f"COTIZACIÓN {tipo_cotizacion}",
+                    "fecha_cotizacion": "Fecha de Cotización",
+                    "producto": "Producto",
+                    "talla": "Talla",
+                    "cliente": "Cliente",
+                    "destino": "Destino",
+                    "glaseo_solicitado": "Glaseo Solicitado",
+                    "precio_header": f"PRECIO {tipo_cotizacion} USD/KG",
+                    "flete_incluido": "Flete Incluido",
+                    "concepto": "Concepto",
+                    "detalle": "Detalle",
+                    "glaseo_aplicado": "Glaseo Aplicado",
+                    "especificacion": "Especificación"
+                },
+                "en": {
+                    "cotizacion": f"{tipo_cotizacion} QUOTATION",
+                    "fecha_cotizacion": "Quotation Date",
+                    "producto": "Product",
+                    "talla": "Size",
+                    "cliente": "Client",
+                    "destino": "Destination",
+                    "glaseo_solicitado": "Requested Glazing",
+                    "precio_header": f"{tipo_cotizacion} PRICE USD/KG",
+                    "flete_incluido": "Freight Included",
+                    "concepto": "Concept",
+                    "detalle": "Detail",
+                    "glaseo_aplicado": "Applied Glazing",
+                    "especificacion": "Specification"
+                }
+            }
+            
+            # Seleccionar idioma
+            t = translations.get(language, translations["es"])
+            
             # === LOGO Y ENCABEZADO ===
             logo_path = os.path.join("data", "logoBGR.png")
             if os.path.exists(logo_path):
@@ -73,18 +120,8 @@ class PDFGenerator:
             
             story.append(Spacer(1, 15))  # Reducir espacio después del logo
             
-            # === TÍTULO PRINCIPAL ===
-            title_style = ParagraphStyle(
-                'Title',
-                parent=styles['Heading1'],
-                fontSize=20,
-                spaceAfter=30,
-                alignment=TA_CENTER,
-                textColor=azul_marino,
-                fontName='Helvetica-Bold'
-            )
-            story.append(Paragraph("COTIZACIÓN DE CAMARÓN", title_style))
-            
+            # === SIN TÍTULO PRINCIPAL (eliminado según solicitud) ===
+
             # === INFORMACIÓN GENERAL ===
             # Extraer datos del price_info
             producto = price_info.get('producto', 'N/A')
@@ -94,15 +131,20 @@ class PDFGenerator:
             glaseo = price_info.get('glaseo_factor', 0.7)
             fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
             
-            # Tabla de información general
+            # Tabla de información general (multiidioma)
             info_data = [
-                ['Fecha de Cotización', fecha_actual],
-                ['Producto', producto],
-                ['Talla', talla],
-                ['Cliente', cliente],
-                ['Destino', destino],
-                ['Glaseo Solicitado', f"{int(glaseo * 100)}%"]
+                [t["fecha_cotizacion"], fecha_actual],
+                [t["producto"], producto],
+                [t["talla"], talla],
+                [t["cliente"], cliente],
+                [t["destino"], destino],
+                [t["glaseo_solicitado"], f"{int(glaseo * 100)}%"]
             ]
+            
+            # Si es CFR, agregar información del flete
+            if flete_incluido:
+                flete_valor = price_info.get('flete', 0)
+                info_data.append([t["flete_incluido"], f"${flete_valor:.2f}/kg"])
             
             info_table = Table(info_data, colWidths=[2.5*inch, 3*inch])
             info_table.setStyle(TableStyle([
@@ -124,23 +166,23 @@ class PDFGenerator:
             story.append(info_table)
             story.append(Spacer(1, 20))  # Reducir espacio antes del título FOB
             
-            # === TÍTULO COTIZACIÓN FOB ===
-            fob_title_style = ParagraphStyle(
-                'FOBTitle',
+            # === TÍTULO COTIZACIÓN (FOB/CFR dinámico) ===
+            cotizacion_title_style = ParagraphStyle(
+                'CotizacionTitle',
                 parent=styles['Heading2'],
                 fontSize=18,
-                spaceAfter=15,  # Reducir espacio después del título
+                spaceAfter=15,
                 alignment=TA_CENTER,
                 textColor=azul_marino,
                 fontName='Helvetica-Bold'
             )
-            story.append(Paragraph("COTIZACIÓN FOB", fob_title_style))
+            story.append(Paragraph(t["cotizacion"], cotizacion_title_style))
             
-            # === PRECIO FOB PRINCIPAL ===
+            # === PRECIO PRINCIPAL (FOB/CFR dinámico) ===
             precio_final = price_info.get('precio_final_kg', 0)
             
-            # Tabla del precio FOB con diseño destacado
-            precio_data = [['PRECIO FOB USD/KG'], [f'${precio_final:.2f}']]
+            # Tabla del precio con diseño destacado
+            precio_data = [[t["precio_header"]], [f'${precio_final:.2f}']]
             precio_table = Table(precio_data, colWidths=[3*inch])
             precio_table.setStyle(TableStyle([
                 # Encabezado
@@ -173,44 +215,7 @@ class PDFGenerator:
             ]))
             
             story.append(precio_centered)
-            story.append(Spacer(1, 25))  # Reducir espacio después del precio FOB
-            
-            # === TABLA DE DETALLES ===
-            # Extraer valores para la tabla de detalles
-            glaseo_pct = f"{int(glaseo * 100)}.0%"
-            flete_kg = price_info.get('flete', 0)
-            especificacion = f"{producto} - Talla {talla}"
-            
-            detalles_data = [
-                ['Concepto', 'Detalle'],
-                ['Glaseo Aplicado', glaseo_pct],
-                ['Flete Incluido', f'${flete_kg:.2f}/kg'],
-                ['Especificación', especificacion]
-            ]
-            
-            detalles_table = Table(detalles_data, colWidths=[3*inch, 3*inch])
-            detalles_table.setStyle(TableStyle([
-                # Encabezado
-                ('BACKGROUND', (0, 0), (-1, 0), azul_marino),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 12),
-                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-                # Filas de datos
-                ('BACKGROUND', (0, 1), (-1, -1), gris_claro),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 11),
-                ('ALIGN', (0, 1), (0, -1), 'LEFT'),   # Concepto alineado a la izquierda
-                ('ALIGN', (1, 1), (1, -1), 'RIGHT'),  # Detalle alineado a la derecha
-                # Bordes y padding
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('TOPPADDING', (0, 0), (-1, -1), 8),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-                ('LEFTPADDING', (0, 0), (-1, -1), 12),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 12),
-            ]))
-            
-            story.append(detalles_table)
+            # === TABLA DE DETALLES ELIMINADA (según solicitud) ===
             
             # Generar PDF
             doc.build(story)
@@ -228,6 +233,35 @@ class PDFGenerator:
         except Exception as e:
             logger.error(f"❌ Error generando PDF: {str(e)}")
             return None
+    
+    def get_language_options(self) -> str:
+        """
+        Retorna las opciones de idioma para el PDF
+        """
+        return "🌐 **Seleccione idioma del PDF:**\n\n1️⃣ 🇪🇸 Español\n2️⃣ 🇺🇸 English\n\n💡 Responda con el número de su opción"
+    
+    def parse_language_selection(self, user_input: str) -> str:
+        """
+        Parsea la selección de idioma del usuario
+        
+        Returns:
+            "es" para español, "en" para inglés, None si no es válido
+        """
+        user_input = user_input.lower().strip()
+        
+        # Opciones numéricas
+        if user_input in ['1', '1️⃣']:
+            return "es"
+        elif user_input in ['2', '2️⃣']:
+            return "en"
+        
+        # Opciones por nombre
+        if any(word in user_input for word in ['español', 'spanish', 'es', 'esp']):
+            return "es"
+        elif any(word in user_input for word in ['english', 'inglés', 'ingles', 'en', 'eng']):
+            return "en"
+        
+        return None
     
     def cleanup_old_pdfs(self, days_old: int = 7):
         """
