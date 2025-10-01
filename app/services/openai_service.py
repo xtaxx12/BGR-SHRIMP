@@ -391,14 +391,22 @@ Formato de respuesta: texto directo sin JSON.
                         size = f"{match.group(1)}/{match.group(2)}"
                     break
             
-            # Detectar glaseo con patrones más amplios
+            # Detectar glaseo con patrones más amplios (español e inglés)
             glaseo_patterns = [
+                # Patrones en español
                 r'(\d+)\s*(?:de\s*)?glaseo',
                 r'glaseo\s*(?:de\s*)?(\d+)',
                 r'(\d+)\s*%\s*glaseo',
                 r'glaseo\s*(\d+)\s*%',
                 r'con\s*(\d+)\s*glaseo',
-                r'(\d+)\s*porciento\s*glaseo'
+                r'(\d+)\s*porciento\s*glaseo',
+                # Patrones en inglés
+                r'(\d+)g?\s*(?:of\s*)?glaze',
+                r'glaze\s*(?:of\s*)?(\d+)g?',
+                r'(\d+)\s*%\s*glaze',
+                r'glaze\s*(\d+)\s*%',
+                r'with\s*(\d+)g?\s*glaze',
+                r'(\d+)\s*percent\s*glaze'
             ]
             
             glaseo_percentage_original = None
@@ -474,25 +482,35 @@ Formato de respuesta: texto directo sin JSON.
                             destination = dest_word.title()
                         break
             
-            # Detectar nombre del cliente con patrones más amplios
+            # Detectar nombre del cliente con patrones más amplios (español e inglés)
             cliente_nombre = None
             cliente_patterns = [
+                # Patrones en español
                 r'cliente\s+([a-záéíóúñ\w\s]+?)(?:\s+con|\s+de|\s+para|\s+precio|$)',
                 r'para\s+(?:el\s+cliente\s+)?([a-záéíóúñ\w\s]+?)(?:\s+con|\s+de|\s+precio|$)',
                 r'proforma\s+para\s+(?:el\s+cliente\s+)?([a-záéíóúñ\w\s]+?)(?:\s+con|\s+de|\s+precio|$)',
                 r'cotizacion\s+para\s+([a-záéíóúñ\w\s]+?)(?:\s+con|\s+de|\s+precio|$)',
                 r'señor\s+([a-záéíóúñ\w\s]+?)(?:\s+con|\s+de|\s+precio|$)',
-                r'sr\s+([a-záéíóúñ\w\s]+?)(?:\s+con|\s+de|\s+precio|$)'
+                r'sr\s+([a-záéíóúñ\w\s]+?)(?:\s+con|\s+de|\s+precio|$)',
+                # Patrones en inglés
+                r'client\s+([a-záéíóúñ\w\s]+?)(?:\s+with|\s+for|\s+price|$)',
+                r'for\s+(?:the\s+client\s+)?([a-záéíóúñ\w\s]+?)(?:\s+with|\s+for|\s+price|$)',
+                r'proforma\s+for\s+(?:the\s+client\s+)?([a-záéíóúñ\w\s]+?)(?:\s+with|\s+for|\s+price|$)',
+                r'quote\s+for\s+([a-záéíóúñ\w\s]+?)(?:\s+with|\s+for|\s+price|$)',
+                r'mr\s+([a-záéíóúñ\w\s]+?)(?:\s+with|\s+for|\s+price|$)',
+                r'mrs\s+([a-záéíóúñ\w\s]+?)(?:\s+with|\s+for|\s+price|$)'
             ]
             
             for pattern in cliente_patterns:
                 match = re.search(pattern, message_lower)
                 if match:
                     cliente_nombre = match.group(1).strip()
-                    # Limpiar palabras comunes que no son nombres
+                    # Limpiar palabras comunes que no son nombres (español e inglés)
                     stop_words = [
                         'el', 'la', 'con', 'de', 'para', 'precio', 'tipo', 'glaseo', 
-                        'flete', 'producto', 'talla', 'envio', 'destino', 'kilo', 'kilos'
+                        'flete', 'producto', 'talla', 'envio', 'destino', 'kilo', 'kilos',
+                        'the', 'with', 'for', 'price', 'type', 'glaze', 'freight', 
+                        'product', 'size', 'shipping', 'destination'
                     ]
                     cliente_words = [word for word in cliente_nombre.split() if word not in stop_words]
                     if cliente_words and len(' '.join(cliente_words)) > 2:
