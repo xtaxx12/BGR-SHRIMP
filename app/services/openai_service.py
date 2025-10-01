@@ -83,6 +83,7 @@ PARÁMETROS CRÍTICOS A EXTRAER (TODOS DINÁMICOS):
 - Precio base: "precio base 5.50", "base 6.20", "precio 4.80" → extraer valor si se menciona
 - Cantidad: "15000 lb", "10 toneladas", "5000 kilos" → extraer número y unidad
 - Cliente: "para [nombre]", "cliente [nombre]", "empresa [nombre]"
+- Idioma: Detectar si el mensaje está en inglés o español
 
 REGLAS IMPORTANTES:
 - El usuario puede especificar TODOS los valores: glaseo, flete, precio base
@@ -117,6 +118,7 @@ Responde SOLO en formato JSON válido:
     "usar_libras": true/false,
     "cliente_nombre": "nombre del cliente o null",
     "wants_proforma": true/false,
+    "language": "es|en",
     "confidence": 0.95,
     "suggested_response": "respuesta sugerida"
 }
@@ -497,6 +499,15 @@ Formato de respuesta: texto directo sin JSON.
                         cliente_nombre = ' '.join(cliente_words)
                         break
             
+            # Detectar idioma
+            english_keywords = ['quote', 'price', 'cost', 'freight', 'shipping', 'quotation', 'shrimp', 'product']
+            spanish_keywords = ['proforma', 'cotizacion', 'precio', 'flete', 'envio', 'camaron', 'producto', 'glaseo']
+            
+            english_count = sum(1 for keyword in english_keywords if keyword in message_lower)
+            spanish_count = sum(1 for keyword in spanish_keywords if keyword in message_lower)
+            
+            language = "en" if english_count > spanish_count else "es"
+            
             # Detectar cantidad
             quantity = None
             quantity_patterns = [
@@ -531,6 +542,7 @@ Formato de respuesta: texto directo sin JSON.
                 "usar_libras": usar_libras,
                 "cliente_nombre": cliente_nombre,
                 "wants_proforma": True,
+                "language": language,  # Idioma detectado
                 "confidence": min(confidence, 0.95),  # Máximo 0.95
                 "suggested_response": "Procesar proforma con datos extraídos"
             }

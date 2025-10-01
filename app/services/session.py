@@ -55,12 +55,32 @@ class SessionManager:
         session = self.get_session(user_id)
         return session.get('last_quote')
     
+    def set_user_language(self, user_id: str, language: str):
+        """
+        Establece el idioma preferido del usuario
+        """
+        session = self.get_session(user_id)
+        session['language'] = language
+        logger.info(f"Idioma configurado para usuario {user_id}: {language}")
+    
+    def get_user_language(self, user_id: str) -> str:
+        """
+        Obtiene el idioma preferido del usuario (por defecto español)
+        """
+        session = self.get_session(user_id)
+        return session.get('language', 'es')
+    
     def clear_session(self, user_id: str):
         """
-        Limpia la sesión del usuario
+        Limpia la sesión del usuario (preserva idioma)
         """
         if user_id in self.sessions:
+            # Preservar idioma al limpiar sesión
+            language = self.sessions[user_id].get('language', 'es')
             del self.sessions[user_id]
+            # Recrear sesión con idioma preservado
+            self.get_session(user_id)
+            self.sessions[user_id]['language'] = language
     
     def _cleanup_expired_sessions(self, current_time: float):
         """

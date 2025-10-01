@@ -183,8 +183,14 @@ async def whatsapp_webhook(
                     logger.debug(f"✅ Proforma automática generada para: {ai_query}")
                     
                     # Generar PDF directamente sin mostrar cotización en texto
-                    logger.info(f"📄 Generando PDF automáticamente para usuario {user_id}")
-                    pdf_path = pdf_generator.generate_quote_pdf(price_info, From)
+                    detected_language = ai_analysis.get('language')
+                    user_preferred_language = session_manager.get_user_language(user_id)
+                    final_language = detected_language or user_preferred_language
+                    
+                    logger.info(f"📄 Generando PDF automáticamente para usuario {user_id} en idioma {final_language}")
+                    logger.debug(f"Idioma detectado: {detected_language}, Idioma preferido: {user_preferred_language}")
+                    
+                    pdf_path = pdf_generator.generate_quote_pdf(price_info, From, final_language)
                     
                     if pdf_path:
                         # Crear URL pública del PDF para envío
@@ -234,6 +240,21 @@ async def whatsapp_webhook(
         
         # Comandos globales que funcionan desde cualquier estado
         message_lower = Body.lower().strip()
+        
+        # Comando para seleccionar idioma
+        if message_lower in ['idioma', 'language', 'lang', 'cambiar idioma']:
+            language_message = """🌐 **Selecciona el idioma para las proformas:**
+
+1️⃣ Español 🇪🇸
+2️⃣ English 🇺🇸
+
+Responde con el número o escribe:
+• "español" o "spanish"
+• "inglés" o "english" """
+            
+            response.message(language_message)
+            session_manager.set_session_state(user_id, 'waiting_for_language_selection', {})
+            return PlainTextResponse(str(response), media_type="application/xml")
         
         if message_lower in ['precios', 'precio', 'prices', 'Precios']:
             size_message, available_sizes = interactive_service.create_size_selection_message()
@@ -345,6 +366,28 @@ async def whatsapp_webhook(
             else:
                 error_msg = "🤔 Opción no válida. Por favor selecciona:\n\n1️⃣ Consultar Precios\n2️⃣ Información de Productos\n3️⃣ Contacto Comercial\n\n💡 O escribe 'menu' para reiniciar"
                 response.message(error_msg)
+            return PlainTextResponse(str(response), media_type="application/xml")
+        
+        elif session['state'] == 'waiting_for_language_selection':
+            # Usuario está seleccionando idioma
+            message_lower = Body.lower().strip()
+            
+            selected_language = None
+            if message_lower in ['1', 'español', 'spanish', 'es']:
+                selected_language = 'es'
+            elif message_lower in ['2', 'inglés', 'ingles', 'english', 'en']:
+                selected_language = 'en'
+            
+            if selected_language:
+                # Guardar idioma preferido en la sesión
+                session_manager.set_user_language(user_id, selected_language)
+                
+                lang_name = "Español 🇪🇸" if selected_language == 'es' else "English 🇺🇸"
+                response.message(f"✅ Idioma configurado: {lang_name}\n\nAhora puedes solicitar proformas y se generarán en tu idioma preferido.")
+                session_manager.clear_session(user_id)
+            else:
+                response.message("🤔 Selección inválida. Por favor responde:\n\n1️⃣ Para Español\n2️⃣ Para English\n\nO escribe 'menu' para volver al inicio")
+            
             return PlainTextResponse(str(response), media_type="application/xml")
         
         elif session['state'] == 'waiting_for_size_selection':
