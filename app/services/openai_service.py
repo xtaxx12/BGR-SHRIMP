@@ -358,9 +358,30 @@ Formato de respuesta: texto directo sin JSON.
                     'con cabezas', 'tipo con cabeza'
                 ],
                 'P&D IQF': [
-                    'p&d', 'pelado', 'peeled', 'deveined', 'limpio', 'procesado',
-                    'pd', 'p d', 'pelado y desvenado', 'pid', 'qf', 'pid y qf',
-                    'p i d', 'q f', 'pid qf', 'p&d iqf', 'pd iqf'
+                    'p&d iqf', 'pd iqf', 'p&d', 'pelado', 'peeled', 'deveined', 
+                    'limpio', 'procesado', 'pd', 'p d', 'pelado y desvenado'
+                ],
+                'P&D BLOQUE': [
+                    'p&d bloque', 'pd bloque', 'bloque', 'block', 'p&d block',
+                    'pd block', 'pelado bloque'
+                ],
+                'PuD-EUROPA': [
+                    'pud europa', 'pud-europa', 'europa', 'european', 'europeo'
+                ],
+                'EZ PEEL': [
+                    'ez peel', 'ez', 'easy peel', 'facil pelado', 'fácil pelado'
+                ],
+                'PuD-EEUU': [
+                    'pud eeuu', 'pud-eeuu', 'eeuu', 'usa', 'estados unidos'
+                ],
+                'COOKED': [
+                    'cooked', 'cocinado', 'cocido', 'preparado'
+                ],
+                'PRE-COCIDO': [
+                    'pre-cocido', 'pre cocido', 'precocido', 'pre-cooked', 'pre cooked'
+                ],
+                'COCIDO SIN TRATAR': [
+                    'cocido sin tratar', 'sin tratar', 'untreated', 'natural cocido'
                 ]
             }
             

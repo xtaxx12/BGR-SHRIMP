@@ -334,7 +334,42 @@ class GoogleSheetsService:
                 "21/25": {"precio_kg": 8.59, "precio_lb": 3.90, "producto": "EZ PEEL", "talla": "21/25", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
                 "26/30": {"precio_kg": 8.15, "precio_lb": 3.70, "producto": "EZ PEEL", "talla": "26/30", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20}
             },
-            'HOSO': {}
+            'HOSO': {
+                "20/30": {"precio_kg": 6.42, "precio_lb": 2.91, "producto": "HOSO", "talla": "20/30", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
+                "30/40": {"precio_kg": 5.52, "precio_lb": 2.51, "producto": "HOSO", "talla": "30/40", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
+                "40/50": {"precio_kg": 5.12, "precio_lb": 2.32, "producto": "HOSO", "talla": "40/50", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
+                "50/60": {"precio_kg": 4.82, "precio_lb": 2.19, "producto": "HOSO", "talla": "50/60", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
+                "60/70": {"precio_kg": 4.62, "precio_lb": 2.10, "producto": "HOSO", "talla": "60/70", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
+                "70/80": {"precio_kg": 4.42, "precio_lb": 2.01, "producto": "HOSO", "talla": "70/80", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20}
+            },
+            'PuD-EEUU': {
+                "U15": {"precio_kg": 11.85, "precio_lb": 5.38, "producto": "PuD-EEUU", "talla": "U15", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
+                "16/20": {"precio_kg": 10.37, "precio_lb": 4.70, "producto": "PuD-EEUU", "talla": "16/20", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
+                "21/25": {"precio_kg": 9.97, "precio_lb": 4.52, "producto": "PuD-EEUU", "talla": "21/25", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
+                "26/30": {"precio_kg": 9.56, "precio_lb": 4.34, "producto": "PuD-EEUU", "talla": "26/30", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
+                "31/35": {"precio_kg": 9.56, "precio_lb": 4.34, "producto": "PuD-EEUU", "talla": "31/35", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20}
+            },
+            'COOKED': {
+                "U15": {"precio_kg": 14.02, "precio_lb": 6.36, "producto": "COOKED", "talla": "U15", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
+                "16/20": {"precio_kg": 12.33, "precio_lb": 5.59, "producto": "COOKED", "talla": "16/20", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
+                "21/25": {"precio_kg": 11.87, "precio_lb": 5.39, "producto": "COOKED", "talla": "21/25", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
+                "26/30": {"precio_kg": 11.41, "precio_lb": 5.18, "producto": "COOKED", "talla": "26/30", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
+                "31/35": {"precio_kg": 11.41, "precio_lb": 5.18, "producto": "COOKED", "talla": "31/35", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20}
+            },
+            'PRE-COCIDO': {
+                "U15": {"precio_kg": 12.73, "precio_lb": 5.78, "producto": "PRE-COCIDO", "talla": "U15", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
+                "16/20": {"precio_kg": 11.25, "precio_lb": 5.10, "producto": "PRE-COCIDO", "talla": "16/20", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
+                "21/25": {"precio_kg": 10.85, "precio_lb": 4.92, "producto": "PRE-COCIDO", "talla": "21/25", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
+                "26/30": {"precio_kg": 10.45, "precio_lb": 4.74, "producto": "PRE-COCIDO", "talla": "26/30", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
+                "31/35": {"precio_kg": 10.45, "precio_lb": 4.74, "producto": "PRE-COCIDO", "talla": "31/35", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20}
+            },
+            'COCIDO SIN TRATAR': {
+                "U15": {"precio_kg": 14.97, "precio_lb": 6.79, "producto": "COCIDO SIN TRATAR", "talla": "U15", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
+                "16/20": {"precio_kg": 13.14, "precio_lb": 5.96, "producto": "COCIDO SIN TRATAR", "talla": "16/20", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
+                "21/25": {"precio_kg": 12.64, "precio_lb": 5.73, "producto": "COCIDO SIN TRATAR", "talla": "21/25", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
+                "26/30": {"precio_kg": 12.13, "precio_lb": 5.50, "producto": "COCIDO SIN TRATAR", "talla": "26/30", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
+                "31/35": {"precio_kg": 12.13, "precio_lb": 5.50, "producto": "COCIDO SIN TRATAR", "talla": "31/35", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20}
+            }
         }
     
     def get_price_data(self, size: str, product: str = 'HLSO') -> Optional[Dict]:
