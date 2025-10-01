@@ -375,21 +375,34 @@ Formato de respuesta: texto directo sin JSON.
                     'pud eeuu', 'pud-eeuu', 'eeuu', 'usa', 'estados unidos'
                 ],
                 'COOKED': [
-                    'cooked', 'cocinado', 'preparado'
+                    'cooked', 'cocinado', 'cocido', 'preparado'
                 ],
                 'PRE-COCIDO': [
                     'pre-cocido', 'pre cocido', 'precocido', 'pre-cooked', 'pre cooked'
                 ],
                 'COCIDO SIN TRATAR': [
-                    'cocido sin tratar', 'sin tratar', 'untreated', 'natural cocido', 'cocido'
+                    'cocido sin tratar', 'sin tratar', 'untreated', 'natural cocido'
                 ]
             }
             
-            # Buscar coincidencias de productos
-            for prod_name, patterns in product_patterns.items():
-                if any(pattern in message_lower for pattern in patterns):
-                    product = prod_name
-                    break
+            # Buscar coincidencias de productos (orden específico para evitar conflictos)
+            # Primero buscar patrones más específicos
+            specific_order = ['COCIDO SIN TRATAR', 'PRE-COCIDO', 'COOKED', 'P&D IQF', 'P&D BLOQUE', 'PuD-EUROPA', 'PuD-EEUU', 'EZ PEEL', 'HLSO', 'HOSO']
+            
+            for prod_name in specific_order:
+                if prod_name in product_patterns:
+                    patterns = product_patterns[prod_name]
+                    if any(pattern in message_lower for pattern in patterns):
+                        product = prod_name
+                        break
+            
+            # Si no se encontró en el orden específico, buscar en el resto
+            if not product:
+                for prod_name, patterns in product_patterns.items():
+                    if prod_name not in specific_order:
+                        if any(pattern in message_lower for pattern in patterns):
+                            product = prod_name
+                            break
             
             # Si no se detectó producto específico pero menciona "producto" o "tipo", usar HLSO por defecto
             if not product and any(word in message_lower for word in ['producto', 'tipo', 'camaron', 'camarones']):
