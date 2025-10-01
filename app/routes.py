@@ -169,73 +169,50 @@ async def whatsapp_webhook(
                     ai_analysis['glaseo_percentage'] = basic_glaseo_percentage
         
         # PROCESAMIENTO PRIORITARIO DE PROFORMA
-        # Si el análisis detecta una solicitud de proforma, procesarla inmediatamente
+        # Si el análisis detecta una solicitud de proforma, preguntar por idioma primero
         if ai_analysis and ai_analysis.get('intent') == 'proforma' and ai_analysis.get('confidence', 0) > 0.7:
-            logger.info(f"🎯 Procesando proforma inmediatamente para {user_id}")
+            logger.info(f"🎯 Solicitud de proforma detectada para {user_id}")
             ai_query = parse_ai_analysis_to_query(ai_analysis)
             logger.info(f"🤖 Consulta generada por IA: {ai_query}")
             
             if ai_query:
-                # Intentar generar cotización automática
+                # Verificar que se puede generar la cotización
                 price_info = pricing_service.get_shrimp_price(ai_query)
                 
                 if price_info:
-                    logger.debug(f"✅ Proforma automática generada para: {ai_query}")
+                    logger.debug(f"✅ Datos de proforma validados para: {ai_query}")
                     
-                    # Generar PDF directamente sin mostrar cotización en texto
-                    detected_language = ai_analysis.get('language')
-                    user_preferred_language = session_manager.get_user_language(user_id)
-                    final_language = detected_language or user_preferred_language
+                    # Guardar datos de la proforma y preguntar por idioma
+                    session_manager.set_session_state(user_id, 'waiting_for_proforma_language', {
+                        'price_info': price_info,
+                        'ai_query': ai_query
+                    })
                     
-                    logger.info(f"📄 Generando PDF automáticamente para usuario {user_id} en idioma {final_language}")
-                    logger.debug(f"Idioma detectado: {detected_language}, Idioma preferido: {user_preferred_language}")
+                    # Mostrar resumen y opciones de idioma
+                    product_name = price_info.get('producto', 'Camarón')
+                    size = price_info.get('talla', '')
+                    client_name = price_info.get('cliente_nombre', '')
                     
-                    pdf_path = pdf_generator.generate_quote_pdf(price_info, From, final_language)
+                    summary = f"📋 **Proforma lista para generar:**\n"
+                    summary += f"🦐 Producto: {product_name} {size}\n"
+                    if client_name:
+                        summary += f"👤 Cliente: {client_name.title()}\n"
                     
-                    if pdf_path:
-                        # Crear URL pública del PDF para envío
-                        filename = os.path.basename(pdf_path)
-                        base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
-                        download_url = f"{base_url}/webhook/download-pdf/{filename}"
-                        
-                        # Intentar enviar el PDF por WhatsApp
-                        pdf_sent = whatsapp_sender.send_pdf_document(
-                            From, 
-                            pdf_path, 
-                            f"Cotización BGR Export - {price_info.get('producto', 'Camarón')} {price_info.get('talla', '')}"
-                        )
-                        
-                        if pdf_sent:
-                            logger.debug(f"✅ PDF enviado exitosamente por WhatsApp: {pdf_path}")
-                            
-                            # Mensaje de confirmación con información básica
-                            confirmation_msg = f"✅ **Proforma generada y enviada**\n\n"
-                            confirmation_msg += f"🦐 **{price_info.get('producto', 'Camarón')} {price_info.get('talla', '')}**\n"
-                            
-                            if price_info.get('cliente_nombre'):
-                                confirmation_msg += f"👤 Cliente: {price_info['cliente_nombre'].title()}\n"
-                            
-                            if price_info.get('destination'):
-                                confirmation_msg += f"🌍 Destino: {price_info['destination']}\n"
-                            
-                            # Mostrar precio final
-                            if price_info.get('precio_final_kg'):
-                                destination = price_info.get('destination') or ''
-                                if destination.lower() == 'houston':
-                                    confirmation_msg += f"💰 Precio FOB: ${price_info['precio_final_kg']:.2f}/kg\n"
-                                else:
-                                    confirmation_msg += f"💰 Precio FOB: ${price_info['precio_final_kg']:.2f}/kg - ${price_info.get('precio_final_lb', 0):.2f}/lb\n"
-                            
-                            confirmation_msg += f"\n📄 **PDF enviado por WhatsApp**"
-                            
-                            response.message(confirmation_msg)
-                        else:
-                            logger.error(f"❌ Error enviando PDF por WhatsApp")
-                            response.message(f"✅ Proforma generada\n📄 Descarga tu PDF: {download_url}")
-                    else:
-                        logger.error(f"❌ Error generando PDF")
-                        response.message("❌ Error generando la proforma. Intenta nuevamente.")
+                    language_message = f"""{summary}
+🌐 **Selecciona el idioma para la proforma:**
+
+1️⃣ Español 🇪🇸
+2️⃣ English 🇺🇸
+
+Responde con el número o escribe:
+• "español" o "spanish"  
+• "inglés" o "english" """
                     
+                    response.message(language_message)
+                    return PlainTextResponse(str(response), media_type="application/xml")
+                else:
+                    logger.error(f"❌ Error validando datos de proforma")
+                    response.message("❌ Error procesando la solicitud. Intenta nuevamente.")
                     return PlainTextResponse(str(response), media_type="application/xml")
         
         # Comandos globales que funcionan desde cualquier estado
@@ -366,6 +343,77 @@ Responde con el número o escribe:
             else:
                 error_msg = "🤔 Opción no válida. Por favor selecciona:\n\n1️⃣ Consultar Precios\n2️⃣ Información de Productos\n3️⃣ Contacto Comercial\n\n💡 O escribe 'menu' para reiniciar"
                 response.message(error_msg)
+            return PlainTextResponse(str(response), media_type="application/xml")
+        
+        elif session['state'] == 'waiting_for_proforma_language':
+            # Usuario está seleccionando idioma para la proforma
+            message_lower = Body.lower().strip()
+            
+            selected_language = None
+            if message_lower in ['1', 'español', 'spanish', 'es']:
+                selected_language = 'es'
+            elif message_lower in ['2', 'inglés', 'ingles', 'english', 'en']:
+                selected_language = 'en'
+            
+            if selected_language:
+                # Obtener datos de la proforma guardados
+                price_info = session['data'].get('price_info')
+                ai_query = session['data'].get('ai_query')
+                
+                if price_info:
+                    # Generar PDF en el idioma seleccionado
+                    logger.info(f"📄 Generando PDF para usuario {user_id} en idioma {selected_language}")
+                    pdf_path = pdf_generator.generate_quote_pdf(price_info, From, selected_language)
+                    
+                    if pdf_path:
+                        # Crear URL pública del PDF para envío
+                        filename = os.path.basename(pdf_path)
+                        base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
+                        download_url = f"{base_url}/webhook/download-pdf/{filename}"
+                        
+                        # Intentar enviar el PDF por WhatsApp
+                        pdf_sent = whatsapp_sender.send_pdf_document(
+                            From, 
+                            pdf_path, 
+                            f"Cotización BGR Export - {price_info.get('producto', 'Camarón')} {price_info.get('talla', '')}"
+                        )
+                        
+                        if pdf_sent:
+                            lang_name = "Español 🇪🇸" if selected_language == 'es' else "English 🇺🇸"
+                            
+                            confirmation_msg = f"✅ **Proforma generada y enviada**\n\n"
+                            confirmation_msg += f"🌐 Idioma: {lang_name}\n"
+                            confirmation_msg += f"🦐 {price_info.get('producto', 'Producto')}: {price_info.get('talla', '')}\n"
+                            
+                            if price_info.get('cliente_nombre'):
+                                confirmation_msg += f"👤 Cliente: {price_info['cliente_nombre'].title()}\n"
+                            
+                            if price_info.get('destination'):
+                                confirmation_msg += f"🌍 Destino: {price_info['destination']}\n"
+                            
+                            # Mostrar precio final
+                            if price_info.get('precio_final_kg'):
+                                destination = price_info.get('destination') or ''
+                                if destination.lower() == 'houston':
+                                    confirmation_msg += f"💰 Precio FOB: ${price_info['precio_final_kg']:.2f}/kg\n"
+                                else:
+                                    confirmation_msg += f"💰 Precio FOB: ${price_info['precio_final_kg']:.2f}/kg - ${price_info.get('precio_final_lb', 0):.2f}/lb\n"
+                            
+                            confirmation_msg += f"\n📄 **PDF enviado por WhatsApp**"
+                            
+                            response.message(confirmation_msg)
+                        else:
+                            logger.error(f"❌ Error enviando PDF por WhatsApp")
+                            response.message(f"✅ Proforma generada\n📄 Descarga tu PDF: {download_url}")
+                    else:
+                        logger.error(f"❌ Error generando PDF")
+                        response.message("❌ Error generando la proforma. Intenta nuevamente.")
+                
+                # Limpiar sesión
+                session_manager.clear_session(user_id)
+            else:
+                response.message("🤔 Selección inválida. Por favor responde:\n\n1️⃣ Para Español\n2️⃣ Para English\n\nO escribe 'menu' para volver al inicio")
+            
             return PlainTextResponse(str(response), media_type="application/xml")
         
         elif session['state'] == 'waiting_for_language_selection':
