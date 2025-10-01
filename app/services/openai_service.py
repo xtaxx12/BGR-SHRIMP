@@ -375,13 +375,13 @@ Formato de respuesta: texto directo sin JSON.
                     'pud eeuu', 'pud-eeuu', 'eeuu', 'usa', 'estados unidos'
                 ],
                 'COOKED': [
-                    'cooked', 'cocinado', 'cocido', 'preparado'
+                    'cooked', 'cocinado', 'preparado'
                 ],
                 'PRE-COCIDO': [
                     'pre-cocido', 'pre cocido', 'precocido', 'pre-cooked', 'pre cooked'
                 ],
                 'COCIDO SIN TRATAR': [
-                    'cocido sin tratar', 'sin tratar', 'untreated', 'natural cocido'
+                    'cocido sin tratar', 'sin tratar', 'untreated', 'natural cocido', 'cocido'
                 ]
             }
             
