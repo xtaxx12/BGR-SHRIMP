@@ -113,14 +113,18 @@ class ExcelLocalCalculatorService:
             # 2. Precio con glaseo = Precio neto × Factor glaseo
             precio_glaseo_kg = precio_neto_kg * glaseo
             
-            # 3. Precio final = Precio glaseo + Flete
-            precio_final_kg = precio_glaseo_kg + flete_value
+            # 3. Precio FOB con glaseo = Precio glaseo + Costo fijo (según tu Excel: 11.75 + 0.29 = 12.04)
+            precio_fob_con_glaseo_kg = precio_glaseo_kg + self.costo_fijo
+            
+            # 4. Precio final CFR = Precio FOB con glaseo + Flete
+            precio_final_kg = precio_fob_con_glaseo_kg + flete_value
             
             # Convertir a libras con máxima precisión (1 kg = 2.20462262185 lb - valor exacto)
             lb_conversion = 2.20462262185
             precio_fob_lb = precio_fob_kg / lb_conversion
             precio_neto_lb = precio_neto_kg / lb_conversion
             precio_glaseo_lb = precio_glaseo_kg / lb_conversion
+            precio_fob_con_glaseo_lb = precio_fob_con_glaseo_kg / lb_conversion
             precio_final_lb = precio_final_kg / lb_conversion
             
             # Almacenar valores con máxima precisión interna
@@ -129,10 +133,12 @@ class ExcelLocalCalculatorService:
                 '_precio_fob_kg_precise': precio_fob_kg,
                 '_precio_neto_kg_precise': precio_neto_kg,
                 '_precio_glaseo_kg_precise': precio_glaseo_kg,
+                '_precio_fob_con_glaseo_kg_precise': precio_fob_con_glaseo_kg,
                 '_precio_final_kg_precise': precio_final_kg,
                 '_precio_fob_lb_precise': precio_fob_lb,
                 '_precio_neto_lb_precise': precio_neto_lb,
                 '_precio_glaseo_lb_precise': precio_glaseo_lb,
+                '_precio_fob_con_glaseo_lb_precise': precio_fob_con_glaseo_lb,
                 '_precio_final_lb_precise': precio_final_lb,
                 
                 # Valores mostrados (redondeados para display)
@@ -140,9 +146,11 @@ class ExcelLocalCalculatorService:
                 'precio_fob_lb': round(precio_fob_lb, 2),
                 'precio_neto_kg': round(precio_neto_kg, 2),  # Este es el "precio fob - costo fijo"
                 'precio_neto_lb': round(precio_neto_lb, 2),
-                'precio_glaseo_kg': round(precio_glaseo_kg, 2),
+                'precio_glaseo_kg': round(precio_glaseo_kg, 2),  # Solo glaseo (11.75)
                 'precio_glaseo_lb': round(precio_glaseo_lb, 2),
-                'precio_final_kg': round(precio_final_kg, 2),
+                'precio_fob_con_glaseo_kg': round(precio_fob_con_glaseo_kg, 2),  # Glaseo + costo fijo (12.04)
+                'precio_fob_con_glaseo_lb': round(precio_fob_con_glaseo_lb, 2),
+                'precio_final_kg': round(precio_final_kg, 2),  # FOB con glaseo + flete
                 'precio_final_lb': round(precio_final_lb, 2),
                 
                 # Metadatos
@@ -155,7 +163,8 @@ class ExcelLocalCalculatorService:
             logger.info(f"   🚢 FOB: ${result['precio_fob_kg']}/kg (preciso: {precio_fob_kg})")
             logger.info(f"   📊 Neto: ${result['precio_neto_kg']}/kg (preciso: {precio_neto_kg})")
             logger.info(f"   ❄️ Glaseo: ${result['precio_glaseo_kg']}/kg (preciso: {precio_glaseo_kg})")
-            logger.info(f"   ✈️ Final: ${result['precio_final_kg']}/kg (preciso: {precio_final_kg})")
+            logger.info(f"   💰 FOB con glaseo: ${result['precio_fob_con_glaseo_kg']}/kg (preciso: {precio_fob_con_glaseo_kg})")
+            logger.info(f"   ✈️ Final CFR: ${result['precio_final_kg']}/kg (preciso: {precio_final_kg})")
             
             return result
             
