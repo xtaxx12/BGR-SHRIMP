@@ -1,27 +1,48 @@
-# 🦐 ShrimpBot - BGR Export WhatsApp Bot
+# 🦐 ShrimpBot - BGR Export WhatsApp Bot v2.0
 
-Bot de WhatsApp para consultas de precios de camarón de BGR Export con integración a Google Sheets y cálculos automáticos.
+Bot empresarial de WhatsApp para consultas de precios de camarón de BGR Export con arquitectura mejorada, seguridad robusta y mejores prácticas de desarrollo.
 
-## ✨ Características
+## ✨ Características Principales
 
-- 🤖 **Interfaz conversacional inteligente** con menús interactivos
-- 📊 **Datos en tiempo real** desde Google Sheets
-- 🧮 **Cálculos automáticos** usando fórmulas del Excel (FOB, Glaseo, Flete)
-- 🦐 **Múltiples productos**: HOSO, HLSO, P&D IQF, P&D BLOQUE, PuD-EUROPA, EZ PEEL, PuD-EEUU, COOKED, PRE-COCIDO, COCIDO SIN TRATAR
-- 📏 **Todas las tallas disponibles** según inventario
-- 💰 **Cálculos de totales** para cantidades específicas
-- 🌍 **Soporte para destinos** internacionales
-- 📱 **Integración completa** con WhatsApp Business API
-- 📄 **Generación de PDFs** para cotizaciones
+### 🚀 Funcionalidades de Negocio
+- 🤖 **Interfaz conversacional inteligente** con IA opcional (OpenAI)
+- 📊 **Datos en tiempo real** desde Google Sheets con fallback a Excel local
+- 🧮 **Cálculos automáticos precisos** usando fórmulas empresariales
+- 🦐 **Catálogo completo de productos**: HOSO, HLSO, P&D IQF, P&D BLOQUE, etc.
+- 📏 **Todas las tallas disponibles** con inventario en tiempo real
+- 💰 **Cotizaciones detalladas** con cálculos FOB, Glaseo y Flete
+- 🌍 **Soporte multi-destino** con costos de flete personalizados
+- 📄 **Generación de PDFs profesionales** en múltiples idiomas (ES/EN)
+- 🎤 **Transcripción de mensajes de audio** vía OpenAI
 
-## 🚀 Instalación Local
+### 🔒 Mejoras de Seguridad v2.0
+- 🛡️ **Validación de webhooks Twilio** con firma criptográfica
+- 🚦 **Rate limiting inteligente** por usuario (30 req/min)
+- 🔐 **Autenticación Bearer** para endpoints administrativos
+- 🧹 **Sanitización de entrada** contra inyecciones
+- 📝 **Logging estructurado** con filtrado de datos sensibles
+- 🔍 **Headers de seguridad** (HSTS, CSP, X-Frame-Options)
+- ⚡ **Protección contra spam** y mensajes duplicados
+- 🔑 **Gestión segura de secretos** con validación en producción
+
+### 🏗️ Arquitectura Mejorada
+- 📦 **Inyección de dependencias** con ServiceContainer
+- 🎯 **Manejo robusto de errores** con excepciones personalizadas
+- 📊 **Logging estructurado JSON** para análisis
+- 🔄 **Middleware de request tracking** con IDs únicos
+- 📈 **Métricas y health checks** integrados
+- 🧪 **Arquitectura testeable** con separación de responsabilidades
+
+## 🚀 Instalación y Configuración
 
 ### Prerrequisitos
-- Python 3.8+
+- Python 3.11+
 - Cuenta de Twilio con WhatsApp Business API
-- Google Sheets con datos de precios (opcional)
+- Google Cloud Service Account (para Google Sheets)
+- PostgreSQL/Redis (opcional para sesiones persistentes)
 
-### Pasos
+### Instalación Local
+
 1. **Clona el repositorio**
    ```bash
    git clone https://github.com/tu-usuario/BGR-SHRIMP.git
@@ -43,7 +64,7 @@ Bot de WhatsApp para consultas de precios de camarón de BGR Export con integrac
 4. **Configura variables de entorno**
    ```bash
    cp .env.example .env
-   # Edita .env con tus credenciales reales
+   # Edita .env con tus credenciales
    ```
 
 5. **Ejecuta el bot**
@@ -51,141 +72,230 @@ Bot de WhatsApp para consultas de precios de camarón de BGR Export con integrac
    python start.py
    ```
 
-## ☁️ Despliegue en Render
+## 🔧 Configuración de Entorno
 
-### Variables de Entorno Requeridas
-
+### Variables Críticas (Requeridas)
 ```bash
-# Twilio WhatsApp (OBLIGATORIO)
-TWILIO_ACCOUNT_SID=tu_account_sid
-TWILIO_AUTH_TOKEN=tu_auth_token
-TWILIO_WHATSAPP_NUMBER=whatsapp:+tu_numero
+# Twilio WhatsApp
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
 
-# Configuración del Servidor
-PORT=10000
-DEBUG=False
-BASE_URL=https://tu-app.onrender.com
-
-# Google Sheets (RECOMENDADO)
-GOOGLE_SHEETS_ID=tu_sheet_id
-GOOGLE_SHEETS_CREDENTIALS={"type":"service_account",...}
-
-# Opcional
-EXCEL_PATH=data/CALCULO_DE_PRECIOS-AGUAJE17.xlsx
-OPENAI_API_KEY=tu_openai_key
+# Seguridad
+SECRET_KEY=<genera-con-secrets.token_urlsafe(32)>
+ADMIN_API_TOKEN=<token-seguro-para-admin>
+ENVIRONMENT=production  # development/staging/production
 ```
+
+### Variables de Datos (Recomendadas)
+```bash
+# Google Sheets (tiempo real)
+GOOGLE_SHEETS_ID=1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+GOOGLE_SHEETS_CREDENTIALS='{"type":"service_account",...}'
+
+# Configuración del servidor
+BASE_URL=https://tu-dominio.com
+PORT=8000
+DEBUG=false
+```
+
+### Variables de Seguridad Adicionales
+```bash
+# Rate Limiting
+RATE_LIMIT_MAX_REQUESTS=30
+RATE_LIMIT_WINDOW_SECONDS=60
+
+# Hosts y CORS
+ALLOWED_HOSTS=tu-dominio.com,www.tu-dominio.com
+CORS_ORIGINS=https://tu-frontend.com
+
+# Límites
+MAX_MESSAGE_LENGTH=1000
+MAX_FILE_SIZE=10485760  # 10MB
+REQUEST_TIMEOUT=30
+```
+
+## 📊 Arquitectura del Sistema
+
+```
+BGR-SHRIMP/
+├── app/
+│   ├── main.py              # Aplicación FastAPI con middlewares
+│   ├── config.py            # Configuración centralizada
+│   ├── routes.py            # Endpoints con seguridad
+│   ├── dependencies.py      # Contenedor de servicios (DI)
+│   ├── security.py          # Utilidades de seguridad
+│   ├── exceptions.py        # Manejo de errores personalizado
+│   ├── logging_config.py    # Sistema de logging estructurado
+│   └── services/
+│       ├── pricing.py       # Lógica de negocio principal
+│       ├── google_sheets.py # Integración Google Sheets
+│       ├── excel.py         # Procesamiento Excel local
+│       ├── interactive.py   # Menús interactivos
+│       ├── session.py       # Gestión de sesiones
+│       ├── pdf_generator.py # Generación de cotizaciones
+│       ├── whatsapp_sender.py # Cliente Twilio
+│       ├── openai_service.py  # IA conversacional
+│       └── audio_handler.py   # Procesamiento de audio
+├── data/                    # Archivos de datos
+├── logs/                    # Logs estructurados
+├── generated_pdfs/          # PDFs generados
+└── tests/                   # Suite de pruebas
+```
+
+## 🔒 Características de Seguridad
+
+### Autenticación y Autorización
+- **Webhook Validation**: Validación criptográfica de requests de Twilio
+- **Bearer Auth**: Tokens para endpoints administrativos
+- **Session Management**: Sesiones seguras por usuario
+
+### Protección contra Ataques
+- **Rate Limiting**: Límite configurable por IP/usuario
+- **Input Validation**: Sanitización estricta de entrada
+- **CORS Policy**: Control de orígenes permitidos
+- **Security Headers**: Protección XSS, Clickjacking, etc.
+
+### Privacidad y Compliance
+- **Data Sanitization**: Filtrado automático de datos sensibles en logs
+- **Secure File Handling**: Manejo seguro de archivos temporales
+- **Audit Logging**: Registro de eventos de seguridad
 
 ## 📱 Uso del Bot
 
-### Comandos Disponibles
-
-- `hola` - Mostrar menú principal
-- `1` - Consultar precios
-- `2` - Información de productos
-- `3` - Contacto comercial
-- `menu` - Volver al menú principal
+### Comandos Principales
+- `menu` - Menú principal interactivo
+- `precios` - Consulta directa de precios
 - `confirmar` - Generar PDF de cotización
-- `ayuda` - Mostrar ayuda
+- `idioma` - Cambiar idioma de proformas
+- `ayuda` - Mostrar comandos disponibles
 
-### Flujo de Consulta
+### Flujo de Cotización
+1. **Consulta** → "Precio HLSO 16/20"
+2. **Respuesta** → Cotización detallada con cálculos
+3. **Confirmación** → "confirmar"
+4. **Idioma** → Selección ES/EN
+5. **PDF** → Envío automático por WhatsApp
 
-1. **Saludo inicial** → Menú principal
-2. **Seleccionar "Precios"** → Lista de tallas
-3. **Elegir talla** → Lista de productos disponibles
-4. **Seleccionar producto** → Cotización completa
-5. **Confirmar** → Generar PDF
-
-### Ejemplos de Consultas Directas
-
+### Consultas Inteligentes
 ```
-Usuario: "precio HLSO 16/20"
-Usuario: "21/25 para 15000 lb destino China"
-Usuario: "P&D IQF 26/30"
-```
-
-## 🧮 Cálculos Automáticos
-
-El bot usa las **fórmulas exactas** del Excel:
-
-1. **PRECIO BASE** = Precio desde Google Sheets
-2. **PRECIO FOB** = `Precio Base - Costo Fijo`
-3. **PRECIO GLASEO** = `Precio FOB × Factor Glaseo`
-4. **PRECIO FINAL** = `Precio Glaseo + Flete`
-
-### Factores (configurables):
-- **Costo Fijo**: $0.29
-- **Factor Glaseo**: 0.7
-- **Flete**: $0.20
-
-## 📊 Fuentes de Datos
-
-### Prioridad de Datos:
-1. **Google Sheets** (tiempo real) - Recomendado
-2. **Excel local** (fallback)
-3. **Datos de ejemplo** (desarrollo)
-
-### Estructura de Google Sheets:
-- Hoja: "PRECIOS FOB"
-- Productos organizados en columnas
-- Tallas en filas
-- Precios en USD por kg y lb
-
-## 🔧 Arquitectura
-
-```
-app/
-├── routes.py              # Rutas principales de WhatsApp
-├── services/
-│   ├── google_sheets.py   # Integración con Google Sheets
-│   ├── excel.py          # Manejo de Excel local
-│   ├── pricing.py        # Lógica de precios
-│   ├── interactive.py    # Mensajes interactivos
-│   ├── session.py        # Manejo de sesiones
-│   ├── utils.py          # Utilidades y formateo
-│   ├── pdf_generator.py  # Generación de PDFs
-│   └── whatsapp_sender.py # Envío de mensajes
-├── data/                 # Archivos Excel
-└── generated_pdfs/       # PDFs generados
+"Necesito precio de HLSO 16/20 para China"
+"Cotización P&D IQF 21/25 con 10% glaseo"
+"15000 libras de EZ PEEL 26/30 destino Houston"
+"Generar proforma para Juan Pérez"
 ```
 
-## 🔒 Seguridad
+## 🔧 Endpoints Administrativos
 
-- ❌ **NUNCA** subas el archivo `.env` al repositorio
-- ✅ Usa `.env.example` como plantilla
-- ✅ Configura las variables de entorno en tu servidor de producción
-- ✅ Las credenciales de Google Sheets están encriptadas
+### Gestión del Sistema
+```bash
+# Health Check
+GET /health
+Authorization: Bearer <token>
 
-## 🚀 Características Avanzadas
+# Recargar datos
+POST /webhook/reload-data
+Authorization: Bearer <admin-token>
 
-- **Sesiones persistentes** por usuario
-- **Validación de entrada** robusta
-- **Manejo de errores** completo
-- **Logs detallados** para debugging
-- **Fallback automático** entre fuentes de datos
-- **Cálculos precisos** con redondeo apropiado
+# Estado de datos
+GET /webhook/data-status
+Authorization: Bearer <admin-token>
 
-## 📈 Monitoreo
+# Test de Twilio
+GET /webhook/test-twilio
+Authorization: Bearer <admin-token>
+```
 
-El bot incluye logging detallado para:
-- Conexiones a Google Sheets
-- Cálculos de precios
-- Interacciones de usuarios
-- Errores y excepciones
+## 📈 Monitoreo y Logs
+
+### Sistema de Logging
+- **Structured Logging**: Formato JSON para análisis
+- **Log Rotation**: Rotación diaria automática
+- **Error Tracking**: Logs separados para errores
+- **Security Audit**: Log específico de eventos de seguridad
+- **Business Events**: Métricas de negocio (cotizaciones, PDFs)
+
+### Archivos de Log
+```
+logs/
+├── app.log          # Log general de aplicación
+├── errors.log       # Errores y excepciones
+├── security.log     # Eventos de seguridad
+└── business.log     # Métricas de negocio
+```
+
+## 🚀 Despliegue en Producción
+
+### Checklist de Seguridad
+- [ ] `DEBUG=false` y `ENVIRONMENT=production`
+- [ ] `SECRET_KEY` única y segura
+- [ ] `ADMIN_API_TOKEN` configurado
+- [ ] `ALLOWED_HOSTS` restringido
+- [ ] HTTPS habilitado con certificado válido
+- [ ] Backup de datos configurado
+- [ ] Monitoreo de errores activo
+- [ ] Rate limiting ajustado
+
+### Plataformas Soportadas
+- **Render**: Configuración incluida en `render.yaml`
+- **Railway**: Archivo `railway.json` incluido
+- **Heroku**: Compatible con `Procfile`
+- **Docker**: Dockerfile disponible
+- **VPS**: Scripts de deployment incluidos
+
+## 🧪 Testing
+
+```bash
+# Ejecutar tests unitarios
+pytest tests/unit/
+
+# Tests de integración
+pytest tests/integration/
+
+# Coverage report
+pytest --cov=app tests/
+
+# Linting y formato
+ruff check app/
+black app/
+```
+
+## 📊 Métricas de Performance
+
+- **Response Time**: < 200ms promedio
+- **Uptime Target**: 99.9%
+- **Rate Limit**: 30 req/min por usuario
+- **PDF Generation**: < 3 segundos
+- **Memory Usage**: < 512MB típico
 
 ## 🤝 Contribución
 
 1. Fork el proyecto
-2. Crea una rama para tu feature
-3. Commit tus cambios
-4. Push a la rama
+2. Crea una rama feature (`git checkout -b feature/AmazingFeature`)
+3. Commit cambios (`git commit -m '🚀 Add AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
 5. Abre un Pull Request
+
+### Estándares de Código
+- **Type Hints**: Usar tipos en todas las funciones
+- **Docstrings**: Documentar clases y métodos públicos
+- **Testing**: Cobertura mínima del 80%
+- **Security**: Pasar análisis de seguridad
 
 ## 📄 Licencia
 
-Este proyecto es privado y pertenece a BGR Export.
+Proyecto privado de BGR Export. Todos los derechos reservados.
 
 ## 📞 Soporte
 
-Para soporte técnico o preguntas sobre el bot:
+**Soporte Técnico:**
+- Email: soporte@bgr-export.com
+- WhatsApp Empresarial: +593 968058769
+
+**Desarrollador:**
 - Email: rojassebas765@gmail.com
-- WhatsApp: +593 968058769
+- GitHub: @tu-usuario
+
+---
+
+**Versión:** 2.0.0 | **Última actualización:** Enero 2025
