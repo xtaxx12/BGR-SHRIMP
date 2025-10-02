@@ -154,39 +154,30 @@ class PricingService:
             if glaseo_factor is None:
                 glaseo_factor = 0.70
             
-            # Aplicar fórmula correcta según Excel mostrado en imagen:
-            # Precio con glaseo = (precio fob - costo fijo) × factor glaseo
-            # CFR = Precio con glaseo + Costo fijo + Flete
+            # Usar el calculador corregido con máxima precisión
+            # El precio base que recibimos es en realidad el precio FOB
+            calculated_result = self.calculator_service.calculate_prices(
+                precio_fob_kg=base_price_kg,
+                glaseo_factor=glaseo_factor,
+                flete=flete_value
+            )
             
-            # 1. Precio FOB = Precio Base
-            precio_fob_kg = base_price_kg
+            if not calculated_result:
+                logger.error("Error en calculador de precisión")
+                return None
             
-            # 2. Precio con Glaseo = (Precio FOB - Costo fijo) × Factor glaseo
-            # Según imagen: (8.59) × 0.8 = 6.8756304 → 6.88 (redondeado)
-            precio_fob_menos_costo = precio_fob_kg - costo_fijo  # 8.88 - 0.29 = 8.59
-            precio_glaseo_kg = precise_round(precio_fob_menos_costo * glaseo_factor)  # 8.59 × 0.8 = 6.88
+            # Extraer valores calculados con precisión
+            precio_fob_kg = calculated_result.get('precio_fob_kg')
+            precio_glaseo_kg = calculated_result.get('precio_glaseo_kg')
+            precio_final_kg = calculated_result.get('precio_final_kg')
+            precio_neto_kg = calculated_result.get('precio_neto_kg')  # FOB - costo fijo
             
-            # 3. Precio Final CFR = Precio glaseo + Costo fijo + Flete
-            precio_final_kg = precise_round(precio_glaseo_kg + costo_fijo + flete_value)
-            
-            # Calcular precios en libras
-            if usar_libras and destination and destination.lower() != 'houston':
-                # Para ciudades USA (excepto Houston): recalcular con costo fijo en libras
-                costo_fijo_lb = costo_fijo_sheets / 2.2
-                base_price_lb = base_price_kg / 2.2
-                flete_value_lb = flete_value / 2.2
-                
-                # Recalcular todo en libras usando fórmula correcta
-                precio_fob_lb = base_price_lb
-                precio_fob_menos_costo_lb = base_price_lb - costo_fijo_lb
-                precio_glaseo_lb = precise_round(precio_fob_menos_costo_lb * glaseo_factor)
-                precio_final_lb = precise_round(precio_glaseo_lb + costo_fijo_lb + flete_value_lb)
-            else:
-                # Para Houston e internacionales: solo convertir dividiendo por 2.2
-                precio_fob_lb = precise_round(precio_fob_kg / 2.2)
-                precio_glaseo_lb = precise_round(precio_glaseo_kg / 2.2)
-                precio_final_lb = precise_round(precio_final_kg / 2.2)
-                base_price_lb = precise_round(base_price_kg / 2.2)
+            # Obtener precios en libras del calculador (ya calculados con precisión)
+            precio_fob_lb = calculated_result.get('precio_fob_lb')
+            precio_glaseo_lb = calculated_result.get('precio_glaseo_lb')
+            precio_final_lb = calculated_result.get('precio_final_lb')
+            precio_neto_lb = calculated_result.get('precio_neto_lb')
+            base_price_lb = precise_round(base_price_kg / 2.20462262185)
             
             # Determinar si se debe mostrar precio CFR o precio con glaseo
             # Solo incluir flete si el usuario EXPLÍCITAMENTE lo menciona
