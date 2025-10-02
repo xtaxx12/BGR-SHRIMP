@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Request, Form, HTTPException
+from fastapi import APIRouter, Request, Form, HTTPException, Depends
 from fastapi.responses import PlainTextResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from twilio.twiml.messaging_response import MessagingResponse
 from app.services.pricing import PricingService
 from app.services.utils import parse_user_message, parse_ai_analysis_to_query, format_price_response
@@ -9,6 +10,12 @@ from app.services.pdf_generator import PDFGenerator
 from app.services.whatsapp_sender import WhatsAppSender
 from app.services.openai_service import OpenAIService
 from app.services.audio_handler import AudioHandler
+from app.security import (
+    validate_twilio_webhook, rate_limit, sanitize_input, 
+    validate_phone_number, security, verify_admin_token,
+    SecureTempFile, add_security_headers
+)
+from app.config import settings
 import logging
 import os
 import time
@@ -77,7 +84,8 @@ def get_services():
     return pricing_service, interactive_service, pdf_generator, whatsapp_sender, openai_service
 
 @webhook_router.post("/whatsapp")
-async def whatsapp_webhook(
+@rate_limit(lambda req, **kwargs: kwargs.get('From', 'unknown'))
+async def whatsapp_webhook(request: Request,
     Body: str = Form(""),
     From: str = Form(...),
     To: str = Form(...),
@@ -90,6 +98,14 @@ async def whatsapp_webhook(
     Endpoint para recibir mensajes de WhatsApp desde Twilio
     """
     try:
+        # Validar número de teléfono
+        if not validate_phone_number(From):
+            logger.warning(f"Invalid phone number format: {From}")
+            raise HTTPException(status_code=400, detail="Invalid phone format")
+        
+        # Sanitizar entrada
+        Body = sanitize_input(Body, max_length=settings.MAX_MESSAGE_LENGTH)
+        
         # Verificar si es un mensaje duplicado
         if is_duplicate_message(MessageSid):
             # Retornar respuesta vacía para mensajes duplicados
@@ -110,8 +126,9 @@ async def whatsapp_webhook(
             logger.info(f"🎤 Procesando mensaje de audio...")
             audio_handler = AudioHandler()
             
-            # Descargar audio
-            audio_path = audio_handler.download_audio_from_twilio(MediaUrl0)
+            # Descargar audio de forma segura
+            with SecureTempFile(suffix=".ogg") as temp_path:
+                audio_path = audio_handler.download_audio_from_twilio(MediaUrl0, temp_path)
             
             if audio_path:
                 # Transcribir audio
@@ -618,8 +635,12 @@ Responde con el número o escribe:
             response_xml = str(emergency_response)
             logger.info(f"🚨 Usando respuesta de emergencia: {response_xml}")
         
-        return PlainTextResponse(response_xml, media_type="application/xml")
+        # Agregar headers de seguridad
+        response = PlainTextResponse(response_xml, media_type="application/xml")
+        return add_security_headers(response)
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error procesando mensaje: {str(e)}")
         import traceback
@@ -628,7 +649,7 @@ Responde con el número o escribe:
         response.message("❌ Ocurrió un error procesando tu consulta. Intenta nuevamente.")
         response_xml = str(response)
         logger.info(f"Enviando respuesta de error XML: {response_xml}")
-        return PlainTextResponse(response_xml, media_type="application/xml")
+        return add_security_headers(PlainTextResponse(response_xml, media_type="application/xml"))
 
 @webhook_router.get("/whatsapp")
 async def whatsapp_webhook_verification(request: Request):
@@ -682,10 +703,14 @@ async def test_response():
     return PlainTextResponse(response_xml, media_type="application/xml")
 
 @webhook_router.post("/reload-data")
-async def reload_data():
+async def reload_data(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
     Endpoint para recargar datos desde Google Sheets
     """
+    # Verificar token de administrador
+    if not verify_admin_token(credentials):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+        
     try:
         # Reinicializar servicios con variables de entorno actuales
         global pricing_service, interactive_service, pdf_generator, whatsapp_sender, openai_service
@@ -717,10 +742,14 @@ async def reload_data():
         return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
 
 @webhook_router.get("/data-status")
-async def data_status():
+async def data_status(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
     Endpoint para verificar el estado de los datos
     """
+    # Verificar token de administrador
+    if not verify_admin_token(credentials):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+        
     try:
         # Inicializar servicios si no están inicializados
         pricing_service, interactive_service, pdf_generator, whatsapp_sender, openai_service = get_services()
@@ -756,16 +785,20 @@ async def data_status():
         return {"status": "error", "message": str(e)}
 
 @webhook_router.get("/test-twilio")
-async def test_twilio():
+async def test_twilio(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
     Endpoint para probar las credenciales de Twilio
     """
+    # Verificar token de administrador
+    if not verify_admin_token(credentials):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+        
     try:
         from twilio.rest import Client
         
-        account_sid = os.getenv('TWILIO_ACCOUNT_SID')
-        auth_token = os.getenv('TWILIO_AUTH_TOKEN')
-        whatsapp_number = os.getenv('TWILIO_WHATSAPP_NUMBER')
+        account_sid = settings.TWILIO_ACCOUNT_SID
+        auth_token = settings.TWILIO_AUTH_TOKEN
+        whatsapp_number = settings.TWILIO_WHATSAPP_NUMBER
         
         if not all([account_sid, auth_token, whatsapp_number]):
             return {
@@ -796,10 +829,24 @@ async def test_twilio():
         return {"status": "error", "message": str(e)}
 
 @webhook_router.post("/test-pdf-send")
-async def test_pdf_send(phone_number: str = Form(...)):
+async def test_pdf_send(
+    phone_number: str = Form(...),
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
     """
     Endpoint para probar el envío de PDFs
     """
+    # Verificar token de administrador
+    if not verify_admin_token(credentials):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+        
+    # Validar número de teléfono
+    if not phone_number.startswith("whatsapp:"):
+        phone_number = f"whatsapp:{phone_number}"
+    
+    if not validate_phone_number(phone_number):
+        raise HTTPException(status_code=400, detail="Invalid phone number format")
+        
     try:
         # Crear una cotización de prueba
         test_quote = {
