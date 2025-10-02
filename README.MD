@@ -289,12 +289,12 @@ Proyecto privado de BGR Export. Todos los derechos reservados.
 ## 📞 Soporte
 
 **Soporte Técnico:**
-- Email: soporte@bgr-export.com
+- Email: rojassebas765@gmail.com
 - WhatsApp Empresarial: +593 968058769
 
 **Desarrollador:**
 - Email: rojassebas765@gmail.com
-- GitHub: @tu-usuario
+- GitHub: @xtaxx12
 
 ---
 
