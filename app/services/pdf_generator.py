@@ -66,7 +66,15 @@ class PDFGenerator:
             # === REGLAS DE NEGOCIO ===
             # Determinar si es FOB o CFR basado en si se solicitó flete
             flete_incluido = price_info.get('incluye_flete', False)
-            tipo_cotizacion = "CFR" if flete_incluido else "FOB"
+            destino = price_info.get('destination', '')
+            
+            # Crear título dinámico con destino para CFR
+            if flete_incluido and destino:
+                tipo_cotizacion = f"CFR A {destino.upper()}"
+            elif flete_incluido:
+                tipo_cotizacion = "CFR"
+            else:
+                tipo_cotizacion = "FOB"
             
             # === TRADUCCIONES ===
             translations = {

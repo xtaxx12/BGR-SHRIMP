@@ -365,6 +365,16 @@ Responde con el número o escribe:
                         # Si se envió exitosamente por WhatsApp, solo confirmar
                         response.message("✅ ¡Cotización confirmada!\n\n📄 Tu PDF ha sido enviado por WhatsApp.")
                         logger.debug(f"✅ PDF enviado exitosamente por WhatsApp: {pdf_path}")
+                        
+                        # Mensaje adicional sobre el flete si es CFR
+                        if quote_data.get('incluye_flete') and quote_data.get('flete'):
+                            flete_msg = f"\n💡 **Información del flete:**\n"
+                            flete_msg += f"La cotización se basó con flete de ${quote_data['flete']:.3f}/kg"
+                            if quote_data.get('destination'):
+                                flete_msg += f" hacia {quote_data['destination']}"
+                            flete_msg += f"\n\n📋 Precio CFR incluye: Producto + Glaseo + Flete"
+                            
+                            response.message(flete_msg)
                     else:
                         # Si no se pudo enviar por WhatsApp, usar TwiML como respaldo
                         logger.info(f"⚠️ Enviando PDF via TwiML como respaldo: {download_url}")
@@ -478,6 +488,16 @@ Responde con el número o escribe:
                             confirmation_msg += f"\n📄 **PDF enviado por WhatsApp**"
                             
                             response.message(confirmation_msg)
+                            
+                            # Mensaje adicional sobre el flete si es CFR
+                            if price_info.get('incluye_flete') and price_info.get('flete'):
+                                flete_msg = f"\n💡 **Información del flete:**\n"
+                                flete_msg += f"La cotización se basó con flete de ${price_info['flete']:.3f}/kg"
+                                if price_info.get('destination'):
+                                    flete_msg += f" hacia {price_info['destination']}"
+                                flete_msg += f"\n\n📋 Precio CFR incluye: Producto + Glaseo + Flete"
+                                
+                                response.message(flete_msg)
                         else:
                             logger.error(f"❌ Error enviando PDF por WhatsApp")
                             response.message(f"✅ Proforma generada\n📄 Descarga tu PDF: {download_url}")
