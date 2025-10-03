@@ -404,17 +404,7 @@ Formato de respuesta: texto directo sin JSON.
                             product = prod_name
                             break
             
-            # Lógica inteligente: Si no se detectó producto pero hay talla específica de HOSO, asumir HOSO
-            if not product and size:
-                # Tallas que solo existen en HOSO según la tabla de precios
-                hoso_exclusive_sizes = ['20/30', '30/40', '40/50', '50/60', '60/70', '70/80']
-                if size in hoso_exclusive_sizes:
-                    product = 'HOSO'
-                    logger.info(f"🎯 Talla {size} es exclusiva de HOSO - asignando automáticamente")
-            
-            # NO asumir producto por defecto para otras tallas - el usuario debe especificarlo
-            
-            # Detectar tallas con patrones más amplios
+            # Detectar tallas PRIMERO (antes de la lógica de HOSO)
             size_patterns = [
                 r'(\d+/\d+)',  # 21/25
                 r'(\d+)\s*sobre\s*(\d+)',  # 21 sobre 25
@@ -430,6 +420,15 @@ Formato de respuesta: texto directo sin JSON.
                     else:
                         size = f"{match.group(1)}/{match.group(2)}"
                     break
+            
+            # Lógica inteligente: Si no se detectó producto pero hay talla específica de HOSO, asumir HOSO
+            if not product and size:
+                # Tallas que solo existen en HOSO según la tabla de precios
+                hoso_exclusive_sizes = ['20/30', '30/40', '40/50', '50/60', '60/70', '70/80']
+                if size in hoso_exclusive_sizes:
+                    product = 'HOSO'
+            
+            # NO asumir producto por defecto para otras tallas - el usuario debe especificarlo
             
             # Detectar glaseo con patrones más amplios (español e inglés)
             glaseo_patterns = [
