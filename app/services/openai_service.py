@@ -304,9 +304,10 @@ Formato de respuesta: texto directo sin JSON.
         """
         message_lower = message.lower().strip()
         
-        # Patrones de saludo
-        greeting_patterns = ['hola', 'hello', 'hi', 'buenos', 'buenas', 'como estas', 'que tal', 'q haces']
-        if any(pattern in message_lower for pattern in greeting_patterns):
+        # Patrones de saludo (con límites de palabra para evitar falsos positivos)
+        greeting_patterns = [r'\bhola\b', r'\bhello\b', r'\bhi\b', r'\bbuenos\b', r'\bbuenas\b', 
+                           r'\bcomo estas\b', r'\bque tal\b', r'\bq haces\b']
+        if any(re.search(pattern, message_lower) for pattern in greeting_patterns):
             return {
                 "intent": "greeting",
                 "product": None,
