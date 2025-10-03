@@ -404,9 +404,8 @@ Formato de respuesta: texto directo sin JSON.
                             product = prod_name
                             break
             
-            # Si no se detectó producto específico pero menciona "producto" o "tipo", usar HLSO por defecto
-            if not product and any(word in message_lower for word in ['producto', 'tipo', 'camaron', 'camarones']):
-                product = 'HLSO'  # Más común
+            # NO asumir producto por defecto - el usuario debe especificarlo
+            # Si menciona camarón genérico sin especificar tipo, se manejará en la validación
             
             # Detectar tallas con patrones más amplios
             size_patterns = [

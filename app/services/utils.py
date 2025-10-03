@@ -39,13 +39,14 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
     usar_libras = ai_analysis.get('usar_libras', False)
     cliente_nombre = ai_analysis.get('cliente_nombre')
     
-    # Validar que tengamos al menos talla (producto puede ser inferido)
+    # Validar que tengamos producto y talla
     if not size:
         return None
     
-    # Si no hay producto específico, usar HLSO por defecto
+    # IMPORTANTE: Si no hay producto específico, NO asumir nada
+    # El usuario debe especificar el tipo de camarón
     if not product:
-        product = 'HLSO'
+        return None  # Esto hará que el bot pida al usuario que especifique el producto
     
     # Determinar unidad base según destino
     unit = 'lb' if usar_libras else 'kg'

@@ -169,12 +169,14 @@ class PricingService:
             # Extraer valores calculados con precisión
             precio_fob_kg = calculated_result.get('precio_fob_kg')
             precio_glaseo_kg = calculated_result.get('precio_glaseo_kg')
+            precio_fob_con_glaseo_kg = calculated_result.get('precio_fob_con_glaseo_kg')  # Glaseo + costo fijo
             precio_final_kg = calculated_result.get('precio_final_kg')
             precio_neto_kg = calculated_result.get('precio_neto_kg')  # FOB - costo fijo
             
             # Obtener precios en libras del calculador (ya calculados con precisión)
             precio_fob_lb = calculated_result.get('precio_fob_lb')
             precio_glaseo_lb = calculated_result.get('precio_glaseo_lb')
+            precio_fob_con_glaseo_lb = calculated_result.get('precio_fob_con_glaseo_lb')  # Glaseo + costo fijo
             precio_final_lb = calculated_result.get('precio_final_lb')
             precio_neto_lb = calculated_result.get('precio_neto_lb')
             base_price_lb = precise_round(base_price_kg / 2.20462262185)
@@ -195,14 +197,16 @@ class PricingService:
                 'precio_fob_lb': precio_fob_lb,
                 'precio_neto_kg': precio_neto_kg,  # FOB - costo fijo (el valor preciso)
                 'precio_neto_lb': precio_neto_lb,
-                'precio_glaseo_kg': precio_glaseo_kg,
+                'precio_glaseo_kg': precio_glaseo_kg,  # Solo glaseo
                 'precio_glaseo_lb': precio_glaseo_lb,
-                'precio_final_kg': precio_final_kg,
+                'precio_fob_con_glaseo_kg': precio_fob_con_glaseo_kg,  # Glaseo + costo fijo (precio para PDF)
+                'precio_fob_con_glaseo_lb': precio_fob_con_glaseo_lb,
+                'precio_final_kg': precio_final_kg,  # CFR (glaseo + costo fijo + flete)
                 'precio_final_lb': precio_final_lb,
                 'costo_fijo': calculated_result.get('costo_fijo_used'),
                 'factor_glaseo': calculated_result.get('glaseo_factor_used'),
                 'glaseo_percentage': glaseo_percentage,  # Porcentaje original solicitado
-                'flete': calculated_resuls,
+                'flete': calculated_result.get('flete_used'),
                 'destination': destination,
                 'quantity': user_params.get('quantity', ''),
                 'cliente_nombre': user_params.get('cliente_nombre', ''),

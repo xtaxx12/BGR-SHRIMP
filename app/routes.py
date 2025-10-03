@@ -192,6 +192,63 @@ async def whatsapp_webhook(request: Request,
             ai_query = parse_ai_analysis_to_query(ai_analysis)
             logger.info(f"🤖 Consulta generada por IA: {ai_query}")
             
+            # Verificar si falta información crítica
+            if not ai_query:
+                # Verificar qué información específica falta
+                product = ai_analysis.get('product')
+                size = ai_analysis.get('size')
+                
+                if not product and size:
+                    # Tiene talla pero no producto - pedir producto específico
+                    missing_product_message = f"""🦐 **Detecté la talla {size}, pero necesito saber el tipo de camarón:**
+
+📋 **Productos disponibles:**
+• **HLSO** - Sin cabeza, con cáscara (más popular)
+• **HOSO** - Con cabeza y cáscara (entero)
+• **P&D IQF** - Pelado y desvenado individual
+• **P&D BLOQUE** - Pelado y desvenado en bloque
+• **PuD-EUROPA** - Calidad premium para Europa
+• **EZ PEEL** - Fácil pelado
+
+💡 **Ejemplo:** "Proforma HLSO {size}" o "Cotización P&D IQF {size}"
+
+¿Cuál necesitas? 🤔"""
+                    
+                    response.message(missing_product_message)
+                    return PlainTextResponse(str(response), media_type="application/xml")
+                
+                elif not size and product:
+                    # Tiene producto pero no talla - pedir talla
+                    missing_size_message = f"""📏 **Detecté {product}, pero necesito la talla:**
+
+📋 **Tallas disponibles:**
+U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60, 60/70, 61/70, 70/80, 71/90
+
+💡 **Ejemplo:** "Proforma {product} 16/20" o "Cotización {product} 21/25"
+
+¿Qué talla necesitas? 🤔"""
+                    
+                    response.message(missing_size_message)
+                    return PlainTextResponse(str(response), media_type="application/xml")
+                
+                else:
+                    # Falta tanto producto como talla
+                    missing_both_message = """🦐 **Para generar tu proforma necesito:**
+
+1️⃣ **Tipo de camarón:**
+• HLSO, HOSO, P&D IQF, P&D BLOQUE, etc.
+
+2️⃣ **Talla:**
+• 16/20, 21/25, 26/30, etc.
+
+💡 **Ejemplo completo:** 
+"Proforma HLSO 16/20" o "Cotización P&D IQF 21/25"
+
+¿Qué producto y talla necesitas? 🤔"""
+                    
+                    response.message(missing_both_message)
+                    return PlainTextResponse(str(response), media_type="application/xml")
+            
             if ai_query:
                 # Verificar que se puede generar la cotización
                 price_info = pricing_service.get_shrimp_price(ai_query)
