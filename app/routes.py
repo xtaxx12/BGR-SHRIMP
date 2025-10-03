@@ -287,9 +287,34 @@ Responde con el número o escribe:
                     response.message(language_message)
                     return PlainTextResponse(str(response), media_type="application/xml")
                 else:
-                    logger.error(f"❌ Error validando datos de proforma")
-                    response.message("❌ Error procesando la solicitud. Intenta nuevamente.")
-                    return PlainTextResponse(str(response), media_type="application/xml")
+                    # Verificar si falta el glaseo específicamente
+                    glaseo_factor = ai_query.get('glaseo_factor') if ai_query else None
+                    
+                    if glaseo_factor is None:
+                        # Falta el glaseo - pedir al usuario que lo especifique
+                        product = ai_query.get('product', 'producto') if ai_query else 'producto'
+                        size = ai_query.get('size', 'talla') if ai_query else 'talla'
+                        
+                        glaseo_message = f"""❄️ **Para calcular el precio CFR de {product} {size} necesito el glaseo:**
+
+📋 **Opciones de glaseo disponibles:**
+• **10%** glaseo (factor 0.90)
+• **20%** glaseo (factor 0.80) 
+• **30%** glaseo (factor 0.70)
+
+💡 **Ejemplos:**
+• "Proforma {product} {size} glaseo 10%"
+• "Cotización {product} {size} con 20% glaseo"
+• "{product} {size} glaseo 30%"
+
+¿Qué porcentaje de glaseo necesitas? 🤔"""
+                        
+                        response.message(glaseo_message)
+                        return PlainTextResponse(str(response), media_type="application/xml")
+                    else:
+                        logger.error(f"❌ Error validando datos de proforma: {ai_query}")
+                        response.message("❌ Error procesando la solicitud. Intenta nuevamente.")
+                        return PlainTextResponse(str(response), media_type="application/xml")
         
         # Comandos globales que funcionan desde cualquier estado
         message_lower = Body.lower().strip()
@@ -449,7 +474,32 @@ Responde con el número o escribe:
                 price_info = session['data'].get('price_info')
                 ai_query = session['data'].get('ai_query')
                 
+                # Verificar que price_info tenga glaseo antes de generar PDF
                 if price_info:
+                    glaseo_factor = price_info.get('factor_glaseo') or price_info.get('glaseo_factor')
+                    if not glaseo_factor:
+                        # Falta el glaseo - pedir al usuario que lo especifique
+                        product = price_info.get('producto', 'producto')
+                        size = price_info.get('talla', 'talla')
+                        
+                        glaseo_message = f"""❄️ **Para generar la proforma de {product} {size} necesito el glaseo:**
+
+📋 **Opciones de glaseo disponibles:**
+• **10%** glaseo (factor 0.90)
+• **20%** glaseo (factor 0.80) 
+• **30%** glaseo (factor 0.70)
+
+💡 **Ejemplos:**
+• "Proforma {product} {size} glaseo 10%"
+• "Cotización {product} {size} con 20% glaseo"
+• "{product} {size} glaseo 30%"
+
+¿Qué porcentaje de glaseo necesitas? 🤔"""
+                        
+                        response.message(glaseo_message)
+                        session_manager.clear_session(user_id)
+                        return PlainTextResponse(str(response), media_type="application/xml")
+                    
                     # Generar PDF en el idioma seleccionado
                     logger.info(f"📄 Generando PDF para usuario {user_id} en idioma {selected_language}")
                     pdf_path = pdf_generator.generate_quote_pdf(price_info, From, selected_language)

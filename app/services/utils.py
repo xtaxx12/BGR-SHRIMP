@@ -24,6 +24,7 @@ def parse_user_message(message: str) -> Optional[Dict]:
 def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
     """
     Convierte el análisis de IA en una consulta de precio válida con parámetros personalizados
+    IMPORTANTE: NO usa valores por defecto para glaseo - debe ser especificado por el usuario
     """
     if not ai_analysis or ai_analysis.get('intent') not in ['pricing', 'proforma']:
         return None
@@ -72,9 +73,7 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
         # Si menciona destino (como "houston"), significa que solicitó flete
         flete_solicitado = True
     
-    # Solo aplicar flete si el usuario lo menciona explícitamente
-    
-    # Procesar factor de glaseo
+    # Procesar factor de glaseo - CRÍTICO: NO USAR VALOR POR DEFECTO
     glaseo_value = None
     if glaseo_factor:
         try:
@@ -85,9 +84,9 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
             else:
                 glaseo_value = glaseo_num  # 0.10 → 0.10
         except:
-            glaseo_value = 0.70  # Default
+            glaseo_value = None  # NUNCA usar valor por defecto
     else:
-        glaseo_value = 0.70  # Default
+        glaseo_value = None  # NUNCA usar valor por defecto - pedir al usuario
     
     # Crear consulta estructurada con parámetros personalizados
     query = {
@@ -258,6 +257,7 @@ def format_price_response(price_info: Dict) -> str:
                 
                 if is_houston:
                     response += f"   • ${price_info['precio_glaseo_kg']:.2f}/kg\n\n"
+                    
                 else:
                     response += f"   • ${price_info['precio_glaseo_kg']:.2f}/kg - ${price_info['precio_glaseo_lb']:.2f}/lb\n\n"
         

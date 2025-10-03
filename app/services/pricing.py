@@ -52,7 +52,7 @@ class PricingService:
             20: 0.80,
             30: 0.70
         }
-        return glaseo_factors.get(glaseo_percentage, 0.70)  # Default 30%
+        return glaseo_factors.get(glaseo_percentage, None)  # No default - require user input
     
     def get_shrimp_price(self, user_input: Dict) -> Optional[Dict]:
         """
@@ -150,9 +150,10 @@ class PricingService:
             else:
                 flete_value = 0  # No aplicar flete si no se solicitó
             
-            # Usar glaseo especificado o valor por defecto
+            # Verificar que se haya especificado glaseo
             if glaseo_factor is None:
-                glaseo_factor = 0.70
+                logger.warning("❌ Glaseo no especificado - se requiere para calcular CFR")
+                return None
             
             # Usar el calculador corregido con máxima precisión
             # El precio base que recibimos es en realidad el precio FOB

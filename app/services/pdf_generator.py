@@ -143,9 +143,17 @@ class PDFGenerator:
             cliente = price_info.get('cliente_nombre', 'Cliente')
             # Usar solo el país para el destino en el PDF (ya calculado arriba)
             destino = destino_pais if destino_pais else 'N/A'
-            glaseo_factor = price_info.get('glaseo_factor', 0.7)
+            glaseo_factor = price_info.get('factor_glaseo') or price_info.get('glaseo_factor')
             glaseo_percentage = price_info.get('glaseo_percentage')  # Porcentaje original
             fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
+            
+            # Calcular porcentaje de glaseo para mostrar en el PDF
+            if glaseo_percentage:
+                glaseo_display = f"{glaseo_percentage}%"
+            elif glaseo_factor:
+                glaseo_display = f"{int(glaseo_factor * 100)}%"
+            else:
+                glaseo_display = "N/A"
             
             # Tabla de información general (multiidioma)
             info_data = [
@@ -154,7 +162,7 @@ class PDFGenerator:
                 [t["talla"], talla],
                 [t["cliente"], cliente],
                 [t["destino"], destino],
-                [t["glaseo_solicitado"], f"{glaseo_percentage}%" if glaseo_percentage else f"{int(glaseo_factor * 100)}%"]
+                [t["glaseo_solicitado"], glaseo_display]
             ]
             
             # Nota: Información de flete eliminada por solicitud del usuario
