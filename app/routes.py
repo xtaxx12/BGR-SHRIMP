@@ -310,6 +310,12 @@ Responde con el número o escribe:
 ¿Qué porcentaje de glaseo necesitas? 🤔"""
                         
                         response.message(glaseo_message)
+                        
+                        # Guardar el estado para esperar la respuesta del glaseo
+                        session_manager.set_session_state(user_id, 'waiting_for_glaseo', {
+                            'ai_query': ai_query
+                        })
+                        
                         return PlainTextResponse(str(response), media_type="application/xml")
                     else:
                         logger.error(f"❌ Error validando datos de proforma: {ai_query}")
@@ -585,6 +591,98 @@ Responde con el número o escribe:
                 response.message("🤔 Selección inválida. Por favor responde:\n\n1️⃣ Para Español\n2️⃣ Para English\n\nO escribe 'menu' para volver al inicio")
             
             return PlainTextResponse(str(response), media_type="application/xml")
+        
+        elif session['state'] == 'waiting_for_glaseo':
+            # Usuario está respondiendo con el porcentaje de glaseo
+            ai_query = session['data'].get('ai_query')
+            
+            if ai_query:
+                # Intentar extraer el porcentaje de glaseo del mensaje
+                glaseo_percentage = None
+                glaseo_factor = None
+                
+                # Patrones para detectar porcentaje de glaseo
+                import re
+                glaseo_patterns = [
+                    r'(\d+)\s*%',  # "20%"
+                    r'(\d+)\s*porciento',  # "20 porciento"
+                    r'(\d+)\s*por\s*ciento',  # "20 por ciento"
+                    r'^(\d+)$',  # Solo el número "20"
+                ]
+                
+                message_lower = Body.lower().strip()
+                for pattern in glaseo_patterns:
+                    match = re.search(pattern, message_lower)
+                    if match:
+                        glaseo_percentage = int(match.group(1))
+                        break
+                
+                # Convertir porcentaje a factor
+                if glaseo_percentage == 10:
+                    glaseo_factor = 0.90
+                elif glaseo_percentage == 20:
+                    glaseo_factor = 0.80
+                elif glaseo_percentage == 30:
+                    glaseo_factor = 0.70
+                elif glaseo_percentage:
+                    glaseo_factor = glaseo_percentage / 100
+                
+                if glaseo_factor:
+                    # Actualizar ai_query con el glaseo
+                    ai_query['glaseo_factor'] = glaseo_factor
+                    ai_query['glaseo_percentage'] = glaseo_percentage
+                    
+                    # Intentar calcular el precio con el glaseo
+                    price_info = pricing_service.get_shrimp_price(ai_query)
+                    
+                    if price_info:
+                        logger.debug(f"✅ Datos de proforma validados con glaseo {glaseo_percentage}%")
+                        
+                        # Guardar datos de la proforma y preguntar por idioma
+                        session_manager.set_session_state(user_id, 'waiting_for_proforma_language', {
+                            'price_info': price_info,
+                            'ai_query': ai_query
+                        })
+                        
+                        # Mostrar resumen y opciones de idioma
+                        product_name = price_info.get('producto', 'Camarón')
+                        size = price_info.get('talla', '')
+                        client_name = price_info.get('cliente_nombre', '')
+                        
+                        summary = f"📋 **Proforma lista para generar:**\n"
+                        summary += f"🦐 Producto: {product_name} {size}\n"
+                        summary += f"❄️ Glaseo: {glaseo_percentage}%\n"
+                        if client_name:
+                            summary += f"👤 Cliente: {client_name.title()}\n"
+                        
+                        language_message = f"""{summary}
+🌐 **Selecciona el idioma para la proforma:**
+
+1️⃣ Español 🇪🇸
+2️⃣ English 🇺🇸
+
+Responde con el número o escribe:
+• "español" o "spanish"  
+• "inglés" o "english" """
+                        
+                        response.message(language_message)
+                        return PlainTextResponse(str(response), media_type="application/xml")
+                    else:
+                        logger.error(f"❌ Error calculando precio con glaseo {glaseo_percentage}%")
+                        response.message("❌ Error procesando la solicitud. Intenta nuevamente.")
+                        session_manager.clear_session(user_id)
+                        return PlainTextResponse(str(response), media_type="application/xml")
+                else:
+                    # Glaseo no válido
+                    product = ai_query.get('product', 'producto')
+                    size = ai_query.get('size', 'talla')
+                    
+                    response.message(f"🤔 Porcentaje no válido. Por favor responde con:\n\n• **10** para 10% glaseo\n• **20** para 20% glaseo\n• **30** para 30% glaseo\n\nO escribe 'menu' para volver al inicio")
+                    return PlainTextResponse(str(response), media_type="application/xml")
+            else:
+                response.message("❌ Error: No se encontraron datos de la solicitud. Por favor intenta nuevamente.")
+                session_manager.clear_session(user_id)
+                return PlainTextResponse(str(response), media_type="application/xml")
         
         elif session['state'] == 'waiting_for_size_selection':
             # Usuario está seleccionando una talla
