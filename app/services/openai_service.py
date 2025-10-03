@@ -470,6 +470,25 @@ Formato de respuesta: texto directo sin JSON.
                         glaseo_factor = glaseo_percentage_original / 100  # Para otros valores
                     break
             
+            # Detectar valores numéricos de flete
+            flete_custom = None
+            flete_patterns = [
+                r'flete\s*(?:de\s*)?(?:\$\s*)?(\d+\.?\d*)',  # "flete de 0.20", "flete $0.20"
+                r'(\d+\.?\d*)\s*(?:centavos?\s*)?(?:de\s*)?flete',  # "0.20 centavos de flete"
+                r'con\s*(\d+\.?\d*)\s*(?:de\s*)?flete',  # "con 0.20 de flete"
+                r'freight\s*(?:of\s*)?(?:\$\s*)?(\d+\.?\d*)',  # "freight 0.20", "freight $0.20"
+                r'(\d+\.?\d*)\s*freight',  # "0.20 freight"
+            ]
+            
+            for pattern in flete_patterns:
+                match = re.search(pattern, message_lower)
+                if match:
+                    try:
+                        flete_custom = float(match.group(1))
+                        break
+                    except ValueError:
+                        continue
+            
             # Solo detectar destinos si se menciona flete explícitamente
             flete_keywords = ['flete', 'freight', 'envio', 'envío', 'shipping', 'transporte']
             menciona_flete = any(keyword in message_lower for keyword in flete_keywords)
@@ -605,6 +624,7 @@ Formato de respuesta: texto directo sin JSON.
                 "destination": destination,
                 "glaseo_factor": glaseo_factor,
                 "glaseo_percentage": glaseo_percentage_original,  # Porcentaje original solicitado
+                "flete_custom": flete_custom,  # Valor de flete personalizado detectado
                 "usar_libras": usar_libras,
                 "cliente_nombre": cliente_nombre,
                 "wants_proforma": True,
