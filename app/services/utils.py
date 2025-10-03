@@ -43,8 +43,14 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
     if not size:
         return None
     
-    # IMPORTANTE: Si no hay producto específico, NO asumir nada
-    # El usuario debe especificar el tipo de camarón
+    # Lógica inteligente: Si no hay producto pero la talla es exclusiva de HOSO, asumir HOSO
+    if not product and size:
+        # Tallas que solo existen en HOSO según la tabla de precios
+        hoso_exclusive_sizes = ['20/30', '30/40', '40/50', '50/60', '60/70', '70/80']
+        if size in hoso_exclusive_sizes:
+            product = 'HOSO'
+    
+    # Si aún no hay producto después de la lógica inteligente, pedir al usuario que especifique
     if not product:
         return None  # Esto hará que el bot pida al usuario que especifique el producto
     

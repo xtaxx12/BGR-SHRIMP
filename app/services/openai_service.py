@@ -351,7 +351,7 @@ Formato de respuesta: texto directo sin JSON.
             product_patterns = {
                 'HLSO': [
                     'sin cabeza', 'hlso', 'head less', 'headless', 'descabezado',
-                    'sin cabezas', 'decapitado', 'tipo sin cabeza'
+                    'sin cabezas', 'tipo sin cabeza', 'cola'
                 ],
                 'HOSO': [
                     'con cabeza', 'hoso', 'head on', 'entero', 'completo',
@@ -404,8 +404,15 @@ Formato de respuesta: texto directo sin JSON.
                             product = prod_name
                             break
             
-            # NO asumir producto por defecto - el usuario debe especificarlo
-            # Si menciona camarón genérico sin especificar tipo, se manejará en la validación
+            # Lógica inteligente: Si no se detectó producto pero hay talla específica de HOSO, asumir HOSO
+            if not product and size:
+                # Tallas que solo existen en HOSO según la tabla de precios
+                hoso_exclusive_sizes = ['20/30', '30/40', '40/50', '50/60', '60/70', '70/80']
+                if size in hoso_exclusive_sizes:
+                    product = 'HOSO'
+                    logger.info(f"🎯 Talla {size} es exclusiva de HOSO - asignando automáticamente")
+            
+            # NO asumir producto por defecto para otras tallas - el usuario debe especificarlo
             
             # Detectar tallas con patrones más amplios
             size_patterns = [
@@ -433,13 +440,18 @@ Formato de respuesta: texto directo sin JSON.
                 r'glaseo\s*(\d+)\s*%',
                 r'con\s*(\d+)\s*glaseo',
                 r'(\d+)\s*porciento\s*glaseo',
+                # Patrones adicionales para "al X%"
+                r'al\s*(\d+)\s*%',  # "al 20%"
+                r'(\d+)\s*%\s*de\s*glaseo',
+                r'(\d+)\s*%\s*glaseo',
                 # Patrones en inglés
                 r'(\d+)g?\s*(?:of\s*)?glaze',
                 r'glaze\s*(?:of\s*)?(\d+)g?',
                 r'(\d+)\s*%\s*glaze',
                 r'glaze\s*(\d+)\s*%',
                 r'with\s*(\d+)g?\s*glaze',
-                r'(\d+)\s*percent\s*glaze'
+                r'(\d+)\s*percent\s*glaze',
+                r'at\s*(\d+)\s*%'  # "at 20%"
             ]
             
             glaseo_percentage_original = None
