@@ -162,7 +162,8 @@ async def whatsapp_webhook(request: Request,
         
         # Análisis rápido de intención
         ai_analysis = openai_service._basic_intent_analysis(Body)
-        logger.debug(f"🔍 Análisis básico para {user_id}: {ai_analysis}")
+        logger.info(f"🔍 Análisis básico para {user_id}: {ai_analysis}")
+        logger.info(f"🔍 Intent: {ai_analysis.get('intent')}, Confidence: {ai_analysis.get('confidence')}, Product: {ai_analysis.get('product')}, Size: {ai_analysis.get('size')}")
         
         # Solo usar OpenAI para casos complejos (no para saludos simples)
         if (ai_analysis.get('confidence', 0) < 0.7 and 
@@ -187,6 +188,7 @@ async def whatsapp_webhook(request: Request,
         
         # PROCESAMIENTO PRIORITARIO DE PROFORMA
         # Si el análisis detecta una solicitud de proforma, preguntar por idioma primero
+        logger.info(f"🔍 Verificando condición proforma: intent={ai_analysis.get('intent')}, confidence={ai_analysis.get('confidence')}")
         if ai_analysis and ai_analysis.get('intent') == 'proforma' and ai_analysis.get('confidence', 0) > 0.7:
             logger.info(f"🎯 Solicitud de proforma detectada para {user_id}")
             ai_query = parse_ai_analysis_to_query(ai_analysis)
