@@ -495,15 +495,30 @@ Formato de respuesta: texto directo sin JSON.
             
             if menciona_flete:
                 destination_patterns = {
+                    # Ciudades USA
                     'Houston': ['houston', 'houton', 'huston'],
                     'Miami': ['miami', 'maiami', 'florida'],
                     'New York': ['new york', 'nueva york', 'ny', 'newyork'],
-                    'Los Angeles': ['los angeles', 'la', 'california'],
+                    'Los Angeles': ['los angeles', 'california'],  # Removido 'la' genérico
                     'Chicago': ['chicago', 'chicaco'],
                     'Dallas': ['dallas', 'dalas'],
+                    
+                    # Países y regiones
                     'China': ['china', 'beijing', 'shanghai'],
-                    'Europa': ['europa', 'europe', 'spain', 'italy', 'france'],
-                    'Japón': ['japon', 'japan', 'tokyo']
+                    'Japón': ['japon', 'japón', 'japan', 'tokyo', 'nippon'],
+                    'Europa': ['europa', 'europe', 'spain', 'italy', 'france', 'germany', 'alemania'],
+                    'Brasil': ['brasil', 'brazil', 'sao paulo', 'rio'],
+                    'México': ['mexico', 'méxico', 'guadalajara', 'monterrey'],
+                    'Canadá': ['canada', 'toronto', 'vancouver'],
+                    'Australia': ['australia', 'sydney', 'melbourne'],
+                    'Corea': ['corea', 'korea', 'seoul'],
+                    'India': ['india', 'mumbai', 'delhi'],
+                    'Tailandia': ['tailandia', 'thailand', 'bangkok'],
+                    'Vietnam': ['vietnam', 'ho chi minh'],
+                    'Singapur': ['singapur', 'singapore'],
+                    'Filipinas': ['filipinas', 'philippines', 'manila'],
+                    'Indonesia': ['indonesia', 'jakarta'],
+                    'Malasia': ['malasia', 'malaysia', 'kuala lumpur']
                 }
                 
                 # Buscar destinos USA solo si menciona flete
@@ -516,8 +531,37 @@ Formato de respuesta: texto directo sin JSON.
                         destination = dest_name
                         break
             
-            # También detectar patrones de envío (solo si ya menciona flete)
+            # También detectar patrones de envío específicos (solo si ya menciona flete)
             if menciona_flete and not destination:
+                # Patrones más específicos para detectar destinos
+                envio_specific_patterns = [
+                    r'flete\s+a\s+([a-záéíóúñ\w\s]+?)(?:\s+para|\s+con|\s+de|$)',  # "flete a japón"
+                    r'envio\s+a\s+([a-záéíóúñ\w\s]+?)(?:\s+para|\s+con|\s+de|$)',  # "envío a china"
+                    r'hacia\s+([a-záéíóúñ\w\s]+?)(?:\s+para|\s+con|\s+de|$)',      # "hacia europa"
+                    r'shipping\s+to\s+([a-zA-Z\s]+?)(?:\s+for|\s+with|$)',         # "shipping to japan"
+                ]
+                
+                for pattern in envio_specific_patterns:
+                    match = re.search(pattern, message_lower)
+                    if match:
+                        dest_detected = match.group(1).strip()
+                        
+                        # Verificar si coincide con algún destino conocido
+                        for dest_name, patterns in destination_patterns.items():
+                            if any(p in dest_detected for p in patterns):
+                                destination = dest_name
+                                # Configurar usar_libras según el destino
+                                if dest_name in ['Houston', 'Miami', 'New York', 'Los Angeles', 'Chicago', 'Dallas']:
+                                    usar_libras = True if dest_name != 'Houston' else False
+                                else:
+                                    usar_libras = False  # Países internacionales usan kilos
+                                break
+                        
+                        # Si no coincide con destinos conocidos, usar el texto detectado
+                        if not destination:
+                            destination = dest_detected.title()
+                            usar_libras = False  # Por defecto kilos para destinos desconocidos
+                        break
                 envio_patterns = [
                     r'flete a ([a-zA-Z\s]+)', r'envio a ([a-zA-Z\s]+)', r'enviar a ([a-zA-Z\s]+)', 
                     r'shipping to ([a-zA-Z\s]+)', r'con flete a ([a-zA-Z\s]+)'

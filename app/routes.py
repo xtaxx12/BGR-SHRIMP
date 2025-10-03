@@ -480,16 +480,6 @@ Responde con el número o escribe:
                             if price_info.get('destination'):
                                 confirmation_msg += f"🌍 Destino: {price_info['destination']}\n"
                             
-                            # Mostrar precio final
-                            if price_info.get('precio_final_kg'):
-                                destination = price_info.get('destination') or ''
-                                if destination.lower() == 'houston':
-                                    confirmation_msg += f"💰 Precio FOB: ${price_info['precio_final_kg']:.2f}/kg\n"
-                                else:
-                                    confirmation_msg += f"💰 Precio FOB: ${price_info['precio_final_kg']:.2f}/kg - ${price_info.get('precio_final_lb', 0):.2f}/lb\n"
-                            
-                            confirmation_msg += f"\n📄 **PDF enviado por WhatsApp**"
-                            
                             response.message(confirmation_msg)
                             
                             # Mensaje adicional sobre el flete si es CFR
