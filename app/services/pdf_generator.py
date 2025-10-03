@@ -66,11 +66,19 @@ class PDFGenerator:
             # === REGLAS DE NEGOCIO ===
             # Determinar si es FOB o CFR basado en si se solicitó flete
             flete_incluido = price_info.get('incluye_flete', False)
-            destino = price_info.get('destination', '')
+            destino_completo = price_info.get('destination', '')
+            
+            # Extraer solo el país del destino (antes de "Para")
+            if destino_completo and " para " in destino_completo.lower():
+                destino_pais = destino_completo.split(" para ")[0].strip()
+            elif destino_completo and " Para " in destino_completo:
+                destino_pais = destino_completo.split(" Para ")[0].strip()
+            else:
+                destino_pais = destino_completo
             
             # Crear título dinámico con destino para CFR
-            if flete_incluido and destino:
-                tipo_cotizacion = f"CFR A {destino.upper()}"
+            if flete_incluido and destino_pais:
+                tipo_cotizacion = f"CFR A {destino_pais.upper()}"
             elif flete_incluido:
                 tipo_cotizacion = "CFR"
             else:
@@ -133,7 +141,8 @@ class PDFGenerator:
             producto = price_info.get('producto', 'N/A')
             talla = price_info.get('talla', 'N/A')
             cliente = price_info.get('cliente_nombre', 'Cliente')
-            destino = price_info.get('destination', 'N/A')
+            # Usar solo el país para el destino en el PDF (ya calculado arriba)
+            destino = destino_pais if destino_pais else 'N/A'
             glaseo_factor = price_info.get('glaseo_factor', 0.7)
             glaseo_percentage = price_info.get('glaseo_percentage')  # Porcentaje original
             fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")

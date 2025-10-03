@@ -368,10 +368,13 @@ Responde con el número o escribe:
                         
                         # Mensaje adicional sobre el flete si es CFR
                         if quote_data.get('incluye_flete') and quote_data.get('flete'):
-                            flete_msg = f"\n💡 **Información del flete:**\n"
-                            flete_msg += f"La cotización se basó con flete de ${quote_data['flete']:.3f}/kg"
-                            if quote_data.get('destination'):
-                                flete_msg += f" hacia {quote_data['destination']}"
+                            flete_value = quote_data['flete']
+                            destination = quote_data.get('destination', '')
+                            
+                            flete_msg = f"💡 *Información del flete:*\n"
+                            flete_msg += f"La cotización se basó con flete de ${flete_value:.2f}"
+                            if destination:
+                                flete_msg += f" hacia {destination}"
                             flete_msg += f"\n\n📋 Precio CFR incluye: Producto + Glaseo + Flete"
                             
                             response.message(flete_msg)
@@ -491,10 +494,13 @@ Responde con el número o escribe:
                             
                             # Mensaje adicional sobre el flete si es CFR
                             if price_info.get('incluye_flete') and price_info.get('flete'):
-                                flete_msg = f"\n💡 **Información del flete:**\n"
-                                flete_msg += f"La cotización se basó con flete de ${price_info['flete']:.3f}/kg"
-                                if price_info.get('destination'):
-                                    flete_msg += f" hacia {price_info['destination']}"
+                                flete_value = price_info['flete']
+                                destination = price_info.get('destination', '')
+                                
+                                flete_msg = f"💡 *Información del flete:*\n"
+                                flete_msg += f"La cotización se basó con flete de ${flete_value:.2f}"
+                                if destination:
+                                    flete_msg += f" hacia {destination}"
                                 flete_msg += f"\n\n📋 Precio CFR incluye: Producto + Glaseo + Flete"
                                 
                                 response.message(flete_msg)

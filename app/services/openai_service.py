@@ -481,7 +481,10 @@ Formato de respuesta: texto directo sin JSON.
                     'New York': ['new york', 'nueva york', 'ny', 'newyork'],
                     'Los Angeles': ['los angeles', 'la', 'california'],
                     'Chicago': ['chicago', 'chicaco'],
-                    'Dallas': ['dallas', 'dalas']
+                    'Dallas': ['dallas', 'dalas'],
+                    'China': ['china', 'beijing', 'shanghai'],
+                    'Europa': ['europa', 'europe', 'spain', 'italy', 'france'],
+                    'Japón': ['japon', 'japan', 'tokyo']
                 }
                 
                 # Buscar destinos USA solo si menciona flete
