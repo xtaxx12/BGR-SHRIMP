@@ -72,15 +72,19 @@ class SessionManager:
     
     def clear_session(self, user_id: str):
         """
-        Limpia la sesión del usuario (preserva idioma)
+        Limpia la sesión del usuario (preserva idioma y última cotización)
         """
         if user_id in self.sessions:
-            # Preservar idioma al limpiar sesión
+            # Preservar idioma y última cotización al limpiar sesión
             language = self.sessions[user_id].get('language', 'es')
+            last_quote = self.sessions[user_id].get('last_quote')
             del self.sessions[user_id]
-            # Recrear sesión con idioma preservado
+            # Recrear sesión con datos preservados
             self.get_session(user_id)
             self.sessions[user_id]['language'] = language
+            if last_quote:
+                self.sessions[user_id]['last_quote'] = last_quote
+                logger.debug(f"Cotización preservada después de limpiar sesión para {user_id}")
     
     def _cleanup_expired_sessions(self, current_time: float):
         """
