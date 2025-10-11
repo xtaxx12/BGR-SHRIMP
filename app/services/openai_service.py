@@ -319,15 +319,22 @@ Formato de respuesta: texto directo sin JSON.
             }
         
         # Detectar solicitudes de modificación de flete
+        # IMPORTANTE: Solo detectar cuando hay verbos de modificación explícitos
+        # NO detectar solicitudes nuevas que incluyen flete
         modify_flete_patterns = [
-            r'modifica.*flete', r'cambiar.*flete', r'actualizar.*flete',
-            r'nuevo.*flete', r'otro.*flete', r'flete.*diferente',
-            r'modify.*freight', r'change.*freight', r'update.*freight',
-            r'con\s+flete\s+de', r'flete\s+a\s+\$?(\d+\.?\d*)',
-            r'flete\s+(\d+\.?\d*)', r'(\d+\.?\d*)\s+de\s+flete'
+            r'\bmodifica.*flete', r'\bcambiar.*flete', r'\bactualizar.*flete',
+            r'\bnuevo.*flete', r'\botro.*flete', r'\bflete.*diferente',
+            r'\bmodify.*freight', r'\bchange.*freight', r'\bupdate.*freight',
         ]
         
-        is_flete_modification = any(re.search(pattern, message_lower) for pattern in modify_flete_patterns)
+        # Verificar que NO sea una solicitud nueva de cotización/proforma
+        new_quote_keywords = ['cotizar', 'cotizacion', 'proforma', 'quote', 'quotation', 'contenedor']
+        is_new_quote = any(keyword in message_lower for keyword in new_quote_keywords)
+        
+        is_flete_modification = (
+            any(re.search(pattern, message_lower) for pattern in modify_flete_patterns) and
+            not is_new_quote  # NO es modificación si es una solicitud nueva
+        )
         
         if is_flete_modification:
             # Extraer el nuevo valor de flete
