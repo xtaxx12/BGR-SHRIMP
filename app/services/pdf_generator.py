@@ -267,6 +267,228 @@ class PDFGenerator:
             logger.error(f"❌ Error generando PDF: {str(e)}")
             return None
     
+    def generate_consolidated_quote_pdf(self, products_info: list, user_phone: str = None, language: str = "es", glaseo_percentage: int = 20, destination: str = None) -> str:
+        """
+        Genera un PDF consolidado con múltiples productos
+        
+        Args:
+            products_info: Lista de diccionarios con información de precios de cada producto
+            user_phone: Teléfono del usuario
+            language: Idioma del PDF
+            glaseo_percentage: Porcentaje de glaseo aplicado
+            destination: Destino de envío
+        """
+        try:
+            logger.info(f"📄 Generando PDF consolidado con {len(products_info)} productos")
+            
+            # Generar nombre único para el archivo
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            if user_phone:
+                cleaned_phone = user_phone.replace("+", "").replace(":", "")
+                phone_suffix = cleaned_phone[-4:] if len(cleaned_phone) >= 4 else cleaned_phone.zfill(4)
+            else:
+                phone_suffix = "0000"
+            filename = f"cotizacion_BGR_consolidada_{timestamp}_{phone_suffix}.pdf"
+            filepath = os.path.join(self.output_dir, filename)
+            
+            # Crear documento PDF
+            doc = SimpleDocTemplate(
+                filepath,
+                pagesize=letter,
+                rightMargin=0.5*inch,
+                leftMargin=0.5*inch,
+                topMargin=0.5*inch,
+                bottomMargin=0.5*inch
+            )
+            
+            # Contenedor para elementos del PDF
+            story = []
+            
+            # Colores corporativos
+            azul_marino = colors.HexColor('#1e3a8a')
+            naranja = colors.HexColor('#f97316')
+            
+            # === LOGO ===
+            logo_path = "app/static/logo_bgr.png"
+            if os.path.exists(logo_path):
+                logo = Image(logo_path, width=3*inch, height=0.8*inch)
+                logo.hAlign = 'CENTER'
+                story.append(logo)
+                story.append(Spacer(1, 0.3*inch))
+            
+            # === INFORMACIÓN GENERAL ===
+            styles = getSampleStyleSheet()
+            
+            # Traducciones
+            translations = {
+                "es": {
+                    "titulo": "COTIZACIÓN CONSOLIDADA",
+                    "fecha": "Fecha de Cotización",
+                    "destino": "Destino",
+                    "glaseo": "Glaseo Aplicado",
+                    "producto": "PRODUCTO",
+                    "talla": "TALLA",
+                    "precio_fob": "PRECIO FOB USD/KG",
+                    "precio_cfr": "PRECIO CFR USD/KG",
+                    "notas": "Notas:",
+                    "nota1": "• Precios sujetos a confirmación final",
+                    "nota2": f"• Glaseo aplicado: {glaseo_percentage}%",
+                    "nota3": "• Flete incluido en precio CFR",
+                    "contacto": "Contacto: BGR Export | amerino@bgrexport.com | +593 98-805-7425"
+                },
+                "en": {
+                    "titulo": "CONSOLIDATED QUOTATION",
+                    "fecha": "Quotation Date",
+                    "destino": "Destination",
+                    "glaseo": "Glaze Applied",
+                    "producto": "PRODUCT",
+                    "talla": "SIZE",
+                    "precio_fob": "FOB PRICE USD/KG",
+                    "precio_cfr": "CFR PRICE USD/KG",
+                    "notas": "Notes:",
+                    "nota1": "• Prices subject to final confirmation",
+                    "nota2": f"• Glaze applied: {glaseo_percentage}%",
+                    "nota3": "• Freight included in CFR price",
+                    "contacto": "Contact: BGR Export | amerino@bgrexport.com | +593 98-805-7425"
+                }
+            }
+            
+            t = translations.get(language, translations["es"])
+            
+            # Título
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=18,
+                textColor=azul_marino,
+                spaceAfter=20,
+                alignment=TA_CENTER,
+                fontName='Helvetica-Bold'
+            )
+            story.append(Paragraph(t["titulo"], title_style))
+            
+            # Información general
+            fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
+            info_data = [
+                [t["fecha"], fecha_actual],
+            ]
+            
+            if destination:
+                info_data.append([t["destino"], destination])
+            
+            info_data.append([t["glaseo"], f"{glaseo_percentage}%"])
+            
+            info_table = Table(info_data, colWidths=[2.5*inch, 4*inch])
+            info_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e5e7eb')),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+                ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ]))
+            story.append(info_table)
+            story.append(Spacer(1, 0.3*inch))
+            
+            # === TABLA DE PRODUCTOS ===
+            # Encabezados
+            table_data = [[
+                t["producto"],
+                t["talla"],
+                t["precio_fob"],
+                t["precio_cfr"]
+            ]]
+            
+            # Agregar cada producto
+            for product_info in products_info:
+                producto = product_info.get('producto', 'N/A')
+                talla = product_info.get('talla', 'N/A')
+                precio_fob = product_info.get('precio_fob_kg', 0)
+                precio_cfr = product_info.get('precio_final_kg', 0)
+                
+                table_data.append([
+                    producto,
+                    talla,
+                    f"${precio_fob:.2f}",
+                    f"${precio_cfr:.2f}"
+                ])
+            
+            # Crear tabla
+            products_table = Table(table_data, colWidths=[2*inch, 1.2*inch, 1.7*inch, 1.7*inch])
+            products_table.setStyle(TableStyle([
+                # Encabezado
+                ('BACKGROUND', (0, 0), (-1, 0), azul_marino),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 11),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                # Datos
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+                ('ALIGN', (0, 1), (0, -1), 'LEFT'),  # Producto
+                ('ALIGN', (1, 1), (1, -1), 'CENTER'),  # Talla
+                ('ALIGN', (2, 1), (-1, -1), 'RIGHT'),  # Precios
+                # Bordes y padding
+                ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+                ('TOPPADDING', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+                ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                # Alternar colores de filas
+                *[('BACKGROUND', (0, i), (-1, i), colors.HexColor('#f3f4f6')) 
+                  for i in range(2, len(table_data), 2)]
+            ]))
+            
+            story.append(products_table)
+            story.append(Spacer(1, 0.3*inch))
+            
+            # === NOTAS ===
+            notes_style = ParagraphStyle(
+                'Notes',
+                parent=styles['Normal'],
+                fontSize=9,
+                textColor=colors.black,
+                spaceAfter=5
+            )
+            
+            story.append(Paragraph(f"<b>{t['notas']}</b>", notes_style))
+            story.append(Paragraph(t['nota1'], notes_style))
+            story.append(Paragraph(t['nota2'], notes_style))
+            story.append(Paragraph(t['nota3'], notes_style))
+            story.append(Spacer(1, 0.2*inch))
+            
+            # === CONTACTO ===
+            contact_style = ParagraphStyle(
+                'Contact',
+                parent=styles['Normal'],
+                fontSize=8,
+                textColor=colors.grey,
+                alignment=TA_CENTER
+            )
+            story.append(Paragraph(t['contacto'], contact_style))
+            
+            # Generar PDF
+            doc.build(story)
+            
+            if os.path.exists(filepath):
+                logger.info(f"✅ PDF consolidado generado: {filepath}")
+                return filepath
+            else:
+                logger.error(f"❌ Error: PDF no se creó en {filepath}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"❌ Error generando PDF consolidado: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
     def get_language_options(self) -> str:
         """
         Retorna las opciones de idioma para el PDF

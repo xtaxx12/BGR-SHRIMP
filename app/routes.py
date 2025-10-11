@@ -280,6 +280,40 @@ Responde con el número o escribe:
                 if not ai_analysis.get('glaseo_percentage') and basic_glaseo_percentage:
                     ai_analysis['glaseo_percentage'] = basic_glaseo_percentage
         
+        # DETECTAR MÚLTIPLES PRODUCTOS PRIMERO
+        multiple_products = openai_service.detect_multiple_products(Body)
+        
+        if multiple_products and len(multiple_products) > 1:
+            logger.info(f"📋 Detectados {len(multiple_products)} productos en el mensaje")
+            
+            # Guardar productos detectados en la sesión
+            session_manager.set_session_state(user_id, 'waiting_for_multi_glaseo', {
+                'products': multiple_products,
+                'message': Body
+            })
+            
+            # Mostrar lista de productos detectados
+            products_list = "\n".join([f"   {i+1}. {p['product']} {p['size']}" 
+                                      for i, p in enumerate(multiple_products)])
+            
+            # Detectar destino si está en el mensaje
+            destination = ai_analysis.get('destination') if ai_analysis else None
+            destination_text = f"\n🌍 Destino: {destination}" if destination else ""
+            
+            multi_message = f"""📋 **Detecté {len(multiple_products)} productos para cotizar:**
+
+{products_list}{destination_text}
+
+❄️ **¿Qué glaseo necesitas para todos los productos?**
+• **10%** glaseo (factor 0.90)
+• **20%** glaseo (factor 0.80)
+• **30%** glaseo (factor 0.70)
+
+💡 Responde con el número: 10, 20 o 30"""
+            
+            response.message(multi_message)
+            return PlainTextResponse(str(response), media_type="application/xml")
+        
         # PROCESAMIENTO PRIORITARIO DE PROFORMA
         # Si el análisis detecta una solicitud de proforma, preguntar por idioma primero
         logger.info(f"🔍 Verificando condición proforma: intent={ai_analysis.get('intent')}, confidence={ai_analysis.get('confidence')}")
@@ -650,6 +684,172 @@ Responde con el número o escribe:
             else:
                 error_msg = "🤔 Opción no válida. Por favor selecciona:\n\n1️⃣ Consultar Precios\n2️⃣ Información de Productos\n3️⃣ Contacto Comercial\n\n💡 O escribe 'menu' para reiniciar"
                 response.message(error_msg)
+            return PlainTextResponse(str(response), media_type="application/xml")
+        
+        elif session['state'] == 'waiting_for_multi_glaseo':
+            # Usuario está respondiendo con el glaseo para múltiples productos
+            products = session['data'].get('products', [])
+            
+            if not products:
+                response.message("❌ Error: No se encontraron productos. Intenta nuevamente.")
+                session_manager.clear_session(user_id)
+                return PlainTextResponse(str(response), media_type="application/xml")
+            
+            # Extraer glaseo del mensaje
+            glaseo_percentage = None
+            glaseo_factor = None
+            
+            glaseo_patterns = [
+                r'(\d+)\s*%',
+                r'(\d+)\s*porciento',
+                r'^(\d+)$'
+            ]
+            
+            message_lower = Body.lower().strip()
+            for pattern in glaseo_patterns:
+                match = re.search(pattern, message_lower)
+                if match:
+                    glaseo_percentage = int(match.group(1))
+                    break
+            
+            # Convertir porcentaje a factor
+            if glaseo_percentage == 10:
+                glaseo_factor = 0.90
+            elif glaseo_percentage == 20:
+                glaseo_factor = 0.80
+            elif glaseo_percentage == 30:
+                glaseo_factor = 0.70
+            elif glaseo_percentage:
+                glaseo_factor = glaseo_percentage / 100
+            
+            if glaseo_factor:
+                logger.info(f"📊 Calculando precios para {len(products)} productos con glaseo {glaseo_percentage}%")
+                
+                # Calcular precios para todos los productos
+                products_info = []
+                failed_products = []
+                
+                for product_data in products:
+                    query = {
+                        'product': product_data['product'],
+                        'size': product_data['size'],
+                        'glaseo_factor': glaseo_factor,
+                        'glaseo_percentage': glaseo_percentage,
+                        'flete_custom': 0.15,  # Flete por defecto
+                        'flete_solicitado': True,
+                        'custom_calculation': True
+                    }
+                    
+                    price_info = pricing_service.get_shrimp_price(query)
+                    
+                    if price_info:
+                        products_info.append(price_info)
+                    else:
+                        failed_products.append(f"{product_data['product']} {product_data['size']}")
+                
+                if products_info:
+                    # Guardar para permitir modificaciones
+                    session_manager.set_session_state(user_id, 'waiting_for_multi_language', {
+                        'products_info': products_info,
+                        'glaseo_percentage': glaseo_percentage,
+                        'failed_products': failed_products
+                    })
+                    
+                    # Mostrar resumen
+                    success_count = len(products_info)
+                    total_count = len(products)
+                    
+                    summary = f"✅ **Precios calculados para {success_count}/{total_count} productos**\n\n"
+                    
+                    if failed_products:
+                        summary += f"⚠️ No se encontraron precios para:\n"
+                        for fp in failed_products:
+                            summary += f"   • {fp}\n"
+                        summary += "\n"
+                    
+                    summary += f"🌐 **Selecciona el idioma para la cotización consolidada:**\n\n"
+                    summary += f"1️⃣ Español 🇪🇸\n"
+                    summary += f"2️⃣ English 🇺🇸\n\n"
+                    summary += f"Responde con el número o escribe:\n"
+                    summary += f"• \"español\" o \"spanish\"\n"
+                    summary += f"• \"inglés\" o \"english\""
+                    
+                    response.message(summary)
+                else:
+                    response.message("❌ No se pudieron calcular precios para ningún producto. Verifica los productos y tallas.")
+                    session_manager.clear_session(user_id)
+                
+                return PlainTextResponse(str(response), media_type="application/xml")
+            else:
+                response.message("🤔 Porcentaje no válido. Por favor responde con:\n\n• **10** para 10% glaseo\n• **20** para 20% glaseo\n• **30** para 30% glaseo")
+                return PlainTextResponse(str(response), media_type="application/xml")
+        
+        elif session['state'] == 'waiting_for_multi_language':
+            # Usuario está seleccionando idioma para PDF consolidado
+            message_lower = Body.lower().strip()
+            
+            selected_language = None
+            if message_lower in ['1', 'español', 'spanish', 'es']:
+                selected_language = 'es'
+            elif message_lower in ['2', 'inglés', 'ingles', 'english', 'en']:
+                selected_language = 'en'
+            
+            if selected_language:
+                products_info = session['data'].get('products_info', [])
+                glaseo_percentage = session['data'].get('glaseo_percentage', 20)
+                failed_products = session['data'].get('failed_products', [])
+                
+                if products_info:
+                    # Guardar idioma
+                    session_manager.set_user_language(user_id, selected_language)
+                    
+                    # Generar PDF consolidado
+                    logger.info(f"📄 Generando PDF consolidado con {len(products_info)} productos")
+                    pdf_path = pdf_generator.generate_consolidated_quote_pdf(
+                        products_info,
+                        From,
+                        selected_language,
+                        glaseo_percentage,
+                        destination=None
+                    )
+                    
+                    if pdf_path:
+                        # Enviar PDF
+                        pdf_sent = whatsapp_sender.send_pdf_document(
+                            From,
+                            pdf_path,
+                            f"Cotización Consolidada BGR Export - {len(products_info)} productos"
+                        )
+                        
+                        if pdf_sent:
+                            lang_name = "Español 🇪🇸" if selected_language == 'es' else "English 🇺🇸"
+                            
+                            confirmation = f"✅ **Cotización consolidada generada**\n\n"
+                            confirmation += f"🌐 Idioma: {lang_name}\n"
+                            confirmation += f"📦 Productos: {len(products_info)}\n"
+                            confirmation += f"❄️ Glaseo: {glaseo_percentage}%\n"
+                            
+                            if failed_products:
+                                confirmation += f"\n⚠️ {len(failed_products)} producto(s) sin precio disponible\n"
+                            
+                            confirmation += f"\n📄 **PDF enviado por WhatsApp**"
+                            
+                            response.message(confirmation)
+                        else:
+                            filename = os.path.basename(pdf_path)
+                            base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
+                            download_url = f"{base_url}/webhook/download-pdf/{filename}"
+                            response.message(f"✅ Cotización generada\n📄 Descarga: {download_url}")
+                    else:
+                        response.message("❌ Error generando PDF. Intenta nuevamente.")
+                    
+                    session_manager.clear_session(user_id)
+                else:
+                    response.message("❌ No hay productos para generar PDF.")
+                    session_manager.clear_session(user_id)
+            else:
+                response.message("🤔 Selección inválida. Responde:\n\n1️⃣ Para Español\n2️⃣ Para English")
+            
             return PlainTextResponse(str(response), media_type="application/xml")
         
         elif session['state'] == 'waiting_for_proforma_language':

@@ -298,6 +298,66 @@ Formato de respuesta: texto directo sin JSON.
             logger.error(f"❌ Error en transcripción de audio: {str(e)}")
             return None
     
+    def detect_multiple_products(self, message: str) -> List[Dict]:
+        """
+        Detecta múltiples productos en un mensaje
+        Retorna lista de diccionarios con producto y talla
+        """
+        if not message:
+            return []
+        
+        message_upper = message.upper()
+        products_found = []
+        
+        # Patrones para productos
+        product_patterns = {
+            'HOSO': r'\bHOSO\b',
+            'HLSO': r'\bHLSO\b',
+            'P&D IQF': r'\b(?:P&D|PYD|P\s*&\s*D)\s*(?:IQF|TAIL\s*OFF)?\b',
+            'P&D BLOQUE': r'\b(?:P&D|PYD)\s*(?:BLOQUE|BLOCK)\b',
+            'EZ PEEL': r'\b(?:EZ\s*PEEL|EZPEEL)\b',  # Usar "EZ PEEL" con espacio como en Excel
+        }
+        
+        # Buscar todas las líneas del mensaje
+        lines = message_upper.split('\n')
+        
+        for line in lines:
+            line = line.strip()
+            if not line or len(line) < 5:
+                continue
+            
+            # Buscar talla en la línea (formato XX/XX o XX-XX)
+            size_match = re.search(r'(\d+)[/-](\d+)', line)
+            if not size_match:
+                continue
+            
+            size = f"{size_match.group(1)}/{size_match.group(2)}"
+            
+            # Buscar producto en la línea
+            product_found = None
+            for product_name, pattern in product_patterns.items():
+                if re.search(pattern, line):
+                    product_found = product_name
+                    break
+            
+            # Si no se encontró producto específico, intentar inferir
+            if not product_found:
+                # Si tiene "BLOCK" o "BLOQUE", es P&D BLOQUE
+                if 'BLOCK' in line or 'BLOQUE' in line:
+                    product_found = 'P&D BLOQUE'
+                # Si tiene "IQF", es P&D IQF
+                elif 'IQF' in line:
+                    product_found = 'P&D IQF'
+            
+            if product_found and size:
+                products_found.append({
+                    'product': product_found,
+                    'size': size,
+                    'line': line
+                })
+        
+        return products_found
+    
     def _basic_intent_analysis(self, message: str) -> Dict:
         """
         Análisis básico de intenciones sin IA como fallback
