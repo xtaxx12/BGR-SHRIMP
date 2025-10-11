@@ -318,6 +318,45 @@ Formato de respuesta: texto directo sin JSON.
                 "suggested_response": "Responder con saludo amigable y mostrar opciones"
             }
         
+        # Detectar solicitudes de modificación de flete
+        modify_flete_patterns = [
+            r'modifica.*flete', r'cambiar.*flete', r'actualizar.*flete',
+            r'nuevo.*flete', r'otro.*flete', r'flete.*diferente',
+            r'modify.*freight', r'change.*freight', r'update.*freight',
+            r'con\s+flete\s+de', r'flete\s+a\s+\$?(\d+\.?\d*)',
+            r'flete\s+(\d+\.?\d*)', r'(\d+\.?\d*)\s+de\s+flete'
+        ]
+        
+        is_flete_modification = any(re.search(pattern, message_lower) for pattern in modify_flete_patterns)
+        
+        if is_flete_modification:
+            # Extraer el nuevo valor de flete
+            flete_custom = None
+            flete_patterns = [
+                r'flete\s+a\s+(?:\$\s*)?(\d+\.?\d*)',  # "flete a 0.30"
+                r'flete\s*(?:de\s*)?(?:\$\s*)?(\d+\.?\d*)',
+                r'(\d+\.?\d*)\s*(?:centavos?\s*)?(?:de\s*)?flete',
+                r'con\s*(\d+\.?\d*)\s*(?:de\s*)?flete',
+                r'freight\s*(?:of\s*)?(?:\$\s*)?(\d+\.?\d*)',
+                r'(\d+\.?\d*)\s*freight',
+            ]
+            
+            for pattern in flete_patterns:
+                match = re.search(pattern, message_lower)
+                if match:
+                    try:
+                        flete_custom = float(match.group(1))
+                        break
+                    except ValueError:
+                        continue
+            
+            return {
+                "intent": "modify_flete",
+                "flete_custom": flete_custom,
+                "confidence": 0.9,
+                "suggested_response": "Modificar flete y regenerar proforma"
+            }
+        
         # Patrones de proforma/cotización (lenguaje natural amplio)
         proforma_patterns = [
             # Palabras clave directas

@@ -419,6 +419,99 @@ Responde con el número o escribe:
         # Comandos globales que funcionan desde cualquier estado
         message_lower = Body.lower().strip()
         
+        # DETECTAR MODIFICACIÓN DE FLETE (debe ir antes de otros comandos)
+        if ai_analysis and ai_analysis.get('intent') == 'modify_flete':
+            # Usuario quiere modificar el flete de la última proforma
+            last_quote = session_manager.get_last_quote(user_id)
+            
+            if last_quote:
+                new_flete = ai_analysis.get('flete_custom')
+                
+                if new_flete is not None:
+                    logger.info(f"🔄 Modificando flete de ${last_quote.get('flete', 0):.2f} a ${new_flete:.2f}")
+                    
+                    # Recalcular la proforma con el nuevo flete
+                    # Obtener los datos originales de la consulta
+                    product = last_quote.get('producto')
+                    size = last_quote.get('talla')
+                    glaseo_factor = last_quote.get('factor_glaseo')
+                    glaseo_percentage = last_quote.get('glaseo_percentage')
+                    cliente_nombre = last_quote.get('cliente_nombre')
+                    destination = last_quote.get('destination')
+                    usar_libras = last_quote.get('usar_libras', False)
+                    
+                    # Crear nueva consulta con el flete modificado
+                    modified_query = {
+                        'product': product,
+                        'size': size,
+                        'glaseo_factor': glaseo_factor,
+                        'glaseo_percentage': glaseo_percentage,
+                        'flete_custom': new_flete,
+                        'flete_solicitado': True,
+                        'cliente_nombre': cliente_nombre,
+                        'destination': destination,
+                        'usar_libras': usar_libras,
+                        'custom_calculation': True
+                    }
+                    
+                    # Recalcular precio con nuevo flete
+                    new_price_info = pricing_service.get_shrimp_price(modified_query)
+                    
+                    if new_price_info:
+                        # Guardar la nueva cotización
+                        session_manager.set_last_quote(user_id, new_price_info)
+                        
+                        # Obtener idioma del usuario
+                        user_language = session_manager.get_user_language(user_id)
+                        
+                        # Generar nuevo PDF automáticamente
+                        logger.info(f"📄 Regenerando PDF con nuevo flete ${new_flete:.2f}")
+                        pdf_path = pdf_generator.generate_quote_pdf(new_price_info, From, user_language)
+                        
+                        if pdf_path:
+                            # Enviar mensaje de confirmación
+                            old_flete = last_quote.get('flete', 0)
+                            confirmation_msg = f"✅ **Proforma actualizada**\n\n"
+                            confirmation_msg += f"🔄 Flete modificado:\n"
+                            confirmation_msg += f"   • Anterior: ${old_flete:.2f}\n"
+                            confirmation_msg += f"   • Nuevo: ${new_flete:.2f}\n\n"
+                            confirmation_msg += f"📄 Generando nueva proforma..."
+                            
+                            response.message(confirmation_msg)
+                            
+                            # Intentar enviar el PDF por WhatsApp
+                            pdf_sent = whatsapp_sender.send_pdf_document(
+                                From, 
+                                pdf_path, 
+                                f"📄 Proforma actualizada con flete de ${new_flete:.2f}\n\n💼 Documento válido para procesos comerciales."
+                            )
+                            
+                            if pdf_sent:
+                                logger.debug(f"✅ PDF actualizado enviado por WhatsApp: {pdf_path}")
+                            else:
+                                # Enviar via TwiML como respaldo
+                                filename = os.path.basename(pdf_path)
+                                base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
+                                download_url = f"{base_url}/webhook/download-pdf/{filename}"
+                                
+                                pdf_message = response.message()
+                                pdf_message.body(f"📄 Proforma actualizada con flete de ${new_flete:.2f}")
+                                pdf_message.media(download_url)
+                            
+                            return PlainTextResponse(str(response), media_type="application/xml")
+                        else:
+                            response.message("❌ Error generando el PDF actualizado. Intenta nuevamente.")
+                            return PlainTextResponse(str(response), media_type="application/xml")
+                    else:
+                        response.message("❌ Error recalculando la proforma. Intenta nuevamente.")
+                        return PlainTextResponse(str(response), media_type="application/xml")
+                else:
+                    response.message("🤔 Por favor especifica el nuevo valor del flete.\n\n💡 Ejemplo: 'modifica el flete a 0.30' o 'cambiar flete 0.25'")
+                    return PlainTextResponse(str(response), media_type="application/xml")
+            else:
+                response.message("❌ No hay proforma previa para modificar.\n\n💡 Primero genera una proforma y luego podrás modificar el flete.")
+                return PlainTextResponse(str(response), media_type="application/xml")
+        
         # Comando para seleccionar idioma
         if message_lower in ['idioma', 'language', 'lang', 'cambiar idioma']:
             language_message = """🌐 **Selecciona el idioma para las proformas:**
@@ -600,6 +693,12 @@ Responde con el número o escribe:
                         session_manager.clear_session(user_id)
                         return PlainTextResponse(str(response), media_type="application/xml")
                     
+                    # Guardar la cotización para permitir modificaciones posteriores
+                    session_manager.set_last_quote(user_id, price_info)
+                    
+                    # Guardar el idioma del usuario
+                    session_manager.set_user_language(user_id, selected_language)
+                    
                     # Generar PDF en el idioma seleccionado
                     logger.info(f"📄 Generando PDF para usuario {user_id} en idioma {selected_language}")
                     pdf_path = pdf_generator.generate_quote_pdf(price_info, From, selected_language)
@@ -648,6 +747,9 @@ Responde con el número o escribe:
                                 if destination:
                                     flete_msg += f" hacia {destination}"
                                 flete_msg += f"\n\n📋 Precio CFR incluye: Producto + Glaseo + Flete"
+                                flete_msg += f"\n\n🔄 *¿Necesitas cambiar el flete?*"
+                                flete_msg += f"\nEscribe: 'modifica el flete a [valor]'"
+                                flete_msg += f"\nEjemplo: 'modifica el flete a 0.30'"
                                 
                                 response.message(flete_msg)
                         else:
