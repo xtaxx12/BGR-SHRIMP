@@ -699,6 +699,18 @@ Responde con el número o escribe:
                     # Guardar el idioma del usuario
                     session_manager.set_user_language(user_id, selected_language)
                     
+                    # Debug: Verificar datos antes de generar PDF
+                    logger.info(f"🔍 ROUTES - Datos antes de generar PDF:")
+                    logger.info(f"   - Producto: {price_info.get('producto')}")
+                    logger.info(f"   - Talla: {price_info.get('talla')}")
+                    logger.info(f"   - Precio base: ${price_info.get('precio_kg', 0):.2f}")
+                    logger.info(f"   - Precio FOB: ${price_info.get('precio_fob_kg', 0):.2f}")
+                    logger.info(f"   - Precio glaseo: ${price_info.get('precio_glaseo_kg', 0):.2f}")
+                    logger.info(f"   - Precio FOB+glaseo: ${price_info.get('precio_fob_con_glaseo_kg', 0):.2f}")
+                    logger.info(f"   - Precio CFR final: ${price_info.get('precio_final_kg', 0):.2f}")
+                    logger.info(f"   - Flete: ${price_info.get('flete', 0):.2f}")
+                    logger.info(f"   - Factor glaseo: {price_info.get('factor_glaseo', 0)}")
+                    
                     # Generar PDF en el idioma seleccionado
                     logger.info(f"📄 Generando PDF para usuario {user_id} en idioma {selected_language}")
                     pdf_path = pdf_generator.generate_quote_pdf(price_info, From, selected_language)
