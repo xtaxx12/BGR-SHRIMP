@@ -356,6 +356,13 @@ Responde con el número o escribe:
                         'glaseo_percentage': glaseo_percentage,
                         'failed_products': failed_products
                     })
+                    # Guardar como última cotización consolidada para permitir modificación de flete
+                    session_manager.set_last_quote(user_id, {
+                        'consolidated': True,
+                        'products_info': products_info,
+                        'glaseo_percentage': glaseo_percentage,
+                        'failed_products': failed_products
+                    })
                     
                     # Mostrar resumen y pedir idioma
                     success_count = len(products_info)
@@ -587,8 +594,77 @@ Responde con el número o escribe:
                     }
                     
                     # Recalcular precio con nuevo flete
+                    # Si la última cotización es consolidada, recalcular todos los productos
+                    if last_quote.get('consolidated') and last_quote.get('products_info'):
+                        logger.info("🔄 Recalculando cotización consolidada con nuevo flete")
+                        products = last_quote.get('products_info', [])
+                        recalculated = []
+                        failed = []
+                        for p in products:
+                            try:
+                                query = {
+                                    'product': p.get('producto') or p.get('product'),
+                                    'size': p.get('talla') or p.get('size'),
+                                    'glaseo_factor': p.get('factor_glaseo') or p.get('glaseo_factor'),
+                                    'glaseo_percentage': p.get('glaseo_percentage'),
+                                    'flete_custom': new_flete,
+                                    'flete_solicitado': True,
+                                    'custom_calculation': True
+                                }
+                                price = pricing_service.get_shrimp_price(query)
+                                if price:
+                                    recalculated.append(price)
+                                else:
+                                    failed.append(f"{p.get('product', p.get('producto'))} {p.get('size', p.get('talla'))}")
+                            except Exception as e:
+                                logger.error(f"❌ Error recalculando producto {p}: {e}")
+                                failed.append(str(p))
+
+                        if recalculated:
+                            # Guardar la nueva cotización consolidada como last_quote
+                            new_last = {
+                                'consolidated': True,
+                                'products_info': recalculated,
+                                'glaseo_percentage': last_quote.get('glaseo_percentage'),
+                                'failed_products': failed,
+                                'flete': new_flete
+                            }
+                            session_manager.set_last_quote(user_id, new_last)
+
+                            # Obtener idioma del usuario
+                            user_language = session_manager.get_user_language(user_id)
+
+                            # Generar PDF consolidado
+                            logger.info(f"📄 Regenerando PDF consolidado con nuevo flete ${new_flete:.2f}")
+                            pdf_path = pdf_generator.generate_consolidated_quote_pdf(
+                                recalculated,
+                                From,
+                                user_language,
+                                last_quote.get('glaseo_percentage')
+                            )
+
+                            if pdf_path:
+                                response.message(f"✅ Cotización consolidada actualizada con nuevo flete ${new_flete:.2f} - Generando PDF...")
+                                pdf_sent = whatsapp_sender.send_pdf_document(From, pdf_path, f"Cotización consolidada actualizada - flete ${new_flete:.2f}")
+                                if not pdf_sent:
+                                    filename = os.path.basename(pdf_path)
+                                    base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
+                                    download_url = f"{base_url}/webhook/download-pdf/{filename}"
+                                    pdf_message = response.message()
+                                    pdf_message.body("📄 Cotización consolidada actualizada")
+                                    pdf_message.media(download_url)
+
+                                return PlainTextResponse(str(response), media_type="application/xml")
+                            else:
+                                response.message("❌ Error generando el PDF consolidado actualizado. Intenta nuevamente.")
+                                return PlainTextResponse(str(response), media_type="application/xml")
+                        else:
+                            response.message("❌ No se pudieron recalcular precios para los productos con el nuevo flete.")
+                            return PlainTextResponse(str(response), media_type="application/xml")
+
+                    # Si no es consolidada, comportamiento por producto individual
                     new_price_info = pricing_service.get_shrimp_price(modified_query)
-                    
+
                     if new_price_info:
                         # Guardar la nueva cotización
                         session_manager.set_last_quote(user_id, new_price_info)
