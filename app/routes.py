@@ -294,8 +294,8 @@ Responde con el número o escribe:
             logger.info(f"🔍 Glaseo detectado en análisis: factor={glaseo_factor}, percentage={glaseo_percentage}")
             logger.info(f"🔍 Mensaje completo: {Body}")
             
-            # Si no se detectó glaseo en el análisis, intentar detectarlo manualmente
-            if not glaseo_factor or not glaseo_percentage:
+            # Si no se detectó glaseo en el análisis, o si el glaseo detectado no es válido (10, 20, 30), intentar detectarlo manualmente
+            if not glaseo_factor or not glaseo_percentage or glaseo_percentage not in [10, 20, 30]:
                 message_lower = Body.lower()
                 glaseo_patterns = [
                     r'al\s*(\d+)\s*%',
