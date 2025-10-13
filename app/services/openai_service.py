@@ -753,15 +753,10 @@ Formato de respuesta: texto directo sin JSON.
                 match = re.search(pattern, message_lower)
                 if match:
                     glaseo_percentage_original = int(match.group(1))
-                    # Convertir porcentaje a factor según reglas del negocio
-                    if glaseo_percentage_original == 10:
-                        glaseo_factor = 0.90
-                    elif glaseo_percentage_original == 20:
-                        glaseo_factor = 0.80
-                    elif glaseo_percentage_original == 30:
-                        glaseo_factor = 0.70
-                    else:
-                        glaseo_factor = glaseo_percentage_original / 100  # Para otros valores
+                    # Convertir porcentaje a factor usando fórmula general
+                    # Factor = 1 - (percentage / 100)
+                    # Ejemplo: 15% glaseo → factor = 1 - 0.15 = 0.85
+                    glaseo_factor = 1 - (glaseo_percentage_original / 100)
                     break
             
             # Detectar valores numéricos de flete

@@ -25,6 +25,19 @@ from typing import Set
 
 logger = logging.getLogger(__name__)
 
+def glaseo_percentage_to_factor(percentage: int) -> float:
+    """
+    Convierte porcentaje de glaseo a factor
+    Fórmula: Factor = 1 - (percentage / 100)
+    
+    Ejemplos:
+    - 10% glaseo → factor = 1 - 0.10 = 0.90
+    - 15% glaseo → factor = 1 - 0.15 = 0.85
+    - 20% glaseo → factor = 1 - 0.20 = 0.80
+    - 25% glaseo → factor = 1 - 0.25 = 0.75
+    """
+    return 1 - (percentage / 100)
+
 
 def _detect_language(message: str, ai_analysis: dict = None) -> str:
     """Detecta idioma preferido del usuario.
@@ -210,15 +223,9 @@ async def whatsapp_webhook(request: Request,
                         glaseo_percentage = int(match.group(1))
                         break
                 
-                # Convertir porcentaje a factor
-                if glaseo_percentage == 10:
-                    glaseo_factor = 0.90
-                elif glaseo_percentage == 20:
-                    glaseo_factor = 0.80
-                elif glaseo_percentage == 30:
-                    glaseo_factor = 0.70
-                elif glaseo_percentage:
-                    glaseo_factor = glaseo_percentage / 100
+                # Convertir porcentaje a factor usando función helper
+                if glaseo_percentage:
+                    glaseo_factor = glaseo_percentage_to_factor(glaseo_percentage)
                 
                 if glaseo_factor:
                     # Actualizar ai_query con el glaseo
@@ -477,14 +484,7 @@ async def whatsapp_webhook(request: Request,
                     match = re.search(pattern, message_lower)
                     if match:
                         glaseo_percentage = int(match.group(1))
-                        if glaseo_percentage == 10:
-                            glaseo_factor = 0.90
-                        elif glaseo_percentage == 20:
-                            glaseo_factor = 0.80
-                        elif glaseo_percentage == 30:
-                            glaseo_factor = 0.70
-                        else:
-                            glaseo_factor = glaseo_percentage / 100
+                        glaseo_factor = glaseo_percentage_to_factor(glaseo_percentage)
                         logger.info(f"✅ Glaseo detectado manualmente: {glaseo_percentage}% (factor {glaseo_factor})")
                         break
             
@@ -1057,15 +1057,9 @@ Responde con el número o escribe:
                         glaseo_percentage = int(match.group(1))
                         break
                 
-                # Convertir porcentaje a factor
-                if glaseo_percentage == 10:
-                    glaseo_factor = 0.90
-                elif glaseo_percentage == 20:
-                    glaseo_factor = 0.80
-                elif glaseo_percentage == 30:
-                    glaseo_factor = 0.70
-                elif glaseo_percentage:
-                    glaseo_factor = glaseo_percentage / 100
+                # Convertir porcentaje a factor usando función helper
+                if glaseo_percentage:
+                    glaseo_factor = glaseo_percentage_to_factor(glaseo_percentage)
                 
                 if glaseo_factor:
                     logger.info(f"📊 Calculando precios para {len(products)} productos con glaseo {glaseo_percentage}%")
