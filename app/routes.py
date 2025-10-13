@@ -291,6 +291,35 @@ Responde con el número o escribe:
             glaseo_factor = ai_analysis.get('glaseo_factor') if ai_analysis else None
             glaseo_percentage = ai_analysis.get('glaseo_percentage') if ai_analysis else None
             
+            logger.info(f"🔍 Glaseo detectado en análisis: factor={glaseo_factor}, percentage={glaseo_percentage}")
+            logger.info(f"🔍 Mensaje completo: {Body}")
+            
+            # Si no se detectó glaseo en el análisis, intentar detectarlo manualmente
+            if not glaseo_factor or not glaseo_percentage:
+                message_lower = Body.lower()
+                glaseo_patterns = [
+                    r'al\s*(\d+)\s*%',
+                    r'(\d+)\s*%\s*glaseo',
+                    r'glaseo\s*(\d+)\s*%',
+                    r'con\s*(\d+)\s*glaseo',
+                    r'(\d+)\s*(?:de\s*)?glaseo',
+                ]
+                
+                for pattern in glaseo_patterns:
+                    match = re.search(pattern, message_lower)
+                    if match:
+                        glaseo_percentage = int(match.group(1))
+                        if glaseo_percentage == 10:
+                            glaseo_factor = 0.90
+                        elif glaseo_percentage == 20:
+                            glaseo_factor = 0.80
+                        elif glaseo_percentage == 30:
+                            glaseo_factor = 0.70
+                        else:
+                            glaseo_factor = glaseo_percentage / 100
+                        logger.info(f"✅ Glaseo detectado manualmente: {glaseo_percentage}% (factor {glaseo_factor})")
+                        break
+            
             if glaseo_factor and glaseo_percentage:
                 # El usuario ya especificó el glaseo, procesar directamente
                 logger.info(f"✅ Glaseo detectado en mensaje: {glaseo_percentage}%")
