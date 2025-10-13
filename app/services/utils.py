@@ -1,5 +1,69 @@
 import re
-from typing import Dict, Optional
+from typing import Dict, Optional, List
+import logging
+
+logger = logging.getLogger(__name__)
+
+def parse_multiple_products(message: str) -> Optional[List[Dict]]:
+    """
+    Detecta y extrae múltiples productos del mensaje
+    Retorna una lista de diccionarios con producto y talla
+    """
+    if not message:
+        return None
+    
+    message_upper = message.upper()
+    products_found = []
+    
+    # Patrones para productos
+    product_patterns = {
+        'HOSO': r'\bHOSO\b',
+        'HLSO': r'\bHLSO\b',
+        'P&D IQF': r'\b(?:P&D|PYD|P\s*&\s*D)\s*(?:IQF|TAIL\s*OFF)?\b',
+        'P&D BLOQUE': r'\b(?:P&D|PYD)\s*(?:BLOQUE|BLOCK)\b',
+        'EZPEEL': r'\b(?:EZ\s*PEEL|EZPEEL)\b',
+        'EZ PEEL': r'\b(?:EZ\s*PEEL|EZPEEL)\b',
+    }
+    
+    # Buscar todas las líneas del mensaje
+    lines = message_upper.split('\n')
+    
+    for line in lines:
+        line = line.strip()
+        if not line or len(line) < 5:
+            continue
+        
+        # Buscar talla en la línea (formato XX/XX o XX-XX)
+        size_match = re.search(r'(\d+)[/-](\d+)', line)
+        if not size_match:
+            continue
+        
+        size = f"{size_match.group(1)}/{size_match.group(2)}"
+        
+        # Buscar producto en la línea
+        product_found = None
+        for product_name, pattern in product_patterns.items():
+            if re.search(pattern, line):
+                product_found = product_name
+                break
+        
+        # Si no se encontró producto específico, intentar inferir
+        if not product_found:
+            # Si tiene "BLOCK" o "BLOQUE", es P&D BLOQUE
+            if 'BLOCK' in line or 'BLOQUE' in line:
+                product_found = 'P&D BLOQUE'
+            # Si tiene "IQF", es P&D IQF
+            elif 'IQF' in line:
+                product_found = 'P&D IQF'
+        
+        if product_found and size:
+            products_found.append({
+                'product': product_found,
+                'size': size,
+                'line': line
+            })
+    
+    return products_found if products_found else None
 
 def parse_user_message(message: str) -> Optional[Dict]:
     """
@@ -241,7 +305,7 @@ def format_price_response(price_info: Dict) -> str:
                 if is_houston:
                     response += f"   • ${price_info['precio_final_kg']:.2f}/kg\n\n"
                 else:
-                    response += f"   • ${price_info['precio_final_kg']:.2f}/kg - ${price_info['precio_final_lb']:.2f}/lb\n\n"
+                    response += f"   • ${price_info['precio_final_kg']  :.2f}/kg - ${price_info['precio_final_lb']:.2f}/lb\n\n"
         else:
             # Mostrar solo precio con glaseo (sin flete)
             if 'precio_glaseo_kg' in price_info:
