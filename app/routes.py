@@ -171,9 +171,8 @@ async def whatsapp_webhook(request: Request,
                 # Intentar extraer el porcentaje de glaseo del mensaje
                 glaseo_percentage = None
                 glaseo_factor = None
-                
+
                 # Patrones para detectar porcentaje de glaseo
-                import re
                 glaseo_patterns = [
                     r'(\d+)\s*%',  # "20%"
                     r'(\d+)\s*porciento',  # "20 porciento"
