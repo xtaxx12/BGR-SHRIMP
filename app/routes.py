@@ -287,21 +287,90 @@ Responde con el número o escribe:
         if multiple_products and len(multiple_products) > 1:
             logger.info(f"📋 Detectados {len(multiple_products)} productos en el mensaje")
             
-            # Guardar productos detectados en la sesión
-            session_manager.set_session_state(user_id, 'waiting_for_multi_glaseo', {
-                'products': multiple_products,
-                'message': Body
-            })
+            # Verificar si el usuario ya especificó el glaseo en el mensaje
+            glaseo_factor = ai_analysis.get('glaseo_factor') if ai_analysis else None
+            glaseo_percentage = ai_analysis.get('glaseo_percentage') if ai_analysis else None
             
-            # Mostrar lista de productos detectados
-            products_list = "\n".join([f"   {i+1}. {p['product']} {p['size']}" 
-                                      for i, p in enumerate(multiple_products)])
-            
-            # Detectar destino si está en el mensaje
-            destination = ai_analysis.get('destination') if ai_analysis else None
-            destination_text = f"\n🌍 Destino: {destination}" if destination else ""
-            
-            multi_message = f"""📋 **Detecté {len(multiple_products)} productos para cotizar:**
+            if glaseo_factor and glaseo_percentage:
+                # El usuario ya especificó el glaseo, procesar directamente
+                logger.info(f"✅ Glaseo detectado en mensaje: {glaseo_percentage}%")
+                
+                # Calcular precios para todos los productos
+                products_info = []
+                failed_products = []
+                
+                for product_data in multiple_products:
+                    try:
+                        query = {
+                            'product': product_data['product'],
+                            'size': product_data['size'],
+                            'glaseo_factor': glaseo_factor,
+                            'glaseo_percentage': glaseo_percentage,
+                            'flete_custom': 0.15,
+                            'flete_solicitado': True,
+                            'custom_calculation': True
+                        }
+                        
+                        price_info = pricing_service.get_shrimp_price(query)
+                        
+                        if price_info:
+                            products_info.append(price_info)
+                        else:
+                            failed_products.append(f"{product_data['product']} {product_data['size']}")
+                    except Exception as e:
+                        logger.error(f"❌ Error calculando precio para {product_data['product']} {product_data['size']}: {str(e)}")
+                        failed_products.append(f"{product_data['product']} {product_data['size']}")
+                
+                if products_info:
+                    # Guardar para selección de idioma
+                    session_manager.set_session_state(user_id, 'waiting_for_multi_language', {
+                        'products_info': products_info,
+                        'glaseo_percentage': glaseo_percentage,
+                        'failed_products': failed_products
+                    })
+                    
+                    # Mostrar resumen y pedir idioma
+                    success_count = len(products_info)
+                    total_count = len(multiple_products)
+                    
+                    summary = f"✅ **Precios calculados para {success_count}/{total_count} productos**\n"
+                    summary += f"❄️ Glaseo: {glaseo_percentage}%\n\n"
+                    
+                    if failed_products:
+                        summary += f"⚠️ No se encontraron precios para:\n"
+                        for fp in failed_products:
+                            summary += f"   • {fp}\n"
+                        summary += "\n"
+                    
+                    summary += f"🌐 **Selecciona el idioma para la cotización consolidada:**\n\n"
+                    summary += f"1️⃣ Español 🇪🇸\n"
+                    summary += f"2️⃣ English 🇺🇸\n\n"
+                    summary += f"Responde con el número o escribe:\n"
+                    summary += f"• \"español\" o \"spanish\"\n"
+                    summary += f"• \"inglés\" o \"english\""
+                    
+                    response.message(summary)
+                else:
+                    response.message("❌ No se pudieron calcular precios para ningún producto. Verifica los productos y tallas.")
+                    session_manager.clear_session(user_id)
+                
+                return PlainTextResponse(str(response), media_type="application/xml")
+            else:
+                # No especificó glaseo, pedirlo
+                session_manager.set_session_state(user_id, 'waiting_for_multi_glaseo', {
+                    'products': multiple_products,
+                    'message': Body
+                })
+                
+                # Mostrar lista de productos detectados
+                products_list = "\n".join([f"   {i+1}. {p['product']} {p['size']}" 
+                                          for i, p in enumerate(multiple_products)])
+                
+                # Detectar destino si está en el mensaje
+                destination = ai_analysis.get('destination') if ai_analysis else None
+                destination_text = f"\n🌍 Destino: {destination}" if destination else ""
+                
+                multi_message = f"""📋 **Detecté {len(multiple_products)} productos para cotizar:**
 
 {products_list}{destination_text}
 
@@ -311,9 +380,9 @@ Responde con el número o escribe:
 • **30%** glaseo (factor 0.70)
 
 💡 Responde con el número: 10, 20 o 30"""
-            
-            response.message(multi_message)
-            return PlainTextResponse(str(response), media_type="application/xml")
+                
+                response.message(multi_message)
+                return PlainTextResponse(str(response), media_type="application/xml")
         
         # PROCESAMIENTO PRIORITARIO DE PROFORMA
         # Si el análisis detecta una solicitud de proforma, preguntar por idioma primero
