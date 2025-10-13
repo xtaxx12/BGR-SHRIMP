@@ -688,100 +688,113 @@ Responde con el número o escribe:
         
         elif session['state'] == 'waiting_for_multi_glaseo':
             # Usuario está respondiendo con el glaseo para múltiples productos
-            products = session['data'].get('products', [])
-            
-            if not products:
-                response.message("❌ Error: No se encontraron productos. Intenta nuevamente.")
-                session_manager.clear_session(user_id)
-                return PlainTextResponse(str(response), media_type="application/xml")
-            
-            # Extraer glaseo del mensaje
-            glaseo_percentage = None
-            glaseo_factor = None
-            
-            glaseo_patterns = [
-                r'(\d+)\s*%',
-                r'(\d+)\s*porciento',
-                r'^(\d+)$'
-            ]
-            
-            message_lower = Body.lower().strip()
-            for pattern in glaseo_patterns:
-                match = re.search(pattern, message_lower)
-                if match:
-                    glaseo_percentage = int(match.group(1))
-                    break
-            
-            # Convertir porcentaje a factor
-            if glaseo_percentage == 10:
-                glaseo_factor = 0.90
-            elif glaseo_percentage == 20:
-                glaseo_factor = 0.80
-            elif glaseo_percentage == 30:
-                glaseo_factor = 0.70
-            elif glaseo_percentage:
-                glaseo_factor = glaseo_percentage / 100
-            
-            if glaseo_factor:
-                logger.info(f"📊 Calculando precios para {len(products)} productos con glaseo {glaseo_percentage}%")
+            try:
+                products = session['data'].get('products', [])
                 
-                # Calcular precios para todos los productos
-                products_info = []
-                failed_products = []
-                
-                for product_data in products:
-                    query = {
-                        'product': product_data['product'],
-                        'size': product_data['size'],
-                        'glaseo_factor': glaseo_factor,
-                        'glaseo_percentage': glaseo_percentage,
-                        'flete_custom': 0.15,  # Flete por defecto
-                        'flete_solicitado': True,
-                        'custom_calculation': True
-                    }
-                    
-                    price_info = pricing_service.get_shrimp_price(query)
-                    
-                    if price_info:
-                        products_info.append(price_info)
-                    else:
-                        failed_products.append(f"{product_data['product']} {product_data['size']}")
-                
-                if products_info:
-                    # Guardar para permitir modificaciones
-                    session_manager.set_session_state(user_id, 'waiting_for_multi_language', {
-                        'products_info': products_info,
-                        'glaseo_percentage': glaseo_percentage,
-                        'failed_products': failed_products
-                    })
-                    
-                    # Mostrar resumen
-                    success_count = len(products_info)
-                    total_count = len(products)
-                    
-                    summary = f"✅ **Precios calculados para {success_count}/{total_count} productos**\n\n"
-                    
-                    if failed_products:
-                        summary += f"⚠️ No se encontraron precios para:\n"
-                        for fp in failed_products:
-                            summary += f"   • {fp}\n"
-                        summary += "\n"
-                    
-                    summary += f"🌐 **Selecciona el idioma para la cotización consolidada:**\n\n"
-                    summary += f"1️⃣ Español 🇪🇸\n"
-                    summary += f"2️⃣ English 🇺🇸\n\n"
-                    summary += f"Responde con el número o escribe:\n"
-                    summary += f"• \"español\" o \"spanish\"\n"
-                    summary += f"• \"inglés\" o \"english\""
-                    
-                    response.message(summary)
-                else:
-                    response.message("❌ No se pudieron calcular precios para ningún producto. Verifica los productos y tallas.")
+                if not products:
+                    response.message("❌ Error: No se encontraron productos. Intenta nuevamente.")
                     session_manager.clear_session(user_id)
+                    return PlainTextResponse(str(response), media_type="application/xml")
                 
-                return PlainTextResponse(str(response), media_type="application/xml")
-            else:
-                response.message("🤔 Porcentaje no válido. Por favor responde con:\n\n• **10** para 10% glaseo\n• **20** para 20% glaseo\n• **30** para 30% glaseo")
+                # Extraer glaseo del mensaje
+                glaseo_percentage = None
+                glaseo_factor = None
+                
+                glaseo_patterns = [
+                    r'(\d+)\s*%',
+                    r'(\d+)\s*porciento',
+                    r'^(\d+)$'
+                ]
+                
+                message_lower = Body.lower().strip()
+                for pattern in glaseo_patterns:
+                    match = re.search(pattern, message_lower)
+                    if match:
+                        glaseo_percentage = int(match.group(1))
+                        break
+                
+                # Convertir porcentaje a factor
+                if glaseo_percentage == 10:
+                    glaseo_factor = 0.90
+                elif glaseo_percentage == 20:
+                    glaseo_factor = 0.80
+                elif glaseo_percentage == 30:
+                    glaseo_factor = 0.70
+                elif glaseo_percentage:
+                    glaseo_factor = glaseo_percentage / 100
+                
+                if glaseo_factor:
+                    logger.info(f"📊 Calculando precios para {len(products)} productos con glaseo {glaseo_percentage}%")
+                    
+                    # Calcular precios para todos los productos
+                    products_info = []
+                    failed_products = []
+                    
+                    for product_data in products:
+                        try:
+                            query = {
+                                'product': product_data['product'],
+                                'size': product_data['size'],
+                                'glaseo_factor': glaseo_factor,
+                                'glaseo_percentage': glaseo_percentage,
+                                'flete_custom': 0.15,  # Flete por defecto
+                                'flete_solicitado': True,
+                                'custom_calculation': True
+                            }
+                            
+                            price_info = pricing_service.get_shrimp_price(query)
+                            
+                            if price_info:
+                                products_info.append(price_info)
+                            else:
+                                failed_products.append(f"{product_data['product']} {product_data['size']}")
+                        except Exception as e:
+                            logger.error(f"❌ Error calculando precio para {product_data['product']} {product_data['size']}: {str(e)}")
+                            failed_products.append(f"{product_data['product']} {product_data['size']}")
+                    
+                    if products_info:
+                        # Guardar para permitir modificaciones
+                        session_manager.set_session_state(user_id, 'waiting_for_multi_language', {
+                            'products_info': products_info,
+                            'glaseo_percentage': glaseo_percentage,
+                            'failed_products': failed_products
+                        })
+                        
+                        # Mostrar resumen
+                        success_count = len(products_info)
+                        total_count = len(products)
+                        
+                        summary = f"✅ **Precios calculados para {success_count}/{total_count} productos**\n\n"
+                        
+                        if failed_products:
+                            summary += f"⚠️ No se encontraron precios para:\n"
+                            for fp in failed_products:
+                                summary += f"   • {fp}\n"
+                            summary += "\n"
+                        
+                        summary += f"🌐 **Selecciona el idioma para la cotización consolidada:**\n\n"
+                        summary += f"1️⃣ Español 🇪🇸\n"
+                        summary += f"2️⃣ English 🇺🇸\n\n"
+                        summary += f"Responde con el número o escribe:\n"
+                        summary += f"• \"español\" o \"spanish\"\n"
+                        summary += f"• \"inglés\" o \"english\""
+                        
+                        response.message(summary)
+                    else:
+                        response.message("❌ No se pudieron calcular precios para ningún producto. Verifica los productos y tallas.")
+                        session_manager.clear_session(user_id)
+                    
+                    return PlainTextResponse(str(response), media_type="application/xml")
+                else:
+                    response.message("🤔 Porcentaje no válido. Por favor responde con:\n\n• **10** para 10% glaseo\n• **20** para 20% glaseo\n• **30** para 30% glaseo")
+                    return PlainTextResponse(str(response), media_type="application/xml")
+            
+            except Exception as e:
+                logger.error(f"❌ Error procesando glaseo para múltiples productos: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                response.message("❌ Ocurrió un error procesando tu consulta. Intenta nuevamente.")
+                session_manager.clear_session(user_id)
                 return PlainTextResponse(str(response), media_type="application/xml")
         
         elif session['state'] == 'waiting_for_multi_language':
