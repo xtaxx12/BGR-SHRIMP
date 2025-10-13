@@ -33,12 +33,45 @@ class SessionManager:
             self.sessions[user_id] = {
                 'state': 'idle',
                 'data': {},
+                'conversation_history': [],  # Historial de conversación con GPT
                 'last_activity': current_time
             }
         
         # Actualizar última actividad
         self.sessions[user_id]['last_activity'] = current_time
         return self.sessions[user_id]
+    
+    def add_to_conversation(self, user_id: str, role: str, content: str):
+        """
+        Agrega un mensaje al historial de conversación
+        
+        Args:
+            user_id: ID del usuario
+            role: 'user' o 'assistant'
+            content: Contenido del mensaje
+        """
+        session = self.get_session(user_id)
+        
+        if 'conversation_history' not in session:
+            session['conversation_history'] = []
+        
+        session['conversation_history'].append({
+            'role': role,
+            'content': content
+        })
+        
+        # Mantener solo los últimos 20 mensajes para no exceder límites de tokens
+        if len(session['conversation_history']) > 20:
+            session['conversation_history'] = session['conversation_history'][-20:]
+        
+        logger.debug(f"Mensaje agregado al historial de {user_id}: {role}")
+    
+    def get_conversation_history(self, user_id: str) -> list:
+        """
+        Obtiene el historial de conversación del usuario
+        """
+        session = self.get_session(user_id)
+        return session.get('conversation_history', [])
     
     def set_session_state(self, user_id: str, state: str, data: Dict = None):
         """

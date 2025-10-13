@@ -19,6 +19,194 @@ class OpenAIService:
         """Verifica si OpenAI está disponible"""
         return bool(self.api_key)
     
+    def chat_with_context(self, user_message: str, conversation_history: List[Dict] = None, session_data: Dict = None) -> Dict:
+        """
+        Conversación natural con GPT manteniendo contexto completo
+        
+        Args:
+            user_message: Mensaje actual del usuario
+            conversation_history: Historial de mensajes previos
+            session_data: Datos de la sesión actual (productos detectados, precios, etc.)
+        
+        Returns:
+            Dict con respuesta y acciones a realizar
+        """
+        if not self.is_available():
+            return {
+                "response": "Lo siento, el servicio de IA no está disponible en este momento.",
+                "action": None,
+                "data": {}
+            }
+        
+        try:
+            # Construir historial de conversación
+            messages = [
+                {"role": "system", "content": self._get_conversation_system_prompt()}
+            ]
+            
+            # Agregar contexto de sesión si existe
+            if session_data:
+                context_message = self._build_context_message(session_data)
+                messages.append({"role": "system", "content": context_message})
+            
+            # Agregar historial de conversación
+            if conversation_history:
+                messages.extend(conversation_history[-10:])  # Últimos 10 mensajes
+            
+            # Agregar mensaje actual
+            messages.append({"role": "user", "content": user_message})
+            
+            # Hacer petición a GPT
+            result = self._make_request(messages, max_tokens=500, temperature=0.7)
+            
+            if result:
+                # Parsear respuesta para extraer acciones
+                parsed = self._parse_gpt_response(result)
+                return parsed
+            else:
+                return {
+                    "response": "Disculpa, tuve un problema procesando tu mensaje. ¿Podrías repetirlo?",
+                    "action": None,
+                    "data": {}
+                }
+        
+        except Exception as e:
+            logger.error(f"❌ Error en chat con contexto: {str(e)}")
+            return {
+                "response": "Ocurrió un error. Por favor intenta nuevamente.",
+                "action": None,
+                "data": {}
+            }
+    
+    def _get_conversation_system_prompt(self) -> str:
+        """
+        Prompt del sistema para conversación natural
+        """
+        return """Eres ShrimpBot, el asistente comercial de BGR Export especializado en camarones premium.
+
+TU PERSONALIDAD:
+- Profesional pero amigable y conversacional
+- Experto en productos de camarón
+- Proactivo en ayudar al cliente
+- Usas emojis apropiados (🦐, 💰, 📊, 📋, ❄️, 🌍)
+- Mantienes conversaciones naturales y fluidas
+- Recuerdas el contexto de la conversación
+
+PRODUCTOS DISPONIBLES:
+- HOSO (Head On Shell On) - Camarón entero con cabeza
+- HLSO (Head Less Shell On) - Sin cabeza, con cáscara
+- P&D IQF (Peeled & Deveined) - Pelado y desvenado individual
+- P&D BLOQUE - Pelado y desvenado en bloque
+- EZ PEEL - Fácil pelado
+- PuD-EUROPA - Calidad premium para Europa
+- PuD-EEUU - Calidad para Estados Unidos
+- COOKED - Cocido listo para consumo
+
+TALLAS: U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60, 60/70, 61/70, 70/80, 71/90
+
+TU OBJETIVO:
+Ayudar al cliente a generar cotizaciones y proformas de camarón.
+
+FLUJO DE CONVERSACIÓN:
+1. Detectar qué productos y tallas necesita el cliente
+2. Preguntar por glaseo si no lo especificó (10%, 20%, 30%)
+3. Preguntar por destino si necesita flete
+4. Confirmar datos antes de generar proforma
+5. Preguntar idioma del PDF (Español/English)
+
+REGLAS IMPORTANTES:
+- Mantén respuestas concisas (máximo 200 caracteres)
+- Si detectas múltiples productos, lista todos
+- Si falta información, pregunta de forma natural
+- Confirma siempre antes de generar proforma
+- Usa lenguaje natural, no robótico
+
+FORMATO DE RESPUESTA:
+Responde en formato JSON con esta estructura:
+{
+    "response": "Tu respuesta natural al usuario",
+    "action": "detect_products|ask_glaseo|ask_language|generate_proforma|none",
+    "data": {
+        "products": [...],
+        "glaseo": 20,
+        "language": "es",
+        ...
+    }
+}
+
+EJEMPLOS:
+Usuario: "Hola"
+Respuesta: {
+    "response": "¡Hola! 👋 Soy ShrimpBot de BGR Export. ¿En qué puedo ayudarte hoy? 🦐",
+    "action": "none",
+    "data": {}
+}
+
+Usuario: "Necesito precios de HLSO 16/20"
+Respuesta: {
+    "response": "¡Perfecto! HLSO 16/20 es una excelente opción. ❄️ ¿Qué glaseo necesitas? (10%, 20% o 30%)",
+    "action": "ask_glaseo",
+    "data": {"products": [{"product": "HLSO", "size": "16/20"}]}
+}
+
+Usuario: "20%"
+Respuesta: {
+    "response": "Excelente, glaseo 20%. 🌐 ¿En qué idioma quieres la proforma? (Español/English)",
+    "action": "ask_language",
+    "data": {"glaseo": 20}
+}"""
+    
+    def _build_context_message(self, session_data: Dict) -> str:
+        """
+        Construye mensaje de contexto con datos de la sesión
+        """
+        context_parts = ["CONTEXTO DE LA SESIÓN ACTUAL:"]
+        
+        if session_data.get('products'):
+            products_list = ", ".join([f"{p['product']} {p['size']}" for p in session_data['products']])
+            context_parts.append(f"- Productos detectados: {products_list}")
+        
+        if session_data.get('glaseo_percentage'):
+            context_parts.append(f"- Glaseo especificado: {session_data['glaseo_percentage']}%")
+        
+        if session_data.get('destination'):
+            context_parts.append(f"- Destino: {session_data['destination']}")
+        
+        if session_data.get('language'):
+            context_parts.append(f"- Idioma preferido: {session_data['language']}")
+        
+        if session_data.get('state'):
+            context_parts.append(f"- Estado actual: {session_data['state']}")
+        
+        return "\n".join(context_parts)
+    
+    def _parse_gpt_response(self, response: str) -> Dict:
+        """
+        Parsea la respuesta de GPT para extraer JSON
+        """
+        try:
+            # Intentar parsear como JSON
+            # Buscar JSON en la respuesta
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(0)
+                parsed = json.loads(json_str)
+                return parsed
+            else:
+                # Si no hay JSON, retornar respuesta como texto
+                return {
+                    "response": response,
+                    "action": "none",
+                    "data": {}
+                }
+        except json.JSONDecodeError:
+            # Si falla el parseo, retornar respuesta como texto
+            return {
+                "response": response,
+                "action": "none",
+                "data": {}
+            }
+    
     def _make_request(self, messages: List[Dict], max_tokens: int = 300, temperature: float = 0.3) -> Optional[str]:
         """
         Hace una petición directa a la API de OpenAI usando requests
