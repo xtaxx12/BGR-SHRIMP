@@ -1,0 +1,14 @@
+{
+  "+593968058769": {
+    "state": "idle",
+    "data": {},
+    "last_activity": 1760385642.8811953,
+    "last_quote": {
+      "producto": "HLSO",
+      "talla": "16/20",
+      "factor_glaseo": 0.9,
+      "glaseo_percentage": 10,
+      "flete": 0.15
+    }
+  }
+}

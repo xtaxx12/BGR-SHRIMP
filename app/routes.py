@@ -10,6 +10,7 @@ from app.services.pdf_generator import PDFGenerator
 from app.services.whatsapp_sender import WhatsAppSender
 from app.services.openai_service import OpenAIService
 from app.services.audio_handler import AudioHandler
+from app.services.utils_new import retry
 from app.security import (
     validate_twilio_webhook, rate_limit, sanitize_input, 
     validate_phone_number, security, verify_admin_token,
@@ -23,6 +24,28 @@ import re
 from typing import Set
 
 logger = logging.getLogger(__name__)
+
+
+def _detect_language(message: str, ai_analysis: dict = None) -> str:
+    """Detecta idioma preferido del usuario.
+    - Primero usa el resultado del análisis de IA si viene con 'language'.
+    - Si no, usa una heurística simple basada en palabras comunes en cada idioma.
+    Retorna 'es' o 'en'.
+    """
+    if ai_analysis:
+        lang = ai_analysis.get('language')
+        if lang in ('es', 'en'):
+            return lang
+
+    text = (message or "").lower()
+    # Palabras comunes para cada idioma
+    english_words = ['please', 'hello', 'hi', 'thanks', 'thank', 'price', 'quote', 'proforma', 'ddp', 'cif', 'fob']
+    spanish_words = ['por favor', 'hola', 'gracias', 'precio', 'precios', 'proforma', 'cotización', 'cotizacion', 'ddp', 'flete']
+
+    en_score = sum(text.count(w) for w in english_words)
+    es_score = sum(text.count(w) for w in spanish_words)
+
+    return 'en' if en_score > es_score else 'es'
 
 webhook_router = APIRouter()
 
@@ -203,18 +226,17 @@ async def whatsapp_webhook(request: Request,
                     ai_query['glaseo_percentage'] = glaseo_percentage
                     
                     # Intentar calcular el precio con el glaseo
-                    price_info = pricing_service.get_shrimp_price(ai_query)
+                    price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(ai_query,))
                     
                     if price_info:
                         logger.debug(f"✅ Datos de proforma validados con glaseo {glaseo_percentage}%")
                         
-                        # Guardar datos de la proforma y preguntar por idioma
-                        session_manager.set_session_state(user_id, 'waiting_for_proforma_language', {
-                            'price_info': price_info,
-                            'ai_query': ai_query
-                        })
-                        
-                        # Mostrar resumen y opciones de idioma
+                        # Detectar idioma automáticamente y generar PDF
+                        user_lang = _detect_language(Body, ai_analysis)
+                        session_manager.set_last_quote(user_id, price_info)
+                        session_manager.set_user_language(user_id, user_lang)
+
+                        # Mostrar resumen (generación automática en idioma detectado)
                         product_name = price_info.get('producto', 'Camarón')
                         size = price_info.get('talla', '')
                         client_name = price_info.get('cliente_nombre', '')
@@ -225,17 +247,27 @@ async def whatsapp_webhook(request: Request,
                         if client_name:
                             summary += f"👤 Cliente: {client_name.title()}\n"
                         
-                        language_message = f"""{summary}
-🌐 **Selecciona el idioma para la proforma:**
+                        # Generar PDF automáticamente
+                        logger.info(f"📄 Generando PDF automáticamente en idioma {user_lang} para usuario {user_id}")
+                        pdf_path = pdf_generator.generate_quote_pdf(price_info, From, user_lang)
 
-1️⃣ Español 🇪🇸
-2️⃣ English 🇺🇸
+                        if pdf_path:
+                            pdf_sent = whatsapp_sender.send_pdf_document(
+                                From,
+                                pdf_path,
+                                f"Cotización BGR Export - {product_name} {size}"
+                            )
+                            if pdf_sent:
+                                response.message(f"✅ Proforma generada y enviada en {'Español' if user_lang == 'es' else 'English'} �🇸�🇺🇸")
+                            else:
+                                filename = os.path.basename(pdf_path)
+                                base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
+                                download_url = f"{base_url}/webhook/download-pdf/{filename}"
+                                pdf_message = response.message()
+                                pdf_message.body(f"✅ Proforma generada. Descarga: {download_url}")
+                        else:
+                            response.message("❌ Error generando la proforma. Intenta nuevamente.")
 
-Responde con el número o escribe:
-• "español" o "spanish"  
-• "inglés" o "english" """
-                        
-                        response.message(language_message)
                         return PlainTextResponse(str(response), media_type="application/xml")
                     else:
                         logger.error(f"❌ Error calculando precio con glaseo {glaseo_percentage}%")
@@ -280,6 +312,143 @@ Responde con el número o escribe:
                 if not ai_analysis.get('glaseo_percentage') and basic_glaseo_percentage:
                     ai_analysis['glaseo_percentage'] = basic_glaseo_percentage
         
+        # Manejar modificación de flete con prioridad (antes de procesar múltiples productos)
+        if ai_analysis and ai_analysis.get('intent') == 'modify_flete':
+            # Usuario quiere modificar el flete de la última proforma
+            last_quote = session_manager.get_last_quote(user_id)
+            
+            if last_quote:
+                new_flete = ai_analysis.get('flete_custom')
+                
+                if new_flete is not None:
+                    logger.info(f"🔄 Modificando flete de ${last_quote.get('flete', 0):.2f} a ${new_flete:.2f}")
+                    
+                    # Recalcular la proforma con el nuevo flete
+                    product = last_quote.get('producto')
+                    size = last_quote.get('talla')
+                    glaseo_factor = last_quote.get('factor_glaseo')
+                    glaseo_percentage = last_quote.get('glaseo_percentage')
+                    cliente_nombre = last_quote.get('cliente_nombre')
+                    destination = last_quote.get('destination')
+                    usar_libras = last_quote.get('usar_libras', False)
+                    
+                    modified_query = {
+                        'product': product,
+                        'size': size,
+                        'glaseo_factor': glaseo_factor,
+                        'glaseo_percentage': glaseo_percentage,
+                        'flete_custom': new_flete,
+                        'flete_solicitado': True,
+                        'cliente_nombre': cliente_nombre,
+                        'destination': destination,
+                        'usar_libras': usar_libras,
+                        'custom_calculation': True
+                    }
+
+                    # Si la última cotización es consolidada, recalcular todos los productos
+                    if last_quote.get('consolidated') and last_quote.get('products_info'):
+                        logger.info("🔄 Recalculando cotización consolidada con nuevo flete")
+                        products = last_quote.get('products_info', [])
+                        recalculated = []
+                        failed = []
+                        for p in products:
+                            try:
+                                query = {
+                                    'product': p.get('producto') or p.get('product'),
+                                    'size': p.get('talla') or p.get('size'),
+                                    'glaseo_factor': p.get('factor_glaseo') or p.get('glaseo_factor'),
+                                    'glaseo_percentage': p.get('glaseo_percentage'),
+                                    'flete_custom': new_flete,
+                                    'flete_solicitado': True,
+                                    'custom_calculation': True
+                                }
+                                price = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(query,))
+                                if price:
+                                    recalculated.append(price)
+                                else:
+                                    failed.append(f"{p.get('product', p.get('producto'))} {p.get('size', p.get('talla'))}")
+                            except Exception as e:
+                                logger.error(f"❌ Error recalculando producto {p}: {e}")
+                                failed.append(str(p))
+
+                        if recalculated:
+                            new_last = {
+                                'consolidated': True,
+                                'products_info': recalculated,
+                                'glaseo_percentage': last_quote.get('glaseo_percentage'),
+                                'failed_products': failed,
+                                'flete': new_flete
+                            }
+                            session_manager.set_last_quote(user_id, new_last)
+
+                            user_language = session_manager.get_user_language(user_id)
+                            logger.info(f"📄 Regenerando PDF consolidado con nuevo flete ${new_flete:.2f}")
+                            pdf_path = pdf_generator.generate_consolidated_quote_pdf(
+                                recalculated,
+                                From,
+                                user_language,
+                                last_quote.get('glaseo_percentage')
+                            )
+
+                            if pdf_path:
+                                response.message(f"✅ Cotización consolidada actualizada con nuevo flete ${new_flete:.2f} - Generando PDF...")
+                                pdf_sent = whatsapp_sender.send_pdf_document(From, pdf_path, f"Cotización consolidada actualizada - flete ${new_flete:.2f}")
+                                if not pdf_sent:
+                                    filename = os.path.basename(pdf_path)
+                                    base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
+                                    download_url = f"{base_url}/webhook/download-pdf/{filename}"
+                                    pdf_message = response.message()
+                                    pdf_message.body("📄 Cotización consolidada actualizada")
+                                    pdf_message.media(download_url)
+
+                                return PlainTextResponse(str(response), media_type="application/xml")
+                            else:
+                                response.message("❌ Error generando el PDF consolidado actualizado. Intenta nuevamente.")
+                                return PlainTextResponse(str(response), media_type="application/xml")
+                        else:
+                            response.message("❌ No se pudieron recalcular precios para los productos con el nuevo flete.")
+                            return PlainTextResponse(str(response), media_type="application/xml")
+
+                    new_price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(modified_query,))
+
+                    if new_price_info:
+                        session_manager.set_last_quote(user_id, new_price_info)
+                        user_language = session_manager.get_user_language(user_id)
+                        logger.info(f"📄 Regenerando PDF con nuevo flete ${new_flete:.2f}")
+                        pdf_path = pdf_generator.generate_quote_pdf(new_price_info, From, user_language)
+
+                        if pdf_path:
+                            old_flete = last_quote.get('flete', 0)
+                            confirmation_msg = f"✅ **Proforma actualizada**\n\n"
+                            confirmation_msg += f"🔄 Flete modificado:\n"
+                            confirmation_msg += f"   • Anterior: ${old_flete:.2f}\n"
+                            confirmation_msg += f"   • Nuevo: ${new_flete:.2f}\n\n"
+                            confirmation_msg += f"📄 Generando nueva proforma..."
+                            response.message(confirmation_msg)
+                            pdf_sent = whatsapp_sender.send_pdf_document(From, pdf_path, f"📄 Proforma actualizada con flete de ${new_flete:.2f}\n\n💼 Documento válido para procesos comerciales.")
+                            if pdf_sent:
+                                logger.debug(f"✅ PDF actualizado enviado por WhatsApp: {pdf_path}")
+                            else:
+                                filename = os.path.basename(pdf_path)
+                                base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
+                                download_url = f"{base_url}/webhook/download-pdf/{filename}"
+                                pdf_message = response.message()
+                                pdf_message.body(f"📄 Proforma actualizada con flete de ${new_flete:.2f}")
+                                pdf_message.media(download_url)
+                            return PlainTextResponse(str(response), media_type="application/xml")
+                        else:
+                            response.message("❌ Error generando el PDF actualizado. Intenta nuevamente.")
+                            return PlainTextResponse(str(response), media_type="application/xml")
+                    else:
+                        response.message("❌ Error recalculando la proforma. Intenta nuevamente.")
+                        return PlainTextResponse(str(response), media_type="application/xml")
+                else:
+                    response.message("🤔 Por favor especifica el nuevo valor del flete.\n\n💡 Ejemplo: 'modifica el flete a 0.30' o 'cambiar flete 0.25'")
+                    return PlainTextResponse(str(response), media_type="application/xml")
+            else:
+                response.message("❌ No hay proforma previa para modificar.\n\n💡 Primero genera una proforma y luego podrás modificar el flete.")
+                return PlainTextResponse(str(response), media_type="application/xml")
+
         # DETECTAR MÚLTIPLES PRODUCTOS PRIMERO
         multiple_products = openai_service.detect_multiple_products(Body)
         
@@ -339,7 +508,7 @@ Responde con el número o escribe:
                             'custom_calculation': True
                         }
                         
-                        price_info = pricing_service.get_shrimp_price(query)
+                        price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(query,))
                         
                         if price_info:
                             products_info.append(price_info)
@@ -486,38 +655,39 @@ U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60
             
             if ai_query:
                 # Verificar que se puede generar la cotización
-                price_info = pricing_service.get_shrimp_price(ai_query)
+                price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(ai_query,))
                 
                 if price_info:
                     logger.debug(f"✅ Datos de proforma validados para: {ai_query}")
                     
-                    # Guardar datos de la proforma y preguntar por idioma
-                    session_manager.set_session_state(user_id, 'waiting_for_proforma_language', {
-                        'price_info': price_info,
-                        'ai_query': ai_query
-                    })
-                    
-                    # Mostrar resumen y opciones de idioma
+                    # Detectar idioma automáticamente y generar PDF
+                    user_lang = _detect_language(Body, ai_analysis)
+                    session_manager.set_last_quote(user_id, price_info)
+                    session_manager.set_user_language(user_id, user_lang)
+
                     product_name = price_info.get('producto', 'Camarón')
                     size = price_info.get('talla', '')
-                    client_name = price_info.get('cliente_nombre', '')
-                    
-                    summary = f"📋 **Proforma lista para generar:**\n"
-                    summary += f"🦐 Producto: {product_name} {size}\n"
-                    if client_name:
-                        summary += f"👤 Cliente: {client_name.title()}\n"
-                    
-                    language_message = f"""{summary}
-🌐 **Selecciona el idioma para la proforma:**
 
-1️⃣ Español 🇪🇸
-2️⃣ English 🇺🇸
+                    logger.info(f"📄 Generando PDF automáticamente en idioma {user_lang} para usuario {user_id}")
+                    pdf_path = pdf_generator.generate_quote_pdf(price_info, From, user_lang)
 
-Responde con el número o escribe:
-• "español" o "spanish"  
-• "inglés" o "english" """
-                    
-                    response.message(language_message)
+                    if pdf_path:
+                        pdf_sent = whatsapp_sender.send_pdf_document(
+                            From,
+                            pdf_path,
+                            f"Cotización BGR Export - {product_name} {size}"
+                        )
+                        if pdf_sent:
+                            response.message(f"✅ Proforma generada y enviada en {'Español' if user_lang == 'es' else 'English'} 🇪🇸🇺🇸")
+                        else:
+                            filename = os.path.basename(pdf_path)
+                            base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
+                            download_url = f"{base_url}/webhook/download-pdf/{filename}"
+                            pdf_message = response.message()
+                            pdf_message.body(f"✅ Proforma generada. Descarga: {download_url}")
+                    else:
+                        response.message("❌ Error generando la proforma. Intenta nuevamente.")
+
                     return PlainTextResponse(str(response), media_type="application/xml")
                 else:
                     # Verificar si falta el glaseo específicamente
@@ -611,7 +781,7 @@ Responde con el número o escribe:
                                     'flete_solicitado': True,
                                     'custom_calculation': True
                                 }
-                                price = pricing_service.get_shrimp_price(query)
+                                price = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(query,))
                                 if price:
                                     recalculated.append(price)
                                 else:
@@ -663,7 +833,7 @@ Responde con el número o escribe:
                             return PlainTextResponse(str(response), media_type="application/xml")
 
                     # Si no es consolidada, comportamiento por producto individual
-                    new_price_info = pricing_service.get_shrimp_price(modified_query)
+                    new_price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(modified_query,))
 
                     if new_price_info:
                         # Guardar la nueva cotización
@@ -916,7 +1086,7 @@ Responde con el número o escribe:
                                 'custom_calculation': True
                             }
                             
-                            price_info = pricing_service.get_shrimp_price(query)
+                            price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(query,))
                             
                             if price_info:
                                 products_info.append(price_info)
@@ -927,33 +1097,42 @@ Responde con el número o escribe:
                             failed_products.append(f"{product_data['product']} {product_data['size']}")
                     
                     if products_info:
-                        # Guardar para permitir modificaciones
-                        session_manager.set_session_state(user_id, 'waiting_for_multi_language', {
+                        # Guardar como última cotización consolidada y generar PDF automáticamente
+                        user_lang = _detect_language(Body, ai_analysis)
+                        last = {
+                            'consolidated': True,
                             'products_info': products_info,
                             'glaseo_percentage': glaseo_percentage,
-                            'failed_products': failed_products
-                        })
-                        
-                        # Mostrar resumen
-                        success_count = len(products_info)
-                        total_count = len(products)
-                        
-                        summary = f"✅ **Precios calculados para {success_count}/{total_count} productos**\n\n"
-                        
-                        if failed_products:
-                            summary += f"⚠️ No se encontraron precios para:\n"
-                            for fp in failed_products:
-                                summary += f"   • {fp}\n"
-                            summary += "\n"
-                        
-                        summary += f"🌐 **Selecciona el idioma para la cotización consolidada:**\n\n"
-                        summary += f"1️⃣ Español 🇪🇸\n"
-                        summary += f"2️⃣ English 🇺🇸\n\n"
-                        summary += f"Responde con el número o escribe:\n"
-                        summary += f"• \"español\" o \"spanish\"\n"
-                        summary += f"• \"inglés\" o \"english\""
-                        
-                        response.message(summary)
+                            'failed_products': failed_products,
+                            'flete': 0.15
+                        }
+                        session_manager.set_last_quote(user_id, last)
+                        session_manager.set_user_language(user_id, user_lang)
+
+                        logger.info(f"📄 Generando PDF consolidado automáticamente en idioma {user_lang} para usuario {user_id}")
+                        pdf_path = pdf_generator.generate_consolidated_quote_pdf(
+                            products_info,
+                            From,
+                            user_lang,
+                            glaseo_percentage,
+                            destination=None
+                        )
+
+                        if pdf_path:
+                            pdf_sent = whatsapp_sender.send_pdf_document(
+                                From,
+                                pdf_path,
+                                f"Cotización Consolidada BGR Export - {len(products_info)} productos"
+                            )
+                            if pdf_sent:
+                                response.message(f"✅ Cotización consolidada generada y enviada en {'Español' if user_lang == 'es' else 'English'} - {len(products_info)} productos")
+                            else:
+                                filename = os.path.basename(pdf_path)
+                                base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
+                                download_url = f"{base_url}/webhook/download-pdf/{filename}"
+                                response.message(f"✅ Cotización generada\n📄 Descarga: {download_url}")
+                        else:
+                            response.message("❌ Error generando PDF consolidado. Intenta nuevamente.")
                     else:
                         response.message("❌ No se pudieron calcular precios para ningún producto. Verifica los productos y tallas.")
                         session_manager.clear_session(user_id)
@@ -1223,7 +1402,7 @@ Responde con el número o escribe:
                     'product': selected_product
                 }
                 
-                price_info = pricing_service.get_shrimp_price(user_input)
+                price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(user_input,))
                 
                 if price_info:
                     formatted_response = format_price_response(price_info)
@@ -1298,7 +1477,7 @@ Responde con el número o escribe:
         
         if user_input:
             # Obtener precio del camarón
-            price_info = pricing_service.get_shrimp_price(user_input)
+            price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(user_input,))
             
             if price_info:
                 formatted_response = format_price_response(price_info)
