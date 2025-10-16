@@ -22,6 +22,7 @@ class OpenAIService:
     def chat_with_context(self, user_message: str, conversation_history: List[Dict] = None, session_data: Dict = None) -> Dict:
         """
         Conversación natural con GPT manteniendo contexto completo
+        MANEJA CUALQUIER TIPO DE SOLICITUD DEL USUARIO
         
         Args:
             user_message: Mensaje actual del usuario
@@ -32,11 +33,8 @@ class OpenAIService:
             Dict con respuesta y acciones a realizar
         """
         if not self.is_available():
-            return {
-                "response": "Lo siento, el servicio de IA no está disponible en este momento.",
-                "action": None,
-                "data": {}
-            }
+            # Fallback inteligente sin IA
+            return self._intelligent_fallback(user_message, session_data)
         
         try:
             # Construir historial de conversación
@@ -56,27 +54,21 @@ class OpenAIService:
             # Agregar mensaje actual
             messages.append({"role": "user", "content": user_message})
             
-            # Hacer petición a GPT
-            result = self._make_request(messages, max_tokens=500, temperature=0.7)
+            # Hacer petición a GPT con reintentos
+            result = self._make_request_with_retry(messages, max_tokens=500, temperature=0.7)
             
             if result:
                 # Parsear respuesta para extraer acciones
                 parsed = self._parse_gpt_response(result)
                 return parsed
             else:
-                return {
-                    "response": "Disculpa, tuve un problema procesando tu mensaje. ¿Podrías repetirlo?",
-                    "action": None,
-                    "data": {}
-                }
+                # Fallback inteligente si falla la petición
+                return self._intelligent_fallback(user_message, session_data)
         
         except Exception as e:
             logger.error(f"❌ Error en chat con contexto: {str(e)}")
-            return {
-                "response": "Ocurrió un error. Por favor intenta nuevamente.",
-                "action": None,
-                "data": {}
-            }
+            # Siempre retornar algo coherente
+            return self._intelligent_fallback(user_message, session_data)
     
     def _get_conversation_system_prompt(self) -> str:
         """
@@ -447,14 +439,36 @@ Formato de respuesta: texto directo sin JSON.
             logger.error(f"❌ Error mejorando explicación de precio: {str(e)}")
             return None
     
-    def transcribe_audio(self, audio_file_path: str) -> Optional[str]:
+    def transcribe_audio(self, audio_file_path: str, language: str = 'es') -> Optional[str]:
         """
-        Transcribe audio usando OpenAI Whisper
+        Transcribe audio usando OpenAI Whisper con manejo robusto
+        Soporta múltiples idiomas y formatos de audio
+        
+        Args:
+            audio_file_path: Ruta al archivo de audio
+            language: Código de idioma (es, en, etc.) - None para detección automática
+        
+        Returns:
+            Texto transcrito o None si falla
         """
         if not self.is_available():
+            logger.warning("⚠️ OpenAI no disponible para transcripción de audio")
             return None
         
         try:
+            # Verificar que el archivo existe
+            if not os.path.exists(audio_file_path):
+                logger.error(f"❌ Archivo de audio no encontrado: {audio_file_path}")
+                return None
+            
+            # Verificar tamaño del archivo (máximo 25MB para Whisper)
+            file_size = os.path.getsize(audio_file_path)
+            if file_size > 25 * 1024 * 1024:  # 25MB
+                logger.error(f"❌ Archivo de audio muy grande: {file_size / (1024*1024):.2f}MB")
+                return None
+            
+            logger.info(f"🎤 Transcribiendo audio: {audio_file_path} ({file_size / 1024:.2f}KB)")
+            
             headers = {
                 "Authorization": f"Bearer {self.api_key}"
             }
@@ -462,28 +476,43 @@ Formato de respuesta: texto directo sin JSON.
             with open(audio_file_path, 'rb') as audio_file:
                 files = {
                     'file': audio_file,
-                    'model': (None, self.whisper_model),
-                    'language': (None, 'es')  # Español
+                    'model': (None, self.whisper_model)
                 }
                 
+                # Agregar idioma solo si se especifica
+                if language:
+                    files['language'] = (None, language)
+                
+                # Intentar transcripción con timeout extendido
                 response = requests.post(
                     f"{self.base_url}/audio/transcriptions",
                     headers=headers,
                     files=files,
-                    timeout=30
+                    timeout=60  # Timeout más largo para archivos grandes
                 )
             
             if response.status_code == 200:
                 result = response.json()
                 transcription = result.get('text', '').strip()
-                logger.info(f"🎤 Audio transcrito: '{transcription}'")
-                return transcription
+                
+                if transcription:
+                    logger.info(f"✅ Audio transcrito exitosamente: '{transcription[:100]}...'")
+                    return transcription
+                else:
+                    logger.warning("⚠️ Transcripción vacía")
+                    return None
             else:
-                logger.error(f"❌ Error transcribiendo audio: {response.status_code} - {response.text}")
+                logger.error(f"❌ Error API Whisper: {response.status_code} - {response.text}")
                 return None
                 
+        except requests.exceptions.Timeout:
+            logger.error("❌ Timeout en transcripción de audio")
+            return None
+        except requests.exceptions.RequestException as e:
+            logger.error(f"❌ Error de red en transcripción: {str(e)}")
+            return None
         except Exception as e:
-            logger.error(f"❌ Error en transcripción de audio: {str(e)}")
+            logger.error(f"❌ Error inesperado en transcripción de audio: {str(e)}")
             return None
     
     def detect_multiple_products(self, message: str) -> List[Dict]:
@@ -1042,3 +1071,212 @@ Formato de respuesta: texto directo sin JSON.
             cleaned_text = cleaned_text.replace(problematic, replacement)
         
         return cleaned_text
+    
+    def _make_request_with_retry(self, messages: List[Dict], max_tokens: int = 300, temperature: float = 0.3, max_retries: int = 3) -> Optional[str]:
+        """
+        Hace petición a OpenAI con reintentos automáticos
+        """
+        for attempt in range(max_retries):
+            try:
+                result = self._make_request(messages, max_tokens, temperature)
+                if result:
+                    return result
+                
+                # Si falla, esperar un poco antes de reintentar
+                if attempt < max_retries - 1:
+                    import time
+                    time.sleep(1 * (attempt + 1))  # Backoff exponencial
+                    
+            except Exception as e:
+                logger.warning(f"⚠️ Intento {attempt + 1}/{max_retries} falló: {str(e)}")
+                if attempt < max_retries - 1:
+                    import time
+                    time.sleep(1 * (attempt + 1))
+        
+        return None
+    
+    def _intelligent_fallback(self, user_message: str, session_data: Dict = None) -> Dict:
+        """
+        Fallback inteligente que SIEMPRE responde algo coherente
+        Maneja cualquier tipo de solicitud del usuario
+        """
+        message_lower = user_message.lower().strip()
+        
+        # Detectar saludos
+        greeting_patterns = [r'\bhola\b', r'\bhello\b', r'\bhi\b', r'\bbuenos\b', r'\bbuenas\b', 
+                           r'\bhey\b', r'\bqué tal\b', r'\bcómo estás\b']
+        if any(re.search(pattern, message_lower) for pattern in greeting_patterns):
+            return {
+                "response": "¡Hola! 👋 Soy ShrimpBot de BGR Export 🦐\n\n¿Qué producto necesitas? Te ayudo a crear tu cotización al instante 💰",
+                "action": "greeting",
+                "data": {}
+            }
+        
+        # Detectar solicitudes de audio/voz
+        audio_patterns = ['audio', 'voz', 'voice', 'nota de voz', 'mensaje de voz', 'grabación']
+        if any(pattern in message_lower for pattern in audio_patterns):
+            return {
+                "response": "🎤 ¡Claro! Puedes enviarme notas de voz y las procesaré automáticamente.\n\nSolo envía tu audio y te responderé con la información que necesites 🦐",
+                "action": "audio_info",
+                "data": {}
+            }
+        
+        # Detectar preguntas sobre productos
+        product_patterns = ['producto', 'productos', 'qué tienen', 'qué venden', 'catálogo', 'opciones']
+        if any(pattern in message_lower for pattern in product_patterns):
+            return {
+                "response": "🦐 Productos disponibles:\n\n• HLSO (sin cabeza)\n• HOSO (con cabeza)\n• P&D IQF (pelado)\n• P&D BLOQUE\n• EZ PEEL\n• PuD-EUROPA\n• COOKED\n\n¿Cuál te interesa? 💰",
+                "action": "product_list",
+                "data": {}
+            }
+        
+        # Detectar preguntas sobre precios
+        price_patterns = ['precio', 'precios', 'cuánto', 'cuanto', 'costo', 'cost', 'value']
+        if any(pattern in message_lower for pattern in price_patterns):
+            return {
+                "response": "💰 Te genero cotizaciones con precios FOB actualizados.\n\n¿Qué producto y talla necesitas?\nEjemplo: HLSO 16/20 🦐",
+                "action": "price_inquiry",
+                "data": {}
+            }
+        
+        # Detectar solicitudes de ayuda
+        help_patterns = ['ayuda', 'help', 'cómo', 'como funciona', 'qué puedes', 'opciones']
+        if any(pattern in message_lower for pattern in help_patterns):
+            return {
+                "response": "🤖 Te ayudo a crear proformas de camarón:\n\n✅ Precios FOB actualizados\n✅ Todas las tallas\n✅ PDF profesional\n✅ Cálculo de glaseo\n✅ Flete incluido\n\n¿Qué producto necesitas? 🦐",
+                "action": "help",
+                "data": {}
+            }
+        
+        # Detectar agradecimientos
+        thanks_patterns = ['gracias', 'thanks', 'thank you', 'muchas gracias', 'te agradezco']
+        if any(pattern in message_lower for pattern in thanks_patterns):
+            return {
+                "response": "¡De nada! 😊 Estoy aquí para ayudarte.\n\n¿Necesitas algo más? 🦐",
+                "action": "thanks",
+                "data": {}
+            }
+        
+        # Detectar despedidas
+        goodbye_patterns = ['adiós', 'adios', 'bye', 'chao', 'hasta luego', 'nos vemos']
+        if any(pattern in message_lower for pattern in goodbye_patterns):
+            return {
+                "response": "¡Hasta pronto! 👋 Cuando necesites cotizaciones, aquí estaré 🦐💰",
+                "action": "goodbye",
+                "data": {}
+            }
+        
+        # Detectar tallas específicas (intento de cotización)
+        if re.search(r'\d+/\d+', message_lower):
+            return {
+                "response": "📊 Detecté una talla en tu mensaje.\n\n¿Qué producto necesitas?\n• HLSO (sin cabeza)\n• HOSO (con cabeza)\n• P&D IQF (pelado)\n\nEscribe el producto para generar tu cotización 🦐",
+                "action": "size_detected",
+                "data": {}
+            }
+        
+        # Si tiene contexto de sesión, usar eso
+        if session_data and session_data.get('products'):
+            products = session_data['products']
+            products_str = ", ".join([f"{p['product']} {p['size']}" for p in products])
+            return {
+                "response": f"📋 Tienes en tu sesión: {products_str}\n\n¿Quieres generar la proforma o modificar algo? 🦐",
+                "action": "session_context",
+                "data": session_data
+            }
+        
+        # Respuesta genérica pero útil para CUALQUIER otra cosa
+        return {
+            "response": "🦐 Soy ShrimpBot de BGR Export.\n\nTe ayudo a crear cotizaciones de camarón premium.\n\n¿Qué producto necesitas?\nEjemplo: HLSO 16/20 💰",
+            "action": "general_inquiry",
+            "data": {}
+        }
+    
+    def process_audio_message(self, audio_file_path: str, session_data: Dict = None, conversation_history: List[Dict] = None) -> Dict:
+        """
+        Procesa un mensaje de audio completo: transcribe y responde
+        
+        Args:
+            audio_file_path: Ruta al archivo de audio
+            session_data: Datos de la sesión actual
+            conversation_history: Historial de conversación
+        
+        Returns:
+            Dict con transcripción, respuesta y acciones
+        """
+        try:
+            # Transcribir audio
+            transcription = self.transcribe_audio(audio_file_path)
+            
+            if not transcription:
+                return {
+                    "response": "🎤 No pude entender el audio. ¿Podrías enviarlo de nuevo o escribir tu mensaje? 🦐",
+                    "action": "audio_transcription_failed",
+                    "data": {},
+                    "transcription": None
+                }
+            
+            logger.info(f"✅ Audio transcrito: '{transcription}'")
+            
+            # Procesar el mensaje transcrito
+            result = self.handle_any_request(transcription, session_data, conversation_history)
+            
+            # Agregar transcripción al resultado
+            result['transcription'] = transcription
+            result['input_type'] = 'audio'
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ Error procesando audio: {str(e)}")
+            return {
+                "response": "🎤 Hubo un problema con el audio. Por favor intenta de nuevo o escribe tu mensaje 🦐",
+                "action": "audio_processing_error",
+                "data": {},
+                "transcription": None
+            }
+    
+    def handle_any_request(self, user_message: str, session_data: Dict = None, conversation_history: List[Dict] = None) -> Dict:
+        """
+        MÉTODO PRINCIPAL: Maneja CUALQUIER tipo de solicitud del usuario
+        Garantiza que siempre haya una respuesta coherente
+        
+        Args:
+            user_message: Mensaje del usuario (texto o transcripción de audio)
+            session_data: Datos de la sesión actual
+            conversation_history: Historial de conversación
+        
+        Returns:
+            Dict con respuesta garantizada y acciones
+        """
+        try:
+            # Validar entrada
+            if not user_message or not user_message.strip():
+                return {
+                    "response": "🤔 No recibí ningún mensaje. ¿Podrías escribir o enviar audio de nuevo? 🦐",
+                    "action": "empty_message",
+                    "data": {}
+                }
+            
+            # Limpiar mensaje
+            user_message = user_message.strip()
+            
+            # Intentar con IA primero
+            if self.is_available():
+                try:
+                    result = self.chat_with_context(user_message, conversation_history, session_data)
+                    if result and result.get('response'):
+                        return result
+                except Exception as e:
+                    logger.warning(f"⚠️ Error en IA, usando fallback: {str(e)}")
+            
+            # Si falla IA o no está disponible, usar fallback inteligente
+            return self._intelligent_fallback(user_message, session_data)
+            
+        except Exception as e:
+            logger.error(f"❌ Error crítico en handle_any_request: {str(e)}")
+            # Última línea de defensa: respuesta de emergencia
+            return {
+                "response": "🦐 Soy ShrimpBot de BGR Export.\n\n¿Qué producto de camarón necesitas? Te ayudo a crear tu cotización 💰",
+                "action": "emergency_fallback",
+                "data": {}
+            }
