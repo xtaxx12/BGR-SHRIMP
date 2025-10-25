@@ -294,6 +294,95 @@ async def whatsapp_webhook(request: Request,
                 session_manager.clear_session(user_id)
                 return PlainTextResponse(str(response), media_type="application/xml")
         
+        # Manejar respuesta de flete
+        if session['state'] == 'waiting_for_flete':
+            # Usuario está respondiendo con el valor del flete
+            ai_query = session['data'].get('ai_query')
+            
+            if ai_query:
+                # Intentar extraer el valor del flete del mensaje
+                flete_value = None
+                
+                # Patrones para detectar valor de flete
+                flete_patterns = [
+                    r'(\d+\.?\d*)\s*(?:centavos?|cents?)',  # "25 centavos", "0.25 cents"
+                    r'(?:flete\s*)?(\d+\.?\d*)(?:\s|$)',  # "flete 0.25", "0.25"
+                    r'(\d+\.?\d*)\s*(?:de\s*)?flete',  # "0.25 de flete"
+                    r'^\s*(\d+\.?\d*)\s*$',  # Solo el número "0.25"
+                ]
+                
+                message_lower = Body.lower().strip()
+                for pattern in flete_patterns:
+                    match = re.search(pattern, message_lower)
+                    if match:
+                        try:
+                            flete_value = float(match.group(1))
+                            # Si el valor es mayor a 5, probablemente son centavos, convertir a dólares
+                            if flete_value > 5:
+                                flete_value = flete_value / 100
+                            break
+                        except ValueError:
+                            continue
+                
+                if flete_value and flete_value > 0:
+                    # Actualizar ai_query con el flete
+                    ai_query['flete_custom'] = flete_value
+                    
+                    # Intentar calcular el precio con el flete
+                    price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(ai_query,))
+                    
+                    if price_info:
+                        logger.debug(f"✅ Datos de proforma validados con flete ${flete_value:.2f}")
+                        
+                        # Detectar idioma automáticamente y generar PDF
+                        user_lang = _detect_language(Body, ai_analysis)
+                        session_manager.set_last_quote(user_id, price_info)
+                        session_manager.set_user_language(user_id, user_lang)
+
+                        # Generar PDF automáticamente
+                        product_name = price_info.get('producto', 'Camarón')
+                        size = price_info.get('talla', '')
+                        destination = price_info.get('destination', '')
+                        
+                        logger.info(f"📄 Generando PDF automáticamente con flete ${flete_value:.2f} para usuario {user_id}")
+                        pdf_path = pdf_generator.generate_quote_pdf(price_info, From, user_lang)
+
+                        if pdf_path:
+                            pdf_sent = whatsapp_sender.send_pdf_document(
+                                From,
+                                pdf_path,
+                                f"Cotización BGR Export - {product_name} {size}"
+                            )
+                            if pdf_sent:
+                                response.message(f"✅ Proforma generada con flete ${flete_value:.2f} a {destination} 🚢")
+                            else:
+                                filename = os.path.basename(pdf_path)
+                                base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
+                                download_url = f"{base_url}/webhook/download-pdf/{filename}"
+                                pdf_message = response.message()
+                                pdf_message.body(f"✅ Proforma generada. Descarga: {download_url}")
+                        else:
+                            response.message("❌ Error generando la proforma. Intenta nuevamente.")
+
+                        return PlainTextResponse(str(response), media_type="application/xml")
+                    else:
+                        logger.error(f"❌ Error calculando precio con flete ${flete_value:.2f}")
+                        response.message("❌ Error procesando la solicitud. Intenta nuevamente.")
+                        session_manager.clear_session(user_id)
+                        return PlainTextResponse(str(response), media_type="application/xml")
+                else:
+                    # Flete no válido
+                    product = ai_query.get('product', 'producto')
+                    size = ai_query.get('size', 'talla')
+                    destination = ai_query.get('destination', 'destino')
+                    
+                    response.message(f"🤔 Valor no válido. Por favor responde con el valor del flete:\n\n💡 **Ejemplos:**\n• **0.25** para $0.25/kg\n• **0.30** para $0.30/kg\n• **flete 0.22**\n\nO escribe 'menu' para volver al inicio")
+                    return PlainTextResponse(str(response), media_type="application/xml")
+            else:
+                response.message("❌ Error: No se encontraron datos de la solicitud. Por favor intenta nuevamente.")
+                session_manager.clear_session(user_id)
+                return PlainTextResponse(str(response), media_type="application/xml")
+        
         # Análisis rápido de intención
         ai_analysis = openai_service._basic_intent_analysis(Body)
         logger.info(f"🔍 Análisis básico para {user_id}: {ai_analysis}")
@@ -691,9 +780,13 @@ U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60
 
                     return PlainTextResponse(str(response), media_type="application/xml")
                 else:
-                    # Verificar si falta el glaseo específicamente
+                    # Verificar qué información falta específicamente
                     glaseo_factor = ai_query.get('glaseo_factor') if ai_query else None
-                    logger.info(f"🔍 Verificando glaseo: glaseo_factor={glaseo_factor}, ai_query={ai_query}")
+                    flete_solicitado = ai_query.get('flete_solicitado', False) if ai_query else False
+                    flete_custom = ai_query.get('flete_custom') if ai_query else None
+                    destination = ai_query.get('destination') if ai_query else None
+                    
+                    logger.info(f"🔍 Verificando datos faltantes: glaseo_factor={glaseo_factor}, flete_solicitado={flete_solicitado}, flete_custom={flete_custom}, destination={destination}")
                     
                     if glaseo_factor is None:
                         # Falta el glaseo - pedir al usuario que lo especifique
@@ -721,6 +814,31 @@ U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60
                         
                         # Guardar el estado para esperar la respuesta del glaseo
                         session_manager.set_session_state(user_id, 'waiting_for_glaseo', {
+                            'ai_query': ai_query
+                        })
+                        
+                        return PlainTextResponse(str(response), media_type="application/xml")
+                    elif flete_solicitado and flete_custom is None:
+                        # Usuario solicitó flete pero no especificó valor y tampoco está en Sheets
+                        product = ai_query.get('product', 'producto') if ai_query else 'producto'
+                        size = ai_query.get('size', 'talla') if ai_query else 'talla'
+                        
+                        logger.info(f"🚢 Pidiendo valor de flete para {product} {size} con destino {destination}")
+                        
+                        flete_message = f"""🚢 **Para calcular el precio con flete a {destination or 'destino'} necesito el valor del flete:**
+
+💡 **Ejemplos:**
+• "flete 0.25"
+• "0.30 de flete"
+• "con flete de 0.22"
+
+¿Cuál es el valor del flete por kilo? 💰"""
+                        
+                        response.message(flete_message)
+                        logger.info(f"✅ Mensaje de flete agregado a la respuesta")
+                        
+                        # Guardar el estado para esperar la respuesta del flete
+                        session_manager.set_session_state(user_id, 'waiting_for_flete', {
                             'ai_query': ai_query
                         })
                         
