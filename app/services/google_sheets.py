@@ -444,8 +444,8 @@ class GoogleSheetsService:
             if not worksheet:
                 worksheet = worksheets[0]  # Fallback
             
-            # Leer celda AC28 (columna 29, fila 28)
-            flete_value = worksheet.cell(28, 29).value
+            # Leer celda AE28 (columna 31, fila 28)
+            flete_value = worksheet.cell(28, 31).value
             
             if flete_value and self._is_number(flete_value):
                 flete = self._clean_price(flete_value)

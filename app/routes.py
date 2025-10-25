@@ -213,6 +213,7 @@ async def whatsapp_webhook(request: Request,
                     r'(\d+)\s*%',  # "20%"
                     r'(\d+)\s*porciento',  # "20 porciento"
                     r'(\d+)\s*por\s*ciento',  # "20 por ciento"
+                    r'al\s*(\d+)',  # "al 20"
                     r'^(\d+)$',  # Solo el número "20"
                 ]
                 
