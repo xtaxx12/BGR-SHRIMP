@@ -296,90 +296,107 @@ async def whatsapp_webhook(request: Request,
         
         # Manejar respuesta de flete
         if session['state'] == 'waiting_for_flete':
-            # Usuario está respondiendo con el valor del flete
-            ai_query = session['data'].get('ai_query')
-            
-            if ai_query:
-                # Intentar extraer el valor del flete del mensaje
-                flete_value = None
+            try:
+                # Usuario está respondiendo con el valor del flete
+                ai_query = session['data'].get('ai_query')
                 
-                # Patrones para detectar valor de flete
-                flete_patterns = [
-                    r'(\d+\.?\d*)\s*(?:centavos?|cents?)',  # "25 centavos", "0.25 cents"
-                    r'(?:flete\s*)?(\d+\.?\d*)(?:\s|$)',  # "flete 0.25", "0.25"
-                    r'(\d+\.?\d*)\s*(?:de\s*)?flete',  # "0.25 de flete"
-                    r'^\s*(\d+\.?\d*)\s*$',  # Solo el número "0.25"
-                ]
-                
-                message_lower = Body.lower().strip()
-                for pattern in flete_patterns:
-                    match = re.search(pattern, message_lower)
-                    if match:
-                        try:
-                            flete_value = float(match.group(1))
-                            # Si el valor es mayor a 5, probablemente son centavos, convertir a dólares
-                            if flete_value > 5:
-                                flete_value = flete_value / 100
-                            break
-                        except ValueError:
-                            continue
-                
-                if flete_value and flete_value > 0:
-                    # Actualizar ai_query con el flete
-                    ai_query['flete_custom'] = flete_value
+                if ai_query:
+                    # Intentar extraer el valor del flete del mensaje
+                    flete_value = None
                     
-                    # Intentar calcular el precio con el flete
-                    price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(ai_query,))
+                    # Patrones para detectar valor de flete
+                    flete_patterns = [
+                        r'(\d+\.?\d*)\s*(?:centavos?|cents?)',  # "25 centavos", "0.25 cents"
+                        r'(?:flete\s*)?(\d+\.?\d*)(?:\s|$)',  # "flete 0.25", "0.25"
+                        r'(\d+\.?\d*)\s*(?:de\s*)?flete',  # "0.25 de flete"
+                        r'^\s*(\d+\.?\d*)\s*$',  # Solo el número "0.25"
+                    ]
                     
-                    if price_info:
-                        logger.debug(f"✅ Datos de proforma validados con flete ${flete_value:.2f}")
+                    message_lower = Body.lower().strip()
+                    for pattern in flete_patterns:
+                        match = re.search(pattern, message_lower)
+                        if match:
+                            try:
+                                flete_value = float(match.group(1))
+                                # Si el valor es mayor a 5, probablemente son centavos, convertir a dólares
+                                if flete_value > 5:
+                                    flete_value = flete_value / 100
+                                break
+                            except ValueError:
+                                continue
+                    
+                    if flete_value and flete_value > 0:
+                        # Actualizar ai_query con el flete
+                        ai_query['flete_custom'] = flete_value
                         
-                        # Detectar idioma automáticamente y generar PDF
-                        user_lang = _detect_language(Body, ai_analysis)
-                        session_manager.set_last_quote(user_id, price_info)
-                        session_manager.set_user_language(user_id, user_lang)
-
-                        # Generar PDF automáticamente
-                        product_name = price_info.get('producto', 'Camarón')
-                        size = price_info.get('talla', '')
-                        destination = price_info.get('destination', '')
+                        logger.info(f"🚢 Flete especificado por usuario: ${flete_value:.2f}")
+                        logger.info(f"🔍 ai_query actualizado: {ai_query}")
                         
-                        logger.info(f"📄 Generando PDF automáticamente con flete ${flete_value:.2f} para usuario {user_id}")
-                        pdf_path = pdf_generator.generate_quote_pdf(price_info, From, user_lang)
+                        # Intentar calcular el precio con el flete
+                        price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(ai_query,))
+                        logger.info(f"🔍 price_info resultado: {price_info is not None}")
+                        
+                        if price_info:
+                            logger.debug(f"✅ Datos de proforma validados con flete ${flete_value:.2f}")
+                            
+                            # Detectar idioma (usar el guardado en sesión o detectar del mensaje)
+                            user_lang = session_manager.get_user_language(user_id) or 'es'
+                            session_manager.set_last_quote(user_id, price_info)
+                            session_manager.set_user_language(user_id, user_lang)
 
-                        if pdf_path:
-                            pdf_sent = whatsapp_sender.send_pdf_document(
-                                From,
-                                pdf_path,
-                                f"Cotización BGR Export - {product_name} {size}"
-                            )
-                            if pdf_sent:
-                                response.message(f"✅ Proforma generada con flete ${flete_value:.2f} a {destination} 🚢")
+                            # Generar PDF automáticamente
+                            product_name = price_info.get('producto', 'Camarón')
+                            size = price_info.get('talla', '')
+                            destination = price_info.get('destination', '')
+                            
+                            logger.info(f"📄 Generando PDF automáticamente con flete ${flete_value:.2f} para usuario {user_id}")
+                            pdf_path = pdf_generator.generate_quote_pdf(price_info, From, user_lang)
+
+                            if pdf_path:
+                                pdf_sent = whatsapp_sender.send_pdf_document(
+                                    From,
+                                    pdf_path,
+                                    f"Cotización BGR Export - {product_name} {size}"
+                                )
+                                if pdf_sent:
+                                    response.message(f"✅ Proforma generada con flete ${flete_value:.2f} a {destination} 🚢")
+                                else:
+                                    filename = os.path.basename(pdf_path)
+                                    base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
+                                    download_url = f"{base_url}/webhook/download-pdf/{filename}"
+                                    pdf_message = response.message()
+                                    pdf_message.body(f"✅ Proforma generada. Descarga: {download_url}")
+                                
+                                # Limpiar sesión después de generar exitosamente
+                                session_manager.clear_session(user_id)
                             else:
-                                filename = os.path.basename(pdf_path)
-                                base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
-                                download_url = f"{base_url}/webhook/download-pdf/{filename}"
-                                pdf_message = response.message()
-                                pdf_message.body(f"✅ Proforma generada. Descarga: {download_url}")
-                        else:
-                            response.message("❌ Error generando la proforma. Intenta nuevamente.")
+                                response.message("❌ Error generando la proforma. Intenta nuevamente.")
+                                session_manager.clear_session(user_id)
 
-                        return PlainTextResponse(str(response), media_type="application/xml")
+                            return PlainTextResponse(str(response), media_type="application/xml")
+                        else:
+                            logger.error(f"❌ Error calculando precio con flete ${flete_value:.2f}")
+                            response.message("❌ Error procesando la solicitud. Intenta nuevamente.")
+                            session_manager.clear_session(user_id)
+                            return PlainTextResponse(str(response), media_type="application/xml")
                     else:
-                        logger.error(f"❌ Error calculando precio con flete ${flete_value:.2f}")
-                        response.message("❌ Error procesando la solicitud. Intenta nuevamente.")
-                        session_manager.clear_session(user_id)
+                        # Flete no válido
+                        product = ai_query.get('product', 'producto')
+                        size = ai_query.get('size', 'talla')
+                        destination = ai_query.get('destination', 'destino')
+                        
+                        response.message(f"🤔 Valor no válido. Por favor responde con el valor del flete:\n\n💡 **Ejemplos:**\n• **0.25** para $0.25/kg\n• **0.30** para $0.30/kg\n• **flete 0.22**\n\nO escribe 'menu' para volver al inicio")
                         return PlainTextResponse(str(response), media_type="application/xml")
                 else:
-                    # Flete no válido
-                    product = ai_query.get('product', 'producto')
-                    size = ai_query.get('size', 'talla')
-                    destination = ai_query.get('destination', 'destino')
-                    
-                    response.message(f"🤔 Valor no válido. Por favor responde con el valor del flete:\n\n💡 **Ejemplos:**\n• **0.25** para $0.25/kg\n• **0.30** para $0.30/kg\n• **flete 0.22**\n\nO escribe 'menu' para volver al inicio")
+                    response.message("❌ Error: No se encontraron datos de la solicitud. Por favor intenta nuevamente.")
+                    session_manager.clear_session(user_id)
                     return PlainTextResponse(str(response), media_type="application/xml")
-            else:
-                response.message("❌ Error: No se encontraron datos de la solicitud. Por favor intenta nuevamente.")
+                
+            except Exception as e:
+                logger.error(f"❌ Error procesando respuesta de flete: {str(e)}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                response.message("❌ Error procesando el valor del flete. Intenta nuevamente.")
                 session_manager.clear_session(user_id)
                 return PlainTextResponse(str(response), media_type="application/xml")
         
