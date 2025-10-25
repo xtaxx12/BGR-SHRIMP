@@ -763,8 +763,9 @@ Formato de respuesta: texto directo sin JSON.
                 r'glaseo\s*(\d+)\s*%',
                 r'con\s*(\d+)\s*glaseo',
                 r'(\d+)\s*porciento\s*glaseo',
-                # Patrones adicionales para "al X%"
+                # Patrones adicionales para "al X%" y "al X"
                 r'al\s*(\d+)\s*%',  # "al 20%"
+                r'al\s*(\d+)(?:\s|$)',  # "al 20" (sin %)
                 r'(\d+)\s*%\s*de\s*glaseo',
                 r'(\d+)\s*%\s*glaseo',
                 # Patrones en inglés
@@ -774,7 +775,8 @@ Formato de respuesta: texto directo sin JSON.
                 r'glaze\s*(\d+)\s*%',
                 r'with\s*(\d+)g?\s*glaze',
                 r'(\d+)\s*percent\s*glaze',
-                r'at\s*(\d+)\s*%'  # "at 20%"
+                r'at\s*(\d+)\s*%',  # "at 20%"
+                r'at\s*(\d+)(?:\s|$)'  # "at 20" (sin %)
             ]
             
             glaseo_percentage_original = None
