@@ -126,7 +126,9 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
     flete_value = None
     flete_solicitado = False
     
-    # Marcar flete solicitado si hay valor personalizado O si hay destino
+    # Marcar flete solicitado si:
+    # 1. Hay valor personalizado de flete, O
+    # 2. Hay destino (porque el análisis básico solo detecta destino si menciona flete)
     if flete_custom:
         try:
             flete_value = float(flete_custom)
@@ -134,7 +136,8 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
         except:
             pass
     elif destination:
-        # Si menciona destino (como "houston"), significa que solicitó flete
+        # Si hay destino, significa que el análisis básico detectó palabras de flete
+        # (ver openai_service.py línea 815: solo detecta destino si menciona_flete)
         flete_solicitado = True
     
     # Procesar factor de glaseo - CRÍTICO: NO USAR VALOR POR DEFECTO

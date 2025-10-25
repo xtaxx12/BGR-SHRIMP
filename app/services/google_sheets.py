@@ -418,14 +418,15 @@ class GoogleSheetsService:
         """
         return self.load_sheets_data()
     
-    def get_flete_value(self) -> float:
+    def get_flete_value(self) -> Optional[float]:
         """
         Obtiene el valor del flete desde la celda AE28 de Google Sheets
+        Retorna None si no hay valor válido (para que el sistema pida al usuario)
         """
         try:
             if not self.sheet:
-                logger.warning("Google Sheets no configurado, usando flete por defecto")
-                return 0.22  # Valor por defecto
+                logger.warning("⚠️ Google Sheets no configurado, no hay valor de flete disponible")
+                return None  # No hay valor disponible
             
             # Obtener la hoja de trabajo correcta
             worksheets = self.sheet.worksheets()
@@ -449,15 +450,15 @@ class GoogleSheetsService:
             
             if flete_value and self._is_number(flete_value):
                 flete = self._clean_price(flete_value)
-                logger.info(f"📊 Flete obtenido de AE28: ${flete}")
+                logger.info(f"✅ Flete obtenido de AE28: ${flete}")
                 return flete
             else:
-                logger.warning(f"⚠️ Valor de flete inválido en AE28: {flete_value}, usando por defecto")
-                return 0.22
+                logger.warning(f"⚠️ Valor de flete no encontrado o inválido en AE28: {flete_value}")
+                return None  # No hay valor válido
                 
         except Exception as e:
             logger.error(f"❌ Error obteniendo flete de AE28: {str(e)}")
-            return 0.22  # Valor por defecto
+            return None  # No hay valor disponible
     
     def get_costo_fijo_value(self) -> float:
         """

@@ -146,7 +146,12 @@ class PricingService:
                 if flete_custom is not None:
                     flete_value = flete_custom
                 else:
+                    # Intentar obtener flete desde Google Sheets
                     flete_value = self.sheets_service.get_flete_value()
+                    if flete_value is None:
+                        # No hay flete en Sheets, retornar None para que el sistema pida al usuario
+                        logger.warning("⚠️ Flete solicitado pero no hay valor en Sheets - se requiere valor del usuario")
+                        return None
             else:
                 flete_value = 0  # No aplicar flete si no se solicitó
             
