@@ -692,11 +692,14 @@ U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60
                 else:
                     # Verificar si falta el glaseo específicamente
                     glaseo_factor = ai_query.get('glaseo_factor') if ai_query else None
+                    logger.info(f"🔍 Verificando glaseo: glaseo_factor={glaseo_factor}, ai_query={ai_query}")
                     
                     if glaseo_factor is None:
                         # Falta el glaseo - pedir al usuario que lo especifique
                         product = ai_query.get('product', 'producto') if ai_query else 'producto'
                         size = ai_query.get('size', 'talla') if ai_query else 'talla'
+                        
+                        logger.info(f"❄️ Pidiendo glaseo para {product} {size}")
                         
                         glaseo_message = f"""❄️ **Para calcular el precio CFR de {product} {size} necesito el glaseo:**
 
@@ -713,6 +716,7 @@ U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60
 ¿Qué porcentaje de glaseo necesitas? 🤔"""
                         
                         response.message(glaseo_message)
+                        logger.info(f"✅ Mensaje de glaseo agregado a la respuesta")
                         
                         # Guardar el estado para esperar la respuesta del glaseo
                         session_manager.set_session_state(user_id, 'waiting_for_glaseo', {
