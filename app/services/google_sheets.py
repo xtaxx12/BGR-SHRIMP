@@ -13,12 +13,17 @@ class GoogleSheetsService:
         self.gc = None
         self.sheet = None
         self.prices_data = None
-        self.setup_google_sheets()
+        self._connection_initialized = False
+        self._data_loaded = False
+        self._cached_worksheet = None  # Cache for worksheet to avoid repeated lookups
     
-    def setup_google_sheets(self):
+    def _ensure_connection(self):
         """
-        Configura la conexión con Google Sheets
+        Establece la conexión con Google Sheets de forma lazy (solo cuando se necesita)
         """
+        if self._connection_initialized:
+            return
+            
         try:
             # Obtener credenciales desde variables de entorno
             credentials_json = os.getenv("GOOGLE_SHEETS_CREDENTIALS")
@@ -27,6 +32,8 @@ class GoogleSheetsService:
             if not credentials_json or not sheet_id:
                 logger.warning("Credenciales de Google Sheets no configuradas, usando datos de ejemplo")
                 self.create_sample_data()
+                self._data_loaded = True
+                self._connection_initialized = True
                 return
             
             # Parsear las credenciales JSON
@@ -56,22 +63,39 @@ class GoogleSheetsService:
             self.sheet = self.gc.open_by_key(sheet_id)
             
             logger.debug("Conexión con Google Sheets establecida exitosamente")
-            self.load_sheets_data()
+            self._connection_initialized = True
             
         except Exception as e:
             logger.error(f"Error configurando Google Sheets: {str(e)}")
             import traceback
             logger.error(f"Traceback completo: {traceback.format_exc()}")
             self.create_sample_data()
+            self._data_loaded = True
+            self._connection_initialized = True
+    
+    def setup_google_sheets(self):
+        """
+        Configura la conexión con Google Sheets (legacy method for backward compatibility)
+        """
+        self._ensure_connection()
     
     def load_sheets_data(self) -> bool:
         """
         Carga los datos desde Google Sheets (hoja PRECIOS FOB)
         """
+        # Check if data is already loaded to avoid redundant loading
+        if self._data_loaded and self.prices_data:
+            logger.debug("📦 Datos ya cargados, usando caché")
+            return True
+            
+        # Ensure connection is established
+        self._ensure_connection()
+        
         try:
             if not self.sheet:
                 logger.warning("Google Sheets no configurado, usando datos de ejemplo")
                 self.create_sample_data()
+                self._data_loaded = True
                 return True
             
             # Listar todas las hojas disponibles
@@ -94,6 +118,9 @@ class GoogleSheetsService:
                 # Usar la primera hoja disponible
                 worksheet = worksheets[0]
                 logger.info(f"Usando primera hoja disponible: {worksheet.title}")
+            
+            # Cache the worksheet for use in other methods
+            self._cached_worksheet = worksheet
             
             # Obtener todos los valores
             all_values = worksheet.get_all_values()
@@ -178,8 +205,6 @@ class GoogleSheetsService:
                         precio_kg = df.iloc[i, cols['precio_kg_col']]
                         precio_lb = df.iloc[i, cols['precio_lb_col']]
                         
-                        logger.debug(f"Leyendo {product} fila {i+1}: talla='{talla}', kg='{precio_kg}', lb='{precio_lb}'")
-                        
                         # Verificar que la talla tenga formato válido (ej: 16/20)
                         if (('/' in talla or talla.startswith('U') or talla.endswith('/100')) and talla != 'nan' and talla and talla != '' and talla != 'TALLA'):
                             # Convertir precios a float si es posible
@@ -202,10 +227,9 @@ class GoogleSheetsService:
                                 'sin_precio': precio_kg == 0
                             }
                             
-                            if precio_kg > 0:
-                                logger.info(f"✅ Agregado {product} {talla}: ${precio_kg}/kg")
-                            else:
-                                logger.info(f"⚠️ Agregado {product} {talla}: Sin precio establecido")
+                            # Only log warnings for items without price
+                            if precio_kg == 0:
+                                logger.warning(f"⚠️ {product} {talla}: Sin precio establecido")
                     except Exception as e:
                         logger.error(f"Error procesando {product} fila {i+1}: {e}")
                         continue
@@ -222,8 +246,6 @@ class GoogleSheetsService:
                         precio_kg = df.iloc[i, cols['precio_kg_col']]
                         precio_lb = df.iloc[i, cols['precio_lb_col']]
                         
-                        logger.debug(f"Leyendo {product} fila {i+1}: talla='{talla}', kg='{precio_kg}', lb='{precio_lb}'")
-                        
                         # Verificar que la talla tenga formato válido (ej: 16/20)
                         if (('/' in talla or talla.startswith('U') or talla.endswith('/100')) and talla != 'nan' and talla and talla != '' and talla != 'TALLA'):
                             # Convertir precios a float si es posible
@@ -246,10 +268,9 @@ class GoogleSheetsService:
                                 'sin_precio': precio_kg == 0
                             }
                             
-                            if precio_kg > 0:
-                                logger.info(f"✅ Agregado {product} {talla}: ${precio_kg}/kg")
-                            else:
-                                logger.info(f"⚠️ Agregado {product} {talla}: Sin precio establecido")
+                            # Only log warnings for items without price
+                            if precio_kg == 0:
+                                logger.warning(f"⚠️ {product} {talla}: Sin precio establecido")
                     except Exception as e:
                         logger.error(f"Error procesando {product} fila {i+1}: {e}")
                         continue
@@ -262,11 +283,15 @@ class GoogleSheetsService:
             for product, tallas in self.prices_data.items():
                 logger.debug(f"  {product}: {len(tallas)} tallas")
             
+            # Mark data as loaded
+            self._data_loaded = True
+            
             return True
             
         except Exception as e:
             logger.error(f"Error cargando datos de Google Sheets: {str(e)}")
             self.create_sample_data()
+            self._data_loaded = True
             return False
     
     def _is_number(self, value):
@@ -428,22 +453,38 @@ class GoogleSheetsService:
                 logger.warning("⚠️ Google Sheets no configurado, no hay valor de flete disponible")
                 return None  # No hay valor disponible
             
-            # Obtener la hoja de trabajo correcta
-            worksheets = self.sheet.worksheets()
-            worksheet = None
+            # Use cached worksheet if available and valid
+            worksheet = self._cached_worksheet
             
-            # Buscar la hoja con datos de precios (no gráficos ni hojas pequeñas)
-            for ws in worksheets:
+            # Validate cached worksheet is still accessible
+            if worksheet:
                 try:
-                    # Verificar que la hoja tenga suficientes columnas
-                    if ws.col_count >= 30 and 'gráfico' not in ws.title.lower():
-                        worksheet = ws
-                        break
+                    # Quick check to verify worksheet is still valid
+                    _ = worksheet.title
                 except:
-                    continue
+                    # Cached worksheet is stale, clear it
+                    logger.debug("Cached worksheet is stale, refreshing...")
+                    self._cached_worksheet = None
+                    worksheet = None
             
             if not worksheet:
-                worksheet = worksheets[0]  # Fallback
+                # Obtener la hoja de trabajo correcta
+                worksheets = self.sheet.worksheets()
+                
+                # Buscar la hoja con datos de precios (no gráficos ni hojas pequeñas)
+                for ws in worksheets:
+                    try:
+                        # Verificar que la hoja tenga suficientes columnas
+                        if ws.col_count >= 30 and 'gráfico' not in ws.title.lower():
+                            worksheet = ws
+                            self._cached_worksheet = ws  # Cache it
+                            break
+                    except:
+                        continue
+                
+                if not worksheet:
+                    worksheet = worksheets[0]  # Fallback
+                    self._cached_worksheet = worksheet
             
             # Leer celda AE28 (columna 31, fila 28)
             flete_value = worksheet.cell(28, 31).value
