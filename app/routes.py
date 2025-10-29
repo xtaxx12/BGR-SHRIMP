@@ -294,6 +294,131 @@ async def whatsapp_webhook(request: Request,
                 session_manager.clear_session(user_id)
                 return PlainTextResponse(str(response), media_type="application/xml")
         
+        # Manejar respuesta de flete para múltiples productos
+        if session['state'] == 'waiting_for_multi_flete':
+            try:
+                # Usuario está respondiendo con el valor del flete para múltiples productos
+                products = session['data'].get('products')
+                glaseo_factor = session['data'].get('glaseo_factor')
+                glaseo_percentage = session['data'].get('glaseo_percentage')
+                is_ddp = session['data'].get('is_ddp', False)
+                
+                if products and glaseo_factor:
+                    # Intentar extraer el valor del flete del mensaje
+                    flete_value = None
+                    
+                    # Patrones para detectar valor de flete
+                    flete_patterns = [
+                        r'(\d+\.?\d*)\s*(?:centavos?|cents?)',
+                        r'(?:flete\s*)?(\d+\.?\d*)(?:\s|$)',
+                        r'(\d+\.?\d*)\s*(?:de\s*)?flete',
+                        r'^\s*(\d+\.?\d*)\s*$',
+                    ]
+                    
+                    message_lower = Body.lower().strip()
+                    for pattern in flete_patterns:
+                        match = re.search(pattern, message_lower)
+                        if match:
+                            try:
+                                flete_value = float(match.group(1))
+                                if flete_value > 5:
+                                    flete_value = flete_value / 100
+                                break
+                            except ValueError:
+                                continue
+                    
+                    if flete_value and flete_value > 0:
+                        logger.info(f"🚢 Flete especificado para múltiples productos: ${flete_value:.2f}")
+                        
+                        # Calcular precios para todos los productos con el flete
+                        products_info = []
+                        failed_products = []
+                        
+                        for product_data in products:
+                            try:
+                                query = {
+                                    'product': product_data['product'],
+                                    'size': product_data['size'],
+                                    'glaseo_factor': glaseo_factor,
+                                    'glaseo_percentage': glaseo_percentage,
+                                    'flete_custom': flete_value,
+                                    'flete_solicitado': True,
+                                    'custom_calculation': True
+                                }
+                                
+                                price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(query,))
+                                
+                                if price_info:
+                                    products_info.append(price_info)
+                                else:
+                                    failed_products.append(f"{product_data['product']} {product_data['size']}")
+                            except Exception as e:
+                                logger.error(f"❌ Error calculando precio para {product_data['product']} {product_data['size']}: {str(e)}")
+                                failed_products.append(f"{product_data['product']} {product_data['size']}")
+                        
+                        if products_info:
+                            # Detectar idioma y generar PDF consolidado automáticamente
+                            user_lang = session_manager.get_user_language(user_id) or 'es'
+                            
+                            # Guardar como última cotización
+                            session_manager.set_last_quote(user_id, {
+                                'consolidated': True,
+                                'products_info': products_info,
+                                'glaseo_percentage': glaseo_percentage,
+                                'failed_products': failed_products,
+                                'flete': flete_value
+                            })
+                            session_manager.set_user_language(user_id, user_lang)
+                            
+                            logger.info(f"📄 Generando PDF consolidado con flete ${flete_value:.2f}")
+                            pdf_path = pdf_generator.generate_consolidated_quote_pdf(
+                                products_info,
+                                From,
+                                user_lang,
+                                glaseo_percentage
+                            )
+                            
+                            if pdf_path:
+                                pdf_sent = whatsapp_sender.send_pdf_document(
+                                    From,
+                                    pdf_path,
+                                    f"Cotización Consolidada BGR Export - {len(products_info)} productos"
+                                )
+                                if pdf_sent:
+                                    response.message(f"✅ Cotización consolidada generada con flete ${flete_value:.2f} - {len(products_info)} productos 🚢")
+                                else:
+                                    filename = os.path.basename(pdf_path)
+                                    base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
+                                    download_url = f"{base_url}/webhook/download-pdf/{filename}"
+                                    response.message(f"✅ Cotización generada\n📄 Descarga: {download_url}")
+                                
+                                # Limpiar sesión
+                                session_manager.clear_session(user_id)
+                            else:
+                                response.message("❌ Error generando PDF consolidado. Intenta nuevamente.")
+                                session_manager.clear_session(user_id)
+                        else:
+                            response.message("❌ No se pudieron calcular precios para ningún producto.")
+                            session_manager.clear_session(user_id)
+                        
+                        return PlainTextResponse(str(response), media_type="application/xml")
+                    else:
+                        # Flete no válido
+                        response.message(f"🤔 Valor no válido. Por favor responde con el valor del flete:\n\n💡 **Ejemplos:**\n• **0.25** para $0.25/kg\n• **0.30** para $0.30/kg\n• **flete 0.22**\n\nO escribe 'menu' para volver al inicio")
+                        return PlainTextResponse(str(response), media_type="application/xml")
+                else:
+                    response.message("❌ Error: No se encontraron datos de la solicitud. Por favor intenta nuevamente.")
+                    session_manager.clear_session(user_id)
+                    return PlainTextResponse(str(response), media_type="application/xml")
+                    
+            except Exception as e:
+                logger.error(f"❌ Error procesando respuesta de flete para múltiples productos: {str(e)}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                response.message("❌ Error procesando el valor del flete. Intenta nuevamente.")
+                session_manager.clear_session(user_id)
+                return PlainTextResponse(str(response), media_type="application/xml")
+        
         # Manejar respuesta de flete
         if session['state'] == 'waiting_for_flete':
             try:
@@ -596,8 +721,47 @@ async def whatsapp_webhook(request: Request,
                         break
             
             if glaseo_factor and glaseo_percentage:
-                # El usuario ya especificó el glaseo, procesar directamente
+                # El usuario ya especificó el glaseo
                 logger.info(f"✅ Glaseo detectado en mensaje: {glaseo_percentage}%")
+                
+                # Verificar si menciona DDP y si especificó el flete
+                is_ddp = ai_analysis.get('is_ddp', False) if ai_analysis else False
+                flete_custom = ai_analysis.get('flete_custom') if ai_analysis else None
+                
+                # Si es DDP sin flete, pedir el flete antes de continuar
+                if is_ddp and flete_custom is None:
+                    logger.info(f"📦 DDP detectado sin flete - pidiendo valor de flete para {len(multiple_products)} productos")
+                    
+                    # Mostrar lista de productos detectados
+                    products_list = "\n".join([f"   {i+1}. {p['product']} {p['size']}" 
+                                              for i, p in enumerate(multiple_products)])
+                    
+                    ddp_flete_message = f"""📦 **Detecté precio DDP para {len(multiple_products)} productos:**
+
+{products_list}
+
+❄️ Glaseo: {glaseo_percentage}%
+
+🚢 **Para calcular el precio DDP necesito el valor del flete:**
+
+💡 **Ejemplos:**
+• "flete 0.25"
+• "0.30 de flete"
+• "con flete de 0.22"
+
+¿Cuál es el valor del flete por kilo? 💰"""
+                    
+                    response.message(ddp_flete_message)
+                    
+                    # Guardar estado para esperar respuesta de flete
+                    session_manager.set_session_state(user_id, 'waiting_for_multi_flete', {
+                        'products': multiple_products,
+                        'glaseo_factor': glaseo_factor,
+                        'glaseo_percentage': glaseo_percentage,
+                        'is_ddp': is_ddp
+                    })
+                    
+                    return PlainTextResponse(str(response), media_type="application/xml")
                 
                 # Calcular precios para todos los productos
                 products_info = []
@@ -610,8 +774,9 @@ async def whatsapp_webhook(request: Request,
                             'size': product_data['size'],
                             'glaseo_factor': glaseo_factor,
                             'glaseo_percentage': glaseo_percentage,
-                            'flete_custom': 0.15,
-                            'flete_solicitado': True,
+                            # Incluir flete si se especificó
+                            'flete_custom': flete_custom,
+                            'flete_solicitado': True if flete_custom is not None else False,
                             'custom_calculation': True
                         }
                         
@@ -1215,8 +1380,7 @@ Responde con el número o escribe:
                                 'size': product_data['size'],
                                 'glaseo_factor': glaseo_factor,
                                 'glaseo_percentage': glaseo_percentage,
-                                'flete_custom': 0.15,  # Flete por defecto
-                                'flete_solicitado': True,
+                                # NO aplicar flete por defecto - solo si el usuario lo especifica
                                 'custom_calculation': True
                             }
                             
@@ -1237,8 +1401,8 @@ Responde con el número o escribe:
                             'consolidated': True,
                             'products_info': products_info,
                             'glaseo_percentage': glaseo_percentage,
-                            'failed_products': failed_products,
-                            'flete': 0.15
+                            'failed_products': failed_products
+                            # NO incluir flete por defecto
                         }
                         session_manager.set_last_quote(user_id, last)
                         session_manager.set_user_language(user_id, user_lang)

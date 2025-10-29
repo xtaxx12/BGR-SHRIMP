@@ -260,6 +260,7 @@ OTROS DESTINOS (usan kilos): Europa, China, Japón, etc.
 PARÁMETROS CRÍTICOS A EXTRAER (TODOS DINÁMICOS):
 - Glaseo: "10 de glaseo", "glaseo 10%", "glaseo 0.15", "con 15 glaseo" → extraer valor decimal exacto
 - Flete: SOLO si menciona explícitamente "flete", "freight", "envío" → extraer valor numérico
+- DDP: Si menciona "DDP" → DEBE pedir flete si no lo especifica (necesario para desglosar precio)
 - Precio base: "precio base 5.50", "base 6.20", "precio 4.80" → extraer valor si se menciona
 - Cantidad: "15000 lb", "10 toneladas", "5000 kilos" → extraer número y unidad
 - Cliente: "para [nombre]", "cliente [nombre]", "empresa [nombre]"
@@ -268,7 +269,8 @@ PARÁMETROS CRÍTICOS A EXTRAER (TODOS DINÁMICOS):
 REGLAS IMPORTANTES:
 - El usuario puede especificar TODOS los valores: glaseo, flete, precio base
 - Si menciona "proforma" o "cotización" → intent: "proforma"
-- IMPORTANTE: Solo extraer "destination" si menciona EXPLÍCITAMENTE flete/envío
+- IMPORTANTE: Solo extraer "destination" si menciona EXPLÍCITAMENTE flete/envío/DDP
+- Si menciona "DDP" SIN valor de flete → marcar flete_solicitado=true para pedirlo
 - NO asumir destino automáticamente - solo si dice "flete a [lugar]" o "envío a [lugar]"
 - Extraer valores numéricos EXACTOS que mencione el usuario
 - Si no especifica un valor → null (el sistema NO usará defaults fijos)
@@ -280,10 +282,12 @@ FACTORES DE GLASEO ESTÁNDAR:
 
 EJEMPLOS DE EXTRACCIÓN:
 "Proforma 20/30 HOSO glaseo 10% flete Houston" → glaseo_factor: 0.90, destination: "Houston", usar_libras: true
-"Cotización con glaseo 20% y flete 0.25" → glaseo_factor: 0.80, flete_custom: 0.25
+"Cotización con glaseo 20% y flete 0.25" → glaseo_factor: 0.80, flete_custom: 0.25, flete_solicitado: true
 "Precio base 5.50 con glaseo 30%" → precio_base_custom: 5.50, glaseo_factor: 0.70, destination: null
-"HLSO 16/20 glaseo 20%" → glaseo_factor: 0.80, destination: null, flete_custom: null
-"16/20 sin cabeza con 20 de glaseo" → glaseo_factor: 0.80, destination: null, flete_custom: null
+"HLSO 16/20 glaseo 20%" → glaseo_factor: 0.80, destination: null, flete_custom: null, flete_solicitado: false
+"16/20 sin cabeza con 20 de glaseo" → glaseo_factor: 0.80, destination: null, flete_custom: null, flete_solicitado: false
+"Precio DDP LA or Houston al 15%" → glaseo_factor: 0.85, is_ddp: true, flete_custom: null, flete_solicitado: true (DEBE pedir flete)
+"Precio DDP con flete 0.30 al 15%" → glaseo_factor: 0.85, is_ddp: true, flete_custom: 0.30, flete_solicitado: true
 
 Responde SOLO en formato JSON válido:
 {
@@ -790,6 +794,19 @@ Formato de respuesta: texto directo sin JSON.
                     glaseo_factor = 1 - (glaseo_percentage_original / 100)
                     break
             
+            # Detectar si menciona DDP (precio que YA incluye flete)
+            # DDP = Delivered Duty Paid (precio incluye todo: flete, impuestos, etc.)
+            # IMPORTANTE: Si dice DDP, necesitamos el valor del flete para desglosar el precio
+            ddp_patterns = [
+                r'\bddp\b',  # DDP con límites de palabra
+                r'ddp\s',    # DDP seguido de espacio
+                r'\sddp',    # DDP precedido de espacio
+                r'precio\s+ddp', 
+                r'ddp\s+price', 
+                r'delivered\s+duty\s+paid'
+            ]
+            menciona_ddp = any(re.search(pattern, message_lower) for pattern in ddp_patterns)
+            
             # Detectar valores numéricos de flete
             flete_custom = None
             flete_patterns = [
@@ -800,6 +817,7 @@ Formato de respuesta: texto directo sin JSON.
                 r'(\d+\.?\d*)\s*freight',  # "0.20 freight"
             ]
             
+            # Extraer valor de flete si se menciona
             for pattern in flete_patterns:
                 match = re.search(pattern, message_lower)
                 if match:
@@ -809,8 +827,8 @@ Formato de respuesta: texto directo sin JSON.
                     except ValueError:
                         continue
             
-            # Solo detectar destinos si se menciona flete explícitamente
-            flete_keywords = ['flete', 'freight', 'envio', 'envío', 'shipping', 'transporte']
+            # Detectar destinos si se menciona flete o DDP
+            flete_keywords = ['flete', 'freight', 'envio', 'envío', 'shipping', 'transporte', 'ddp']
             menciona_flete = any(keyword in message_lower for keyword in flete_keywords)
             
             if menciona_flete:
@@ -989,6 +1007,7 @@ Formato de respuesta: texto directo sin JSON.
                 "glaseo_factor": glaseo_factor,
                 "glaseo_percentage": glaseo_percentage_original,  # Porcentaje original solicitado
                 "flete_custom": flete_custom,  # Valor de flete personalizado detectado
+                "is_ddp": menciona_ddp,  # Flag para indicar que es precio DDP (ya incluye flete)
                 "usar_libras": usar_libras,
                 "cliente_nombre": cliente_nombre,
                 "wants_proforma": True,
