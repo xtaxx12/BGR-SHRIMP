@@ -101,6 +101,7 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
     glaseo_factor = ai_analysis.get('glaseo_factor')
     glaseo_percentage = ai_analysis.get('glaseo_percentage')  # Porcentaje original
     flete_custom = ai_analysis.get('flete_custom')
+    is_ddp = ai_analysis.get('is_ddp', False)  # Flag para precio DDP (ya incluye flete)
     usar_libras = ai_analysis.get('usar_libras', False)
     cliente_nombre = ai_analysis.get('cliente_nombre')
     
@@ -126,10 +127,28 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
     flete_value = None
     flete_solicitado = False
     
+    # Si es DDP, SIEMPRE necesitamos el flete para desglosar el precio
+    if is_ddp:
+        if flete_custom:
+            # Usuario especificó el flete en el mensaje DDP
+            try:
+                flete_value = float(flete_custom)
+                flete_solicitado = True
+                logger.info(f"📦 Precio DDP con flete ${flete_value:.2f} especificado")
+            except:
+                # Flete inválido, solicitar al usuario
+                flete_solicitado = True
+                flete_value = None
+                logger.info("📦 Precio DDP detectado - se solicitará valor de flete")
+        else:
+            # DDP sin flete especificado - DEBE pedirlo
+            flete_solicitado = True
+            flete_value = None
+            logger.info("📦 Precio DDP detectado SIN flete - se solicitará valor de flete al usuario")
     # Marcar flete solicitado si:
     # 1. Hay valor personalizado de flete, O
     # 2. Hay destino (porque el análisis básico solo detecta destino si menciona flete)
-    if flete_custom:
+    elif flete_custom:
         try:
             flete_value = float(flete_custom)
             flete_solicitado = True
@@ -137,7 +156,6 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
             pass
     elif destination:
         # Si hay destino, significa que el análisis básico detectó palabras de flete
-        # (ver openai_service.py línea 815: solo detecta destino si menciona_flete)
         flete_solicitado = True
     
     # Procesar factor de glaseo - CRÍTICO: NO USAR VALOR POR DEFECTO
