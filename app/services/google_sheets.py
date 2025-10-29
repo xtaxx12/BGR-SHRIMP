@@ -229,7 +229,7 @@ class GoogleSheetsService:
                             
                             # Only log warnings for items without price
                             if precio_kg == 0:
-                                logger.debug(f"⚠️ {product} {talla}: Sin precio establecido")
+                                logger.warning(f"⚠️ {product} {talla}: Sin precio establecido")
                     except Exception as e:
                         logger.error(f"Error procesando {product} fila {i+1}: {e}")
                         continue
@@ -270,7 +270,7 @@ class GoogleSheetsService:
                             
                             # Only log warnings for items without price
                             if precio_kg == 0:
-                                logger.debug(f"⚠️ {product} {talla}: Sin precio establecido")
+                                logger.warning(f"⚠️ {product} {talla}: Sin precio establecido")
                     except Exception as e:
                         logger.error(f"Error procesando {product} fila {i+1}: {e}")
                         continue
@@ -453,8 +453,19 @@ class GoogleSheetsService:
                 logger.warning("⚠️ Google Sheets no configurado, no hay valor de flete disponible")
                 return None  # No hay valor disponible
             
-            # Use cached worksheet if available
+            # Use cached worksheet if available and valid
             worksheet = self._cached_worksheet
+            
+            # Validate cached worksheet is still accessible
+            if worksheet:
+                try:
+                    # Quick check to verify worksheet is still valid
+                    _ = worksheet.title
+                except:
+                    # Cached worksheet is stale, clear it
+                    logger.debug("Cached worksheet is stale, refreshing...")
+                    self._cached_worksheet = None
+                    worksheet = None
             
             if not worksheet:
                 # Obtener la hoja de trabajo correcta
