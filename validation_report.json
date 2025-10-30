@@ -1,0 +1,77 @@
+{
+  "summary": {
+    "total_tests": 8,
+    "passed": 8,
+    "failed": 0,
+    "success_rate": 100.0,
+    "total_duration": 16.961589,
+    "start_time": "2025-10-30T12:05:00.640598",
+    "end_time": "2025-10-30T12:05:17.602187"
+  },
+  "results": [
+    {
+      "test_file": "test_quality_assurance.py",
+      "passed": true,
+      "duration": 0.104416,
+      "stdout": "🧪 Probando Sistema de Aseguramiento de Calidad...\n\n================================================================================\n\n1️⃣ Test: Producto válido\n   Resultado: ✅ VÁLIDO\n\n2️⃣ Test: Producto inválido\n   Resultado: ❌ INVÁLIDO: Producto 'CAMARÓN_GIGANTE' no es válido. Productos válidos: HOSO, HLSO, P&D IQF, P&D BLOQUE, EZ PEEL, PuD-EUROPA, PuD-EEUU, COOKED, PRE-COCIDO, COCIDO SIN TRATAR\n\n3️⃣ Test: Talla válida\n   Resultado: ✅ VÁLIDO\n\n4️⃣ Test: Talla inválida\n   Resultado: ❌ INVÁLIDO: Talla '99/100' no es válida. Tallas válidas: U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60, 60/70, 61/70, 70/80, 71/90\n\n5️⃣ Test: Glaseo válido (15%)\n   Resultado: ✅ VÁLIDO\n\n6️⃣ Test: Glaseo inválido (60%)\n   Resultado: ❌ INVÁLIDO: Glaseo 60% fuera de rango válido (0% - 50%)\n\n7️⃣ Test: Precio válido (HLSO $8.00/kg)\n   Resultado: ✅ VÁLIDO\n\n8️⃣ Test: Precio fuera de rango (HLSO $50.00/kg)\n   Resultado: ❌ INVÁLIDO: Precio $50.00/kg para HLSO fuera de rango esperado ($4.00 - $12.00)\n\n9️⃣ Test: Validación completa de cotización\n   Resultado: ✅ VÁLIDO\n\n🔟 Test: Validación de múltiples productos\n   Resultado: ✅ TODOS VÁLIDOS\n   Válidos: 2/2\n\n================================================================================\n✅ Tests de QA completados!\n================================================================================\n",
+      "stderr": "⚠️ Precio $50.00/kg para HLSO fuera de rango esperado ($4.00 - $12.00)\n",
+      "return_code": 0
+    },
+    {
+      "test_file": "test_flexible_glaseo.py",
+      "passed": true,
+      "duration": 2.791665,
+      "stdout": "🧪 Probando conversión flexible de glaseo...\n\n================================================================================\nFórmula: Factor = 1 - (percentage / 100)\n================================================================================\n\n✅ Glaseo 10%:\n   Esperado: 0.9\n   Calculado: 0.9\n   Fórmula: 1 - (10/100) = 0.9\n\n✅ Glaseo 14%:\n   Esperado: 0.86\n   Calculado: 0.86\n   Fórmula: 1 - (14/100) = 0.86\n\n✅ Glaseo 15%:\n   Esperado: 0.85\n   Calculado: 0.85\n   Fórmula: 1 - (15/100) = 0.85\n\n✅ Glaseo 20%:\n   Esperado: 0.8\n   Calculado: 0.8\n   Fórmula: 1 - (20/100) = 0.8\n\n✅ Glaseo 25%:\n   Esperado: 0.75\n   Calculado: 0.75\n   Fórmula: 1 - (25/100) = 0.75\n\n✅ Glaseo 30%:\n   Esperado: 0.7\n   Calculado: 0.7\n   Fórmula: 1 - (30/100) = 0.7\n\n✅ Glaseo 5%:\n   Esperado: 0.95\n   Calculado: 0.95\n   Fórmula: 1 - (5/100) = 0.95\n\n✅ Glaseo 50%:\n   Esperado: 0.5\n   Calculado: 0.5\n   Fórmula: 1 - (50/100) = 0.5\n\n================================================================================\n✅ Todos los tests pasaron!\n================================================================================\n\n📋 Ejemplos prácticos:\n\nUsuario: 'Proforma HLSO 16/20 con glaseo 15%'\n   → Factor calculado: 0.85\n   → Precio neto $10.00 × 0.85 = $8.50\n\nUsuario: 'Cotización HOSO 30/40 glaseo 25%'\n   → Factor calculado: 0.75\n   → Precio neto $8.00 × 0.75 = $6.00\n\nUsuario: 'HLSO 21/25 al 14%'\n   → Factor calculado: 0.86\n   → Precio neto $12.00 × 0.86 = $10.32\n",
+      "stderr": "",
+      "return_code": 0
+    },
+    {
+      "test_file": "test_consolidated_quote.py",
+      "passed": true,
+      "duration": 4.185516,
+      "stdout": "🧪 Probando cotización consolidada...\n\n1️⃣ Mensaje del usuario:\nPrecios para esto por favor ..\nHOSO 50-60 block 10x4\nHLSO 16-20 block 10x4\nHLSO 26-30 block 10x4\nHLSO 36-40 block 10x4\nHLSO 51-60 block 10x4\nPYD TAIL OFF 61-70 IQF 5X2\n16-20 EZPEEL IQF 10X2\n26-30 EZPEEL IQF 10X2\nDDP LA or Houston\n\n================================================================================\n\n2️⃣ Productos detectados: 8\n   1. HOSO 50/60\n   2. HLSO 16/20\n   3. HLSO 26/30\n   4. HLSO 36/40\n   5. HLSO 51/60\n   6. P&D IQF 61/70\n   7. EZ PEEL 16/20\n   8. EZ PEEL 26/30\n\n3️⃣ Calculando precios con glaseo 20%...\n   ✅ HOSO 50/60: $4.07/kg\n   ✅ HLSO 16/20: $7.05/kg\n   ✅ HLSO 26/30: $5.99/kg\n   ✅ HLSO 36/40: $5.73/kg\n   ✅ HLSO 51/60: $5.20/kg\n   ✅ P&D IQF 61/70: $6.07/kg\n   ✅ EZ PEEL 16/20: $8.57/kg\n   ✅ EZ PEEL 26/30: $7.46/kg\n\n4️⃣ Precios calculados: 8/8\n\n5️⃣ Generando PDF consolidado...\n   ✅ PDF generado: generated_pdfs\\cotizacion_BGR_consolidada_20251030_120507_7425.pdf\n   📊 Tamaño: 2767 bytes\n\n✅ ¡Test completado exitosamente!\n",
+      "stderr": "Credenciales de Google Sheets no configuradas, usando datos de ejemplo\nCredenciales de Google Sheets no configuradas, usando datos de ejemplo\n",
+      "return_code": 0
+    },
+    {
+      "test_file": "test_hoso_3040_calculation.py",
+      "passed": true,
+      "duration": 3.567725,
+      "stdout": "🧪 Probando cálculo HOSO 30/40...\n\n📋 Parámetros:\n   Producto: HOSO\n   Talla: 30/40\n   Glaseo: 20% (factor 0.8)\n   Flete: $0.15\n\n✅ Resultado del cálculo:\n   📊 Precio base (Excel): $5.52/kg\n   🚢 Precio FOB: $5.52/kg\n   ❄️ Precio con glaseo: $4.19/kg\n   💰 Precio FOB + glaseo: $4.48/kg\n   ✈️ Precio CFR (final): $4.63/kg\n\n🧮 Verificación manual del cálculo:\n   1. Precio base: $5.52\n   2. Precio neto = $5.52 - $0.29 = $5.23\n   3. Precio con glaseo = $5.23 × 0.8 = $4.19\n   4. Precio FOB + glaseo = $4.19 + $0.29 = $4.48\n   5. Precio CFR = $4.48 + $0.15 = $4.63\n\n📊 Comparación:\n   Calculado: $4.63\n   Manual: $4.63\n   Excel esperado: $4.63\n\n✅ El cálculo coincide con el Excel!\n",
+      "stderr": "Credenciales de Google Sheets no configuradas, usando datos de ejemplo\nCredenciales de Google Sheets no configuradas, usando datos de ejemplo\n",
+      "return_code": 0
+    },
+    {
+      "test_file": "test_session_preservation.py",
+      "passed": true,
+      "duration": 0.132377,
+      "stdout": "🧪 Probando preservación de sesión...\n\n1️⃣ Guardando idioma y cotización...\n   ✅ Idioma guardado: es\n   ✅ Cotización guardada: HOSO 30/40\n\n2️⃣ Limpiando sesión...\n   ✅ Sesión limpiada\n\n3️⃣ Verificando datos preservados...\n   ✅ Idioma preservado: es\n   ✅ Cotización preservada: HOSO 30/40\n\n✅ Todos los tests pasaron!\n",
+      "stderr": "",
+      "return_code": 0
+    },
+    {
+      "test_file": "test_routes_flete.py",
+      "passed": true,
+      "duration": 2.659032,
+      "stdout": "",
+      "stderr": "",
+      "return_code": 0
+    },
+    {
+      "test_file": "test_routes_glaseo.py",
+      "passed": true,
+      "duration": 2.569255,
+      "stdout": "",
+      "stderr": "",
+      "return_code": 0
+    },
+    {
+      "test_file": "test_natural_conversation.py",
+      "passed": true,
+      "duration": 0.932124,
+      "stdout": "🧪 Probando conversación natural con GPT...\n\n================================================================================\n⚠️ OpenAI no está disponible. Configura OPENAI_API_KEY para probar.\n",
+      "stderr": "",
+      "return_code": 0
+    }
+  ]
+}

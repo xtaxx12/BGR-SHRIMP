@@ -1,0 +1,166 @@
+{
+  "timestamp": "2025-10-30T12:39:39.111343",
+  "summary": {
+    "total_checks": 16,
+    "passed": 15,
+    "failed": 1,
+    "critical_checks": 7,
+    "critical_passed": 6,
+    "warnings_count": 3,
+    "ready_for_deployment": false
+  },
+  "results": [
+    {
+      "name": "Variables de entorno requeridas",
+      "passed": true,
+      "is_critical": true,
+      "duration": 2.193450927734375e-05,
+      "details": "Todas las variables requeridas configuradas: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_NUMBER",
+      "warning": null,
+      "timestamp": "2025-10-30T12:39:31.258578"
+    },
+    {
+      "name": "Variables de entorno opcionales",
+      "passed": true,
+      "is_critical": false,
+      "duration": 1.0728836059570312e-05,
+      "details": "Configuradas: GOOGLE_SHEETS_ID, GOOGLE_SHEETS_CREDENTIALS, OPENAI_API_KEY",
+      "warning": null,
+      "timestamp": "2025-10-30T12:39:31.259949"
+    },
+    {
+      "name": "Variables de seguridad",
+      "passed": false,
+      "is_critical": true,
+      "duration": 2.9087066650390625e-05,
+      "details": "Problemas: SECRET_KEY no configurada; DEBUG=true en producción es un riesgo de seguridad",
+      "warning": null,
+      "timestamp": "2025-10-30T12:39:31.261187"
+    },
+    {
+      "name": "Configuración de producción",
+      "passed": true,
+      "is_critical": false,
+      "duration": 4.1961669921875e-05,
+      "details": "ENVIRONMENT=development, BASE_URL=https://bgr-shrimp.onrender.com",
+      "warning": "ALLOWED_HOSTS='*' permite cualquier host; CORS_ORIGINS='*' permite cualquier origen",
+      "timestamp": "2025-10-30T12:39:31.262149"
+    },
+    {
+      "name": "Conectividad con Twilio",
+      "passed": true,
+      "is_critical": true,
+      "duration": 1.4133710861206055,
+      "details": "Conectado a Twilio - Account: My first Twilio account, Status: active",
+      "warning": null,
+      "timestamp": "2025-10-30T12:39:32.677068"
+    },
+    {
+      "name": "Conectividad con Google Sheets",
+      "passed": true,
+      "is_critical": false,
+      "duration": 2.3842382431030273,
+      "details": "Conectado a Google Sheets: CALCULO DE PRECIOS- AGUAJE 17",
+      "warning": null,
+      "timestamp": "2025-10-30T12:39:35.062627"
+    },
+    {
+      "name": "Conectividad con OpenAI",
+      "passed": true,
+      "is_critical": false,
+      "duration": 1.169302225112915,
+      "details": "Conectado a OpenAI API",
+      "warning": null,
+      "timestamp": "2025-10-30T12:39:36.233167"
+    },
+    {
+      "name": "Acceso a archivo Excel",
+      "passed": true,
+      "is_critical": true,
+      "duration": 1.2825233936309814,
+      "details": "Archivo Excel accesible: 21 hojas encontradas",
+      "warning": null,
+      "timestamp": "2025-10-30T12:39:37.516559"
+    },
+    {
+      "name": "Configuración HTTPS",
+      "passed": true,
+      "is_critical": true,
+      "duration": 3.0994415283203125e-06,
+      "details": "HTTPS configurado: https://bgr-shrimp.onrender.com",
+      "warning": null,
+      "timestamp": "2025-10-30T12:39:37.517832"
+    },
+    {
+      "name": "Configuración de rate limiting",
+      "passed": true,
+      "is_critical": false,
+      "duration": 7.867813110351562e-06,
+      "details": "30 requests por 60s",
+      "warning": null,
+      "timestamp": "2025-10-30T12:39:37.518698"
+    },
+    {
+      "name": "Configuración de tokens",
+      "passed": true,
+      "is_critical": true,
+      "duration": 7.62939453125e-06,
+      "details": "Tokens principales configurados",
+      "warning": "ADMIN_API_TOKEN no configurada",
+      "timestamp": "2025-10-30T12:39:37.519725"
+    },
+    {
+      "name": "Headers de seguridad",
+      "passed": true,
+      "is_critical": false,
+      "duration": 0.5190398693084717,
+      "details": "Headers de seguridad implementados",
+      "warning": null,
+      "timestamp": "2025-10-30T12:39:38.039938"
+    },
+    {
+      "name": "Directorio de logs",
+      "passed": true,
+      "is_critical": true,
+      "duration": 0.0009868144989013672,
+      "details": "Directorio de logs escribible: logs",
+      "warning": null,
+      "timestamp": "2025-10-30T12:39:38.042443"
+    },
+    {
+      "name": "Configuración de logging",
+      "passed": true,
+      "is_critical": false,
+      "duration": 0.0058917999267578125,
+      "details": "Sistema de logging configurado. Logs existentes: app.log, errors.log, security.log, business.log",
+      "warning": null,
+      "timestamp": "2025-10-30T12:39:38.049378"
+    },
+    {
+      "name": "Sistema de monitoreo",
+      "passed": true,
+      "is_critical": false,
+      "duration": 1.0565943717956543,
+      "details": "Sistema de monitoreo limitado",
+      "warning": "Sentry no configurado; Métricas no habilitadas",
+      "timestamp": "2025-10-30T12:39:39.107161"
+    },
+    {
+      "name": "Configuración de backup",
+      "passed": true,
+      "is_critical": false,
+      "duration": 0.00023627281188964844,
+      "details": "Directorio de datos existe, sessions.json: 1656 bytes",
+      "warning": null,
+      "timestamp": "2025-10-30T12:39:39.108573"
+    }
+  ],
+  "warnings": [
+    "Configuración de producción: ALLOWED_HOSTS='*' permite cualquier host; CORS_ORIGINS='*' permite cualquier origen",
+    "Configuración de tokens: ADMIN_API_TOKEN no configurada",
+    "Sistema de monitoreo: Sentry no configurado; Métricas no habilitadas"
+  ],
+  "critical_failures": [
+    "Variables de seguridad"
+  ]
+}
