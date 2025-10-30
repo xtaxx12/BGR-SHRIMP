@@ -7,6 +7,26 @@ Este directorio contiene el sistema completo de validación y certificación de 
 ### 1. Script Maestro (`master_validation.py`)
 Script principal que orquesta todo el proceso de validación y certificación.
 
+### 2. Checklist de Pre-Despliegue (`pre_deploy_checklist.py`)
+Script automatizado que valida que el sistema esté listo para despliegue a producción.
+
+**Uso:**
+```bash
+python scripts/pre_deploy_checklist.py
+```
+
+**Funcionalidad:**
+- Valida variables de entorno requeridas y opcionales
+- Verifica conectividad con servicios externos (Twilio, Google Sheets, OpenAI)
+- Valida configuración de seguridad (HTTPS, rate limiting, tokens)
+- Verifica sistema de logs y monitoreo
+- Genera reporte detallado en JSON
+
+**Documentación completa:** Ver `scripts/README_PRE_DEPLOY.md`
+
+### 3. Script Maestro de Validación (`master_validation.py`)
+Script principal que orquesta todo el proceso de validación y certificación.
+
 **Uso:**
 ```bash
 python scripts/master_validation.py
@@ -18,7 +38,7 @@ python scripts/master_validation.py
 - Genera certificado de calidad en PDF y TXT
 - Proporciona resumen consolidado de resultados
 
-### 2. Ejecutor de Tests (`run_validation.py`)
+### 4. Ejecutor de Tests (`run_validation.py`)
 Ejecuta todos los tests existentes y genera reporte consolidado.
 
 **Uso:**
@@ -39,7 +59,7 @@ python scripts/run_validation.py
 **Salida:**
 - `validation_report.json` - Reporte detallado en JSON
 
-### 3. Validador de Puntos Críticos (`validate_critical_points.py`)
+### 5. Validador de Puntos Críticos (`validate_critical_points.py`)
 Verifica funcionalidades esenciales del sistema.
 
 **Uso:**
@@ -61,7 +81,7 @@ python scripts/validate_critical_points.py
 - Resultados en consola
 - Datos disponibles para certificado
 
-### 4. Generador de Certificado (`generate_quality_certificate.py`)
+### 6. Generador de Certificado (`generate_quality_certificate.py`)
 Genera certificado de calidad en formato PDF y TXT.
 
 **Uso:**
@@ -78,6 +98,20 @@ python scripts/generate_quality_certificate.py
 - `quality_certificate.txt` - Certificado en texto plano (siempre)
 
 ## 🚀 Uso Recomendado
+
+### Flujo Completo de Pre-Despliegue
+
+1. **Checklist de Pre-Despliegue** (Primero)
+```bash
+python scripts/pre_deploy_checklist.py
+```
+Verifica que el entorno esté configurado correctamente.
+
+2. **Validación Completa** (Después)
+```bash
+python scripts/master_validation.py
+```
+Ejecuta tests y valida puntos críticos.
 
 ### Validación Completa (Recomendado)
 ```bash
@@ -103,8 +137,10 @@ python scripts/generate_quality_certificate.py
 
 ## 📊 Archivos Generados
 
-Después de ejecutar la validación completa, se generan los siguientes archivos:
+### Pre-Despliegue
+- `pre_deploy_checklist_report.json` - Reporte de checklist de pre-despliegue
 
+### Validación Completa
 - `validation_report.json` - Reporte detallado de todos los tests
 - `critical_points_report.json` - Reporte de puntos críticos
 - `quality_certificate.pdf` - Certificado de calidad en PDF
