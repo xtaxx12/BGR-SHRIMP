@@ -1,229 +1,114 @@
-# Documentación de Entrega - BGR Shrimp Bot v2.0
+# BGR Shrimp Bot — Documentación de Entrega (v2.0)
 
-## Índice de Documentos
+[Estado del proyecto] [badge-placeholder] [Última actualización: Enero 2025]
 
-Esta carpeta contiene toda la documentación de entrega del proyecto BGR Shrimp Bot. Los documentos están organizados para facilitar su consulta según el rol y necesidad.
+Descripción breve
+-----------------
+BGR Shrimp Bot es una solución orientada a automatizar consultas y ventas (proformas, precios, tallas) para BGR Export, integrando canales como WhatsApp (Twilio), Google Sheets y servicios de IA. Esta carpeta contiene la documentación de entrega organizada por rol y propósito.
 
----
+Tabla de contenido
+------------------
+- Quick Start
+- Documentos principales
+  - Resumen Ejecutivo
+  - Manual de Usuario
+  - Manual Técnico
+  - Guía de Troubleshooting
+  - Documentación de API
+  - Guía de Mantenimiento
+- Deployment y Mantenimiento
+- Troubleshooting rápido
+- Contribuir / Cambios
+- Contacto y Soporte
+- Licencia y Confidencialidad
+- Historial y Metadatos
 
-## Documentos Disponibles
+Quick Start
+-----------
+Prerrequisitos:
+- Python 3.10+ (o la versión indicada en el MANUAL_TECNICO)
+- Acceso a la cuenta Twilio (SID, Auth Token) para integración WhatsApp
+- Credenciales de Google (API/Service Account) para Google Sheets
+- Clave de OpenAI (si se utiliza)
+- Acceso a la base de datos / credenciales de almacenamiento
 
-### 1. Resumen Ejecutivo
-**Archivo:** `01-RESUMEN_EJECUTIVO.md`  
-**Para:** Gerencia, Stakeholders  
-**Contenido:**
-- Overview del proyecto
-- Objetivos alcanzados
-- Beneficios para el negocio
-- Estadísticas clave y métricas de calidad
-- ROI y resultados medibles
-- Próximos pasos
+Pasos básicos:
+1. Clonar el repositorio.
+2. Crear y activar un entorno virtual: python -m venv .venv && source .venv/bin/activate
+3. Instalar dependencias: pip install -r requirements.txt
+4. Crear un archivo .env con las variables necesarias (ver abajo).
+5. Ejecutar las validaciones: scripts/pre_deploy_checklist.py
+6. Iniciar la aplicación (ver README raíz / MANUAL_TECNICO para comandos específicos).
 
-**Cuándo usar:** Para presentaciones ejecutivas, reportes de proyecto, evaluación de resultados.
+Variables de entorno recomendadas (ejemplos)
+- TWILIO_ACCOUNT_SID=
+- TWILIO_AUTH_TOKEN=
+- TWILIO_WHATSAPP_FROM=
+- GOOGLE_SERVICE_ACCOUNT_JSON_PATH=
+- OPENAI_API_KEY=
+- DATABASE_URL=
+- LOG_LEVEL=INFO
 
----
+Documentos principales (resumen y enlaces)
+-----------------------------------------
+- 01-RESUMEN_EJECUTIVO.md — Overview para gerencia: objetivos, ROI, métricas clave.
+- 02-MANUAL_USUARIO.md — Guía para usuarios finales: comandos, FAQs, casos de uso.
+- 03-MANUAL_TECNICO.md — Documentación técnica: arquitectura, variables de entorno, despliegue.
+- 04-GUIA_TROUBLESHOOTING.md — Diagnóstico y soluciones rápidas para soporte.
+- 05-API_DOCUMENTATION.md — Endpoints, autenticación y ejemplos (incluye webhooks de Twilio).
+- 06-GUIA_MANTENIMIENTO.md — Procedimientos de mantenimiento, backups y calendario.
 
-### 2. Manual de Usuario
-**Archivo:** `02-MANUAL_USUARIO.md`  
-**Para:** Usuarios finales, Personal de ventas  
-**Contenido:**
-- Guía de uso del bot
-- Productos y tallas disponibles
-- Formas de consultar precios
-- Generación de proformas
-- Comandos disponibles
-- Casos de uso comunes
-- Preguntas frecuentes
-- Solución de problemas básicos
+(Archivos ubicados en la carpeta docs/entrega; ver cada archivo para detalles completos)
 
-**Cuándo usar:** Para capacitación de usuarios, referencia rápida, onboarding de nuevo personal.
+Deployment y mantenimiento
+--------------------------
+- Revisa 03-MANUAL_TECNICO.md para el proceso de despliegue y ramas recomendadas.
+- Antes de cada release ejecutar: scripts/master_validation.py y scripts/pre_deploy_checklist.py
+- Backups: seguir la sección "Backup y restauración" en 06-GUIA_MANTENIMIENTO.md
+- Monitoreo y alertas: configurar logging (LOG_LEVEL) y un sistema de alertas para errores críticos.
 
----
+Troubleshooting rápido
+----------------------
+- Problema de integración Twilio: validar variables TWILIO_* y revisar logs de Twilio.
+- Problemas con Google Sheets: verificar el path de GOOGLE_SERVICE_ACCOUNT_JSON y permisos.
+- Fallos de IA / OpenAI: revisar cuota y clave OPENAI_API_KEY, manejar errores por rate limit.
+- Para pasos detallados seguir 04-GUIA_TROUBLESHOOTING.md.
 
-### 3. Manual Técnico
-**Archivo:** `03-MANUAL_TECNICO.md`  
-**Para:** Desarrolladores, Administradores de sistemas  
-**Contenido:**
-- Arquitectura del sistema
-- Componentes principales
-- Estructura del código
-- Patrones de diseño utilizados
-- Configuración de variables de entorno
-- Base de datos y almacenamiento
-- Integraciones externas (Twilio, Google Sheets, OpenAI)
-- Seguridad
-- Logging y monitoreo
-- Procedimientos de deployment
+Scripts de validación incluidos
+-------------------------------
+- scripts/master_validation.py
+- scripts/pre_deploy_checklist.py
+- scripts/validate_critical_points.py
+- scripts/generate_quality_certificate.py
 
-**Cuándo usar:** Para desarrollo, troubleshooting técnico, deployment, configuración del sistema.
+Contribuir y control de cambios
+-------------------------------
+- CAMBIOS_DDP.md contiene el historial detallado de cambios.
+- Para propuestas de cambio: crear un branch con nombre tipo feature/xxx o fix/xxx y abrir PR describiendo el objetivo y pruebas realizadas.
+- Tests y QA: seguir QUALITY_ASSURANCE.md antes de mergear.
 
----
+Contacto y soporte
+------------------
+- Documentación y consultas: rojassebas765@gmail.com
+- Soporte técnico (incidentes críticos): rojassebas765@gmail.com / +593 968058769 — Disponibilidad: 24/7 para incidentes críticos
+- Mantenido por: Sebastián Rojas
 
-### 4. Guía de Troubleshooting
-**Archivo:** `04-GUIA_TROUBLESHOOTING.md`  
-**Para:** Soporte técnico, Administradores  
-**Contenido:**
-- Problemas comunes y soluciones
-- Diagnóstico paso a paso
-- Códigos de error y su significado
-- Problemas de integración
-- Problemas de performance
-- Procedimientos de emergencia
+Licencia y confidencialidad
+---------------------------
+- Confidencialidad: Uso interno de BGR Export
+- Distribución: Prohibida sin autorización
+- Copyright © 2025 BGR Export — Todos los derechos reservados
 
-**Cuándo usar:** Cuando hay problemas con el sistema, errores, o comportamiento inesperado.
+Historial y metadatos
+---------------------
+- Versión actual: 1.0
+- Fecha: Enero 2025
+- Próxima revisión: Febrero 2025
+- Última actualización: Enero 2025
 
----
-
-### 5. Documentación de API
-**Archivo:** `05-API_DOCUMENTATION.md`  
-**Para:** Desarrolladores, Integradores  
-**Contenido:**
-- Endpoints disponibles
-- Autenticación y seguridad
-- Modelos de datos
-- Códigos de respuesta
-- Ejemplos de uso
-- Webhooks de Twilio
-- Rate limiting
-
-**Cuándo usar:** Para integraciones, desarrollo de features, testing de API.
-
----
-
-### 6. Guía de Mantenimiento
-**Archivo:** `06-GUIA_MANTENIMIENTO.md`  
-**Para:** Administradores de sistemas, DevOps  
-**Contenido:**
-- Mantenimiento preventivo (diario, semanal, mensual)
-- Procedimientos de actualización
-- Backup y restauración
-- Monitoreo y alertas
-- Optimización de performance
-- Gestión de logs
-- Actualización de datos
-- Calendario de mantenimiento
-
-**Cuándo usar:** Para mantenimiento rutinario, actualizaciones, backups, optimización.
-
----
-
-## Guía Rápida por Rol
-
-### Para Gerencia / Stakeholders
-1. Leer: `01-RESUMEN_EJECUTIVO.md`
-2. Revisar métricas y ROI
-3. Evaluar próximos pasos
-
-### Para Usuarios Finales
-1. Leer: `02-MANUAL_USUARIO.md`
-2. Practicar casos de uso comunes
-3. Consultar preguntas frecuentes cuando sea necesario
-
-### Para Desarrolladores
-1. Leer: `03-MANUAL_TECNICO.md`
-2. Familiarizarse con arquitectura y componentes
-3. Consultar: `05-API_DOCUMENTATION.md` para integraciones
-4. Usar: `04-GUIA_TROUBLESHOOTING.md` para debugging
-
-### Para Administradores de Sistemas
-1. Leer: `03-MANUAL_TECNICO.md` (secciones de deployment y configuración)
-2. Implementar: `06-GUIA_MANTENIMIENTO.md` (tareas rutinarias)
-3. Configurar monitoreo y alertas
-4. Consultar: `04-GUIA_TROUBLESHOOTING.md` cuando haya problemas
-
-### Para Soporte Técnico
-1. Leer: `02-MANUAL_USUARIO.md` (para entender funcionalidad)
-2. Usar: `04-GUIA_TROUBLESHOOTING.md` (para resolver problemas)
-3. Consultar: `03-MANUAL_TECNICO.md` (para problemas técnicos avanzados)
-
----
-
-## Flujo de Consulta Recomendado
-
-### Problema de Usuario
-1. Consultar: `02-MANUAL_USUARIO.md` → Sección "Solución de Problemas"
-2. Si no se resuelve → `04-GUIA_TROUBLESHOOTING.md` → Sección "Problemas Comunes"
-3. Si persiste → Contactar soporte técnico
-
-### Problema Técnico
-1. Consultar: `04-GUIA_TROUBLESHOOTING.md` → "Diagnóstico Paso a Paso"
-2. Revisar logs según: `03-MANUAL_TECNICO.md` → "Logging y Monitoreo"
-3. Si es problema de integración → `05-API_DOCUMENTATION.md`
-4. Si persiste → Procedimientos de emergencia en `04-GUIA_TROUBLESHOOTING.md`
-
-### Mantenimiento Rutinario
-1. Seguir: `06-GUIA_MANTENIMIENTO.md` → "Calendario de Mantenimiento"
-2. Ejecutar tareas según frecuencia (diaria, semanal, mensual)
-3. Documentar resultados
-
-### Actualización del Sistema
-1. Seguir: `06-GUIA_MANTENIMIENTO.md` → "Procedimientos de Actualización"
-2. Consultar: `03-MANUAL_TECNICO.md` → "Deployment"
-3. Verificar con: `04-GUIA_TROUBLESHOOTING.md` si hay problemas
-
----
-
-## Documentos Adicionales
-
-Además de estos documentos principales, el proyecto incluye:
-
-- **README.MD** (raíz del proyecto) - Información general y setup
-- **CAMBIOS_DDP.md** - Historial de cambios específicos
-- **QUALITY_ASSURANCE.md** - Documentación de QA
-- **Scripts de validación** en carpeta `scripts/`
-  - `master_validation.py`
-  - `pre_deploy_checklist.py`
-  - `validate_critical_points.py`
-  - `generate_quality_certificate.py`
-
----
-
-## Actualizaciones de Documentación
-
-**Versión Actual:** 1.0  
-**Fecha:** Enero 2025  
-**Próxima Revisión:** Febrero 2025
-
-### Historial de Cambios
-
-**v1.0 (Enero 2025)**
-- Creación inicial de toda la documentación de entrega
-- 6 documentos principales completados
-- Cobertura completa de funcionalidad, arquitectura y mantenimiento
-
-### Proceso de Actualización
-
-Cuando se actualice la documentación:
-
-1. Actualizar el documento correspondiente
-2. Incrementar número de versión
-3. Actualizar fecha de "Última Actualización" en el documento
-4. Documentar cambios en este README
-5. Notificar a stakeholders relevantes
-
----
-
-## Contacto
-
-**Para Consultas sobre Documentación:**
-- Email: rojassebas765@gmail.com
-- WhatsApp: +593 968058769
-
-**Para Soporte Técnico:**
-- Email: rojassebas765@gmail.com
-- WhatsApp: +593 968058769
-- Horario: 24/7 para incidentes críticos
-
----
-
-## Licencia y Confidencialidad
-
-**Confidencialidad:** Uso interno de BGR Export  
-**Distribución:** Prohibida sin autorización  
-**Copyright:** © 2025 BGR Export - Todos los derechos reservados
-
----
-
-**Última Actualización:** Enero 2025  
-**Mantenido por:** Sebastián Rojas  
-**Versión:** 1.0
+Notas finales y recomendaciones
+-------------------------------
+- Reemplaza los badges/placeholder por enlaces reales (status CI, cobertura, security scan).
+- Mueve instrucciones de Quick Start al README raíz si deseas que nuevos contribuyentes las vean primero.
+- Añade ejemplos de comandos concretos de inicio y ejemplos de conversación (si aplica) en 02-MANUAL_USUARIO.md para acelerar onboarding.
+- Considera añadir una sección "Rollback" en 06-GUIA_MANTENIMIENTO.md con pasos de reversión seguros.
