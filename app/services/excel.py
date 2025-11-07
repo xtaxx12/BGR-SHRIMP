@@ -12,8 +12,9 @@ class ExcelService:
     def __init__(self, excel_path: str = "data/CALCULO_DE _PRECIOS-AGUAJE17.xlsx", google_sheets_service: Optional[GoogleSheetsService] = None):
         self.excel_path = excel_path
         self.prices_data = None
+        self._data_loaded = False
         # Usar Google Sheets como fuente principal
-        self.google_sheets_service = GoogleSheetsService()
+        self.google_sheets_service = google_sheets_service if google_sheets_service else GoogleSheetsService()
         self.load_data()
 
     def load_data(self) -> bool:
