@@ -14,6 +14,7 @@ class GoogleSheetsService:
         self.sheet = None
         self.prices_data = None
         self._connection_initialized = False
+        self._data_loaded = False
         self.setup_google_sheets()
 
     def setup_google_sheets(self):
