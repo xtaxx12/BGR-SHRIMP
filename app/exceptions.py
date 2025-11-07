@@ -1,15 +1,16 @@
-from typing import Optional, Dict, Any
-from fastapi import HTTPException, Request
-from fastapi.responses import JSONResponse
 import logging
 import traceback
 from datetime import datetime
+from typing import Any
+
+from fastapi import Request
+from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
 class BusinessException(Exception):
     """Excepción base para errores de negocio"""
-    def __init__(self, message: str, code: str = "BUSINESS_ERROR", details: Dict[str, Any] = None):
+    def __init__(self, message: str, code: str = "BUSINESS_ERROR", details: dict[str, Any] = None):
         self.message = message
         self.code = code
         self.details = details or {}
@@ -17,7 +18,7 @@ class BusinessException(Exception):
 
 class ValidationError(BusinessException):
     """Error de validación de datos"""
-    def __init__(self, message: str, field: str = None, details: Dict[str, Any] = None):
+    def __init__(self, message: str, field: str = None, details: dict[str, Any] = None):
         super().__init__(message, "VALIDATION_ERROR", details)
         if field:
             self.details["field"] = field
@@ -98,7 +99,7 @@ async def business_exception_handler(request: Request, exc: BusinessException):
             "method": request.method
         }
     )
-    
+
     return JSONResponse(
         status_code=400,
         content={
@@ -121,7 +122,7 @@ async def validation_exception_handler(request: Request, exc: ValidationError):
             "method": request.method
         }
     )
-    
+
     return JSONResponse(
         status_code=422,
         content={
@@ -139,7 +140,7 @@ async def general_exception_handler(request: Request, exc: Exception):
     # Generar ID único para el error
     import uuid
     error_id = str(uuid.uuid4())
-    
+
     # Log completo del error
     logger.error(
         f"Unhandled exception: {error_id}",
@@ -152,7 +153,7 @@ async def general_exception_handler(request: Request, exc: Exception):
             "traceback": traceback.format_exc()
         }
     )
-    
+
     # Respuesta genérica al cliente (no revelar detalles internos)
     return JSONResponse(
         status_code=500,
@@ -168,8 +169,9 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 # Decorador para manejo de errores en funciones
 
+from collections.abc import Callable
 from functools import wraps
-from typing import Callable
+
 
 def handle_errors(default_message: str = "An error occurred"):
     """Decorador para manejo automático de errores"""
@@ -197,13 +199,13 @@ def handle_errors(default_message: str = "An error occurred"):
                     code="FUNCTION_ERROR",
                     details={"function": func.__name__}
                 )
-        
+
         return wrapper
     return decorator
 
 # Utilidades para manejo de errores
 
-def safe_parse_json(data: str) -> Optional[Dict[str, Any]]:
+def safe_parse_json(data: str) -> dict[str, Any] | None:
     """Parse JSON de forma segura"""
     try:
         import json

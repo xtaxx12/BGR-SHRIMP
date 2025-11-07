@@ -6,9 +6,7 @@
 3. [Monitoreo y Logging](#monitoreo-y-logging)
 4. [Mejores Prácticas](#mejores-prácticas)
 5. [Checklist de Calidad](#checklist-de-calidad)
-
 ---
-
 ## 1. Validaciones Implementadas
 
 ### ✅ Validación de Productos

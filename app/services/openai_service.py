@@ -1,9 +1,9 @@
-import requests
-import os
-import logging
 import json
+import logging
+import os
 import re
-from typing import Optional, Dict, List
+
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -13,13 +13,13 @@ class OpenAIService:
         self.model = "gpt-3.5-turbo"
         self.whisper_model = "whisper-1"
         self.base_url = "https://api.openai.com/v1"
-    
-    
+
+
     def is_available(self) -> bool:
         """Verifica si OpenAI está disponible"""
         return bool(self.api_key)
-    
-    def chat_with_context(self, user_message: str, conversation_history: List[Dict] = None, session_data: Dict = None) -> Dict:
+
+    def chat_with_context(self, user_message: str, conversation_history: list[dict] = None, session_data: dict = None) -> dict:
         """
         Conversación natural con GPT manteniendo contexto completo
         MANEJA CUALQUIER TIPO DE SOLICITUD DEL USUARIO
@@ -35,28 +35,28 @@ class OpenAIService:
         if not self.is_available():
             # Fallback inteligente sin IA
             return self._intelligent_fallback(user_message, session_data)
-        
+
         try:
             # Construir historial de conversación
             messages = [
                 {"role": "system", "content": self._get_conversation_system_prompt()}
             ]
-            
+
             # Agregar contexto de sesión si existe
             if session_data:
                 context_message = self._build_context_message(session_data)
                 messages.append({"role": "system", "content": context_message})
-            
+
             # Agregar historial de conversación
             if conversation_history:
                 messages.extend(conversation_history[-10:])  # Últimos 10 mensajes
-            
+
             # Agregar mensaje actual
             messages.append({"role": "user", "content": user_message})
-            
+
             # Hacer petición a GPT con reintentos
             result = self._make_request_with_retry(messages, max_tokens=500, temperature=0.7)
-            
+
             if result:
                 # Parsear respuesta para extraer acciones
                 parsed = self._parse_gpt_response(result)
@@ -64,12 +64,12 @@ class OpenAIService:
             else:
                 # Fallback inteligente si falla la petición
                 return self._intelligent_fallback(user_message, session_data)
-        
+
         except Exception as e:
             logger.error(f"❌ Error en chat con contexto: {str(e)}")
             # Siempre retornar algo coherente
             return self._intelligent_fallback(user_message, session_data)
-    
+
     def _get_conversation_system_prompt(self) -> str:
         """
         Prompt del sistema para conversación natural
@@ -147,32 +147,32 @@ Respuesta: {
     "action": "ask_language",
     "data": {"glaseo": 20}
 }"""
-    
-    def _build_context_message(self, session_data: Dict) -> str:
+
+    def _build_context_message(self, session_data: dict) -> str:
         """
         Construye mensaje de contexto con datos de la sesión
         """
         context_parts = ["CONTEXTO DE LA SESIÓN ACTUAL:"]
-        
+
         if session_data.get('products'):
             products_list = ", ".join([f"{p['product']} {p['size']}" for p in session_data['products']])
             context_parts.append(f"- Productos detectados: {products_list}")
-        
+
         if session_data.get('glaseo_percentage'):
             context_parts.append(f"- Glaseo especificado: {session_data['glaseo_percentage']}%")
-        
+
         if session_data.get('destination'):
             context_parts.append(f"- Destino: {session_data['destination']}")
-        
+
         if session_data.get('language'):
             context_parts.append(f"- Idioma preferido: {session_data['language']}")
-        
+
         if session_data.get('state'):
             context_parts.append(f"- Estado actual: {session_data['state']}")
-        
+
         return "\n".join(context_parts)
-    
-    def _parse_gpt_response(self, response: str) -> Dict:
+
+    def _parse_gpt_response(self, response: str) -> dict:
         """
         Parsea la respuesta de GPT para extraer JSON
         """
@@ -198,53 +198,53 @@ Respuesta: {
                 "action": "none",
                 "data": {}
             }
-    
-    def _make_request(self, messages: List[Dict], max_tokens: int = 300, temperature: float = 0.3) -> Optional[str]:
+
+    def _make_request(self, messages: list[dict], max_tokens: int = 300, temperature: float = 0.3) -> str | None:
         """
         Hace una petición directa a la API de OpenAI usando requests
         """
         if not self.is_available():
             return None
-        
+
         try:
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json"
             }
-            
+
             data = {
                 "model": self.model,
                 "messages": messages,
                 "max_tokens": max_tokens,
                 "temperature": temperature
             }
-            
+
             response = requests.post(
                 f"{self.base_url}/chat/completions",
                 headers=headers,
                 json=data,
                 timeout=30
             )
-            
+
             if response.status_code == 200:
                 result = response.json()
                 return result["choices"][0]["message"]["content"].strip()
             else:
                 logger.error(f"❌ Error API OpenAI: {response.status_code} - {response.text}")
                 return None
-                
+
         except Exception as e:
             logger.error(f"❌ Error en petición OpenAI: {str(e)}")
             return None
-    
-    def analyze_user_intent(self, message: str, context: Dict = None) -> Dict:
+
+    def analyze_user_intent(self, message: str, context: dict = None) -> dict:
         """
         Analiza la intención del usuario usando GPT-4o mini
         """
         if not self.is_available():
             # Fallback con análisis básico de patrones
             return self._basic_intent_analysis(message)
-        
+
         try:
             system_prompt = """
 Eres un asistente especializado en análisis de solicitudes de exportación de camarón para BGR Export.
@@ -312,9 +312,9 @@ Responde SOLO en formato JSON válido:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Mensaje: '{message}'"}
             ]
-            
+
             result = self._make_request(messages, max_tokens=300, temperature=0.3)
-            
+
             if result:
                 # Intentar parsear como JSON
                 try:
@@ -326,18 +326,18 @@ Responde SOLO en formato JSON válido:
                     return {"intent": "unknown", "confidence": 0}
             else:
                 return {"intent": "unknown", "confidence": 0}
-            
+
         except Exception as e:
             logger.error(f"❌ Error en análisis OpenAI: {str(e)}")
             return {"intent": "unknown", "confidence": 0}
-    
-    def generate_smart_response(self, user_message: str, context: Dict, price_data: Dict = None) -> Optional[str]:
+
+    def generate_smart_response(self, user_message: str, context: dict, price_data: dict = None) -> str | None:
         """
         Genera una respuesta inteligente y personalizada
         """
         if not self.is_available():
             return None
-        
+
         try:
             # Construir contexto para GPT
             context_info = f"""
@@ -345,10 +345,10 @@ Usuario: {user_message}
 Estado actual: {context.get('state', 'unknown')}
 Datos de sesión: {context.get('data', {})}
 """
-            
+
             if price_data:
                 context_info += f"\nDatos de precio disponibles: {price_data}"
-            
+
             system_prompt = """
 Eres ShrimpBot, el asistente comercial de BGR Export especializado en camarones premium. Tu objetivo principal es ayudar a los clientes a crear proformas y cotizaciones.
 
@@ -391,9 +391,9 @@ OBJETIVO: Generar proformas inmediatamente cuando tengas datos suficientes.
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": context_info}
             ]
-            
+
             result = self._make_request(messages, max_tokens=200, temperature=0.7)
-            
+
             if result:
                 # Limpiar emojis problemáticos que pueden causar errores de codificación
                 cleaned_result = self._clean_problematic_emojis(result)
@@ -401,18 +401,18 @@ OBJETIVO: Generar proformas inmediatamente cuando tengas datos suficientes.
                 return cleaned_result
             else:
                 return None
-            
+
         except Exception as e:
             logger.error(f"❌ Error generando respuesta OpenAI: {str(e)}")
             return None
-    
-    def enhance_price_explanation(self, price_data: Dict) -> Optional[str]:
+
+    def enhance_price_explanation(self, price_data: dict) -> str | None:
         """
         Mejora la explicación de precios usando IA
         """
         if not self.is_available() or not price_data:
             return None
-        
+
         try:
             system_prompt = """
 Eres un experto en explicar precios de camarón de manera clara y profesional.
@@ -431,19 +431,19 @@ Formato de respuesta: texto directo sin JSON.
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Datos de precio: {price_data}"}
             ]
-            
+
             result = self._make_request(messages, max_tokens=100, temperature=0.5)
-            
+
             if result:
                 return result
             else:
                 return None
-            
+
         except Exception as e:
             logger.error(f"❌ Error mejorando explicación de precio: {str(e)}")
             return None
-    
-    def transcribe_audio(self, audio_file_path: str, language: str = 'es') -> Optional[str]:
+
+    def transcribe_audio(self, audio_file_path: str, language: str = 'es') -> str | None:
         """
         Transcribe audio usando OpenAI Whisper con manejo robusto
         Soporta múltiples idiomas y formatos de audio
@@ -458,35 +458,35 @@ Formato de respuesta: texto directo sin JSON.
         if not self.is_available():
             logger.warning("⚠️ OpenAI no disponible para transcripción de audio")
             return None
-        
+
         try:
             # Verificar que el archivo existe
             if not os.path.exists(audio_file_path):
                 logger.error(f"❌ Archivo de audio no encontrado: {audio_file_path}")
                 return None
-            
+
             # Verificar tamaño del archivo (máximo 25MB para Whisper)
             file_size = os.path.getsize(audio_file_path)
             if file_size > 25 * 1024 * 1024:  # 25MB
                 logger.error(f"❌ Archivo de audio muy grande: {file_size / (1024*1024):.2f}MB")
                 return None
-            
+
             logger.info(f"🎤 Transcribiendo audio: {audio_file_path} ({file_size / 1024:.2f}KB)")
-            
+
             headers = {
                 "Authorization": f"Bearer {self.api_key}"
             }
-            
+
             with open(audio_file_path, 'rb') as audio_file:
                 files = {
                     'file': audio_file,
                     'model': (None, self.whisper_model)
                 }
-                
+
                 # Agregar idioma solo si se especifica
                 if language:
                     files['language'] = (None, language)
-                
+
                 # Intentar transcripción con timeout extendido
                 response = requests.post(
                     f"{self.base_url}/audio/transcriptions",
@@ -494,11 +494,11 @@ Formato de respuesta: texto directo sin JSON.
                     files=files,
                     timeout=60  # Timeout más largo para archivos grandes
                 )
-            
+
             if response.status_code == 200:
                 result = response.json()
                 transcription = result.get('text', '').strip()
-                
+
                 if transcription:
                     logger.info(f"✅ Audio transcrito exitosamente: '{transcription[:100]}...'")
                     return transcription
@@ -508,7 +508,7 @@ Formato de respuesta: texto directo sin JSON.
             else:
                 logger.error(f"❌ Error API Whisper: {response.status_code} - {response.text}")
                 return None
-                
+
         except requests.exceptions.Timeout:
             logger.error("❌ Timeout en transcripción de audio")
             return None
@@ -518,18 +518,18 @@ Formato de respuesta: texto directo sin JSON.
         except Exception as e:
             logger.error(f"❌ Error inesperado en transcripción de audio: {str(e)}")
             return None
-    
-    def detect_multiple_products(self, message: str) -> List[Dict]:
+
+    def detect_multiple_products(self, message: str) -> list[dict]:
         """
         Detecta múltiples productos en un mensaje
         Retorna lista de diccionarios con producto y talla
         """
         if not message:
             return []
-        
+
         message_upper = message.upper()
         products_found = []
-        
+
         # Patrones para productos
         product_patterns = {
             'HOSO': r'\bHOSO\b',
@@ -538,29 +538,29 @@ Formato de respuesta: texto directo sin JSON.
             'P&D BLOQUE': r'\b(?:P&D|PYD)\s*(?:BLOQUE|BLOCK)\b',
             'EZ PEEL': r'\b(?:EZ\s*PEEL|EZPEEL)\b',  # Usar "EZ PEEL" con espacio como en Excel
         }
-        
+
         # Buscar todas las líneas del mensaje
         lines = message_upper.split('\n')
-        
+
         for line in lines:
             line = line.strip()
             if not line or len(line) < 5:
                 continue
-            
+
             # Buscar talla en la línea (formato XX/XX o XX-XX)
             size_match = re.search(r'(\d+)[/-](\d+)', line)
             if not size_match:
                 continue
-            
+
             size = f"{size_match.group(1)}/{size_match.group(2)}"
-            
+
             # Buscar producto en la línea
             product_found = None
             for product_name, pattern in product_patterns.items():
                 if re.search(pattern, line):
                     product_found = product_name
                     break
-            
+
             # Si no se encontró producto específico, intentar inferir
             if not product_found:
                 # Si tiene "BLOCK" o "BLOQUE", es P&D BLOQUE
@@ -569,24 +569,24 @@ Formato de respuesta: texto directo sin JSON.
                 # Si tiene "IQF", es P&D IQF
                 elif 'IQF' in line:
                     product_found = 'P&D IQF'
-            
+
             if product_found and size:
                 products_found.append({
                     'product': product_found,
                     'size': size,
                     'line': line
                 })
-        
+
         return products_found
-    
-    def _basic_intent_analysis(self, message: str) -> Dict:
+
+    def _basic_intent_analysis(self, message: str) -> dict:
         """
         Análisis básico de intenciones sin IA como fallback
         """
         message_lower = message.lower().strip()
-        
+
         # Patrones de saludo (con límites de palabra para evitar falsos positivos)
-        greeting_patterns = [r'\bhola\b', r'\bhello\b', r'\bhi\b', r'\bbuenos\b', r'\bbuenas\b', 
+        greeting_patterns = [r'\bhola\b', r'\bhello\b', r'\bhi\b', r'\bbuenos\b', r'\bbuenas\b',
                            r'\bcomo estas\b', r'\bque tal\b', r'\bq haces\b']
         if any(re.search(pattern, message_lower) for pattern in greeting_patterns):
             return {
@@ -598,7 +598,7 @@ Formato de respuesta: texto directo sin JSON.
                 "confidence": 0.8,
                 "suggested_response": "Responder con saludo amigable y mostrar opciones"
             }
-        
+
         # Detectar solicitudes de modificación de flete
         # IMPORTANTE: Solo detectar cuando hay verbos de modificación explícitos
         # NO detectar solicitudes nuevas que incluyen flete
@@ -607,16 +607,16 @@ Formato de respuesta: texto directo sin JSON.
             r'\bnuevo.*flete', r'\botro.*flete', r'\bflete.*diferente',
             r'\bmodify.*freight', r'\bchange.*freight', r'\bupdate.*freight',
         ]
-        
+
         # Verificar que NO sea una solicitud nueva de cotización/proforma
         new_quote_keywords = ['cotizar', 'cotizacion', 'proforma', 'quote', 'quotation', 'contenedor']
         is_new_quote = any(keyword in message_lower for keyword in new_quote_keywords)
-        
+
         is_flete_modification = (
             any(re.search(pattern, message_lower) for pattern in modify_flete_patterns) and
             not is_new_quote  # NO es modificación si es una solicitud nueva
         )
-        
+
         if is_flete_modification:
             # Extraer el nuevo valor de flete
             flete_custom = None
@@ -628,7 +628,7 @@ Formato de respuesta: texto directo sin JSON.
                 r'freight\s*(?:of\s*)?(?:\$\s*)?(\d+\.?\d*)',
                 r'(\d+\.?\d*)\s*freight',
             ]
-            
+
             for pattern in flete_patterns:
                 match = re.search(pattern, message_lower)
                 if match:
@@ -637,14 +637,14 @@ Formato de respuesta: texto directo sin JSON.
                         break
                     except ValueError:
                         continue
-            
+
             return {
                 "intent": "modify_flete",
                 "flete_custom": flete_custom,
                 "confidence": 0.9,
                 "suggested_response": "Modificar flete y regenerar proforma"
             }
-        
+
         # Patrones de proforma/cotización (lenguaje natural amplio)
         proforma_patterns = [
             # Palabras clave directas
@@ -652,20 +652,20 @@ Formato de respuesta: texto directo sin JSON.
             # Verbos de acción
             'creame', 'crear', 'generar', 'hazme', 'dame', 'quiero', 'necesito',
             # Consultas de precio
-            'precio de', 'precio del', 'precio por', 'cuanto cuesta', 'cuanto vale', 
+            'precio de', 'precio del', 'precio por', 'cuanto cuesta', 'cuanto vale',
             'cuanto es', 'cual es el precio', 'saber el precio', 'conocer el precio',
             # Variaciones comunes
             'cost', 'value', 'rate', 'tarifa', 'valor', 'costo',
             # Frases específicas
             'envio a', 'con envio', 'para enviar', 'destino', 'shipping'
         ]
-        
+
         # Detectar si es una consulta de precio/proforma
         is_price_query = any(pattern in message_lower for pattern in proforma_patterns)
-        
+
         # También detectar si menciona tallas específicas (fuerte indicador)
         has_size = bool(re.search(r'\b\d+/\d+\b', message_lower))
-        
+
         # Si es consulta de precio O menciona tallas, procesar como proforma
         if is_price_query or has_size:
             # Extraer información básica
@@ -674,7 +674,7 @@ Formato de respuesta: texto directo sin JSON.
             glaseo_factor = None
             destination = None
             usar_libras = False
-            
+
             # Detectar productos con patrones más amplios
             product_patterns = {
                 'HLSO': [
@@ -686,7 +686,7 @@ Formato de respuesta: texto directo sin JSON.
                     'con cabezas', 'tipo con cabeza'
                 ],
                 'P&D IQF': [
-                    'p&d iqf', 'pd iqf', 'p&d', 'pelado', 'peeled', 'deveined', 
+                    'p&d iqf', 'pd iqf', 'p&d', 'pelado', 'peeled', 'deveined',
                     'limpio', 'procesado', 'pd', 'p d', 'pelado y desvenado'
                 ],
                 'P&D BLOQUE': [
@@ -712,18 +712,18 @@ Formato de respuesta: texto directo sin JSON.
                     'cocido sin tratar', 'sin tratar', 'untreated', 'natural cocido'
                 ]
             }
-            
+
             # Buscar coincidencias de productos (orden específico para evitar conflictos)
             # Primero buscar patrones más específicos
             specific_order = ['COCIDO SIN TRATAR', 'PRE-COCIDO', 'COOKED', 'P&D IQF', 'P&D BLOQUE', 'PuD-EUROPA', 'PuD-EEUU', 'EZ PEEL', 'HLSO', 'HOSO']
-            
+
             for prod_name in specific_order:
                 if prod_name in product_patterns:
                     patterns = product_patterns[prod_name]
                     if any(pattern in message_lower for pattern in patterns):
                         product = prod_name
                         break
-            
+
             # Si no se encontró en el orden específico, buscar en el resto
             if not product:
                 for prod_name, patterns in product_patterns.items():
@@ -731,7 +731,7 @@ Formato de respuesta: texto directo sin JSON.
                         if any(pattern in message_lower for pattern in patterns):
                             product = prod_name
                             break
-            
+
             # Detectar tallas PRIMERO (antes de la lógica de HOSO)
             size_patterns = [
                 r'(\d+/\d+)',  # 21/25
@@ -739,7 +739,7 @@ Formato de respuesta: texto directo sin JSON.
                 r'(\d+)\s*-\s*(\d+)',  # 21-25
                 r'(\d+)\s+(\d+)'  # 21 25
             ]
-            
+
             for pattern in size_patterns:
                 match = re.search(pattern, message_lower)
                 if match:
@@ -748,16 +748,16 @@ Formato de respuesta: texto directo sin JSON.
                     else:
                         size = f"{match.group(1)}/{match.group(2)}"
                     break
-            
+
             # Lógica inteligente: Si no se detectó producto pero hay talla específica de HOSO, asumir HOSO
             if not product and size:
                 # Tallas que solo existen en HOSO según la tabla de precios
                 hoso_exclusive_sizes = ['20/30', '30/40', '40/50', '50/60', '60/70', '70/80']
                 if size in hoso_exclusive_sizes:
                     product = 'HOSO'
-            
+
             # NO asumir producto por defecto para otras tallas - el usuario debe especificarlo
-            
+
             # Detectar glaseo con patrones más amplios (español e inglés)
             glaseo_patterns = [
                 # Patrones en español
@@ -782,7 +782,7 @@ Formato de respuesta: texto directo sin JSON.
                 r'at\s*(\d+)\s*%',  # "at 20%"
                 r'at\s*(\d+)(?:\s|$)'  # "at 20" (sin %)
             ]
-            
+
             glaseo_percentage_original = None
             for pattern in glaseo_patterns:
                 match = re.search(pattern, message_lower)
@@ -793,7 +793,7 @@ Formato de respuesta: texto directo sin JSON.
                     # Ejemplo: 15% glaseo → factor = 1 - 0.15 = 0.85
                     glaseo_factor = 1 - (glaseo_percentage_original / 100)
                     break
-            
+
             # Detectar si menciona DDP (precio que YA incluye flete)
             # DDP = Delivered Duty Paid (precio incluye todo: flete, impuestos, etc.)
             # IMPORTANTE: Si dice DDP, necesitamos el valor del flete para desglosar el precio
@@ -801,12 +801,12 @@ Formato de respuesta: texto directo sin JSON.
                 r'\bddp\b',  # DDP con límites de palabra
                 r'ddp\s',    # DDP seguido de espacio
                 r'\sddp',    # DDP precedido de espacio
-                r'precio\s+ddp', 
-                r'ddp\s+price', 
+                r'precio\s+ddp',
+                r'ddp\s+price',
                 r'delivered\s+duty\s+paid'
             ]
             menciona_ddp = any(re.search(pattern, message_lower) for pattern in ddp_patterns)
-            
+
             # Detectar valores numéricos de flete
             flete_custom = None
             flete_patterns = [
@@ -816,7 +816,7 @@ Formato de respuesta: texto directo sin JSON.
                 r'freight\s*(?:of\s*)?(?:\$\s*)?(\d+\.?\d*)',  # "freight 0.20", "freight $0.20"
                 r'(\d+\.?\d*)\s*freight',  # "0.20 freight"
             ]
-            
+
             # Extraer valor de flete si se menciona
             for pattern in flete_patterns:
                 match = re.search(pattern, message_lower)
@@ -826,11 +826,11 @@ Formato de respuesta: texto directo sin JSON.
                         break
                     except ValueError:
                         continue
-            
+
             # Detectar destinos si se menciona flete o DDP
             flete_keywords = ['flete', 'freight', 'envio', 'envío', 'shipping', 'transporte', 'ddp']
             menciona_flete = any(keyword in message_lower for keyword in flete_keywords)
-            
+
             if menciona_flete:
                 destination_patterns = {
                     # Ciudades USA
@@ -840,7 +840,7 @@ Formato de respuesta: texto directo sin JSON.
                     'Los Angeles': ['los angeles', 'california'],  # Removido 'la' genérico
                     'Chicago': ['chicago', 'chicaco'],
                     'Dallas': ['dallas', 'dalas'],
-                    
+
                     # Países y regiones
                     'China': ['china', 'beijing', 'shanghai'],
                     'Japón': ['japon', 'japón', 'japan', 'tokyo', 'nippon'],
@@ -858,7 +858,7 @@ Formato de respuesta: texto directo sin JSON.
                     'Indonesia': ['indonesia', 'jakarta'],
                     'Malasia': ['malasia', 'malaysia', 'kuala lumpur']
                 }
-                
+
                 # Buscar destinos USA solo si menciona flete
                 for dest_name, patterns in destination_patterns.items():
                     if any(pattern in message_lower for pattern in patterns):
@@ -868,7 +868,7 @@ Formato de respuesta: texto directo sin JSON.
                             usar_libras = True  # Otras ciudades USA usan libras
                         destination = dest_name
                         break
-            
+
             # También detectar patrones de envío específicos (solo si ya menciona flete)
             if menciona_flete and not destination:
                 # Patrones más específicos para detectar destinos
@@ -878,12 +878,12 @@ Formato de respuesta: texto directo sin JSON.
                     r'hacia\s+([a-záéíóúñ\w\s]+?)(?:\s+para|\s+con|\s+de|$)',      # "hacia europa"
                     r'shipping\s+to\s+([a-zA-Z\s]+?)(?:\s+for|\s+with|$)',         # "shipping to japan"
                 ]
-                
+
                 for pattern in envio_specific_patterns:
                     match = re.search(pattern, message_lower)
                     if match:
                         dest_detected = match.group(1).strip()
-                        
+
                         # Verificar si coincide con algún destino conocido
                         for dest_name, patterns in destination_patterns.items():
                             if any(p in dest_detected for p in patterns):
@@ -894,17 +894,17 @@ Formato de respuesta: texto directo sin JSON.
                                 else:
                                     usar_libras = False  # Países internacionales usan kilos
                                 break
-                        
+
                         # Si no coincide con destinos conocidos, usar el texto detectado
                         if not destination:
                             destination = dest_detected.title()
                             usar_libras = False  # Por defecto kilos para destinos desconocidos
                         break
                 envio_patterns = [
-                    r'flete a ([a-zA-Z\s]+)', r'envio a ([a-zA-Z\s]+)', r'enviar a ([a-zA-Z\s]+)', 
+                    r'flete a ([a-zA-Z\s]+)', r'envio a ([a-zA-Z\s]+)', r'enviar a ([a-zA-Z\s]+)',
                     r'shipping to ([a-zA-Z\s]+)', r'con flete a ([a-zA-Z\s]+)'
                 ]
-                
+
                 destination_patterns = {
                     'Houston': ['houston', 'houton', 'huston'],
                     'Miami': ['miami', 'maiami', 'florida'],
@@ -913,7 +913,7 @@ Formato de respuesta: texto directo sin JSON.
                     'Chicago': ['chicago', 'chicaco'],
                     'Dallas': ['dallas', 'dalas']
                 }
-                
+
                 for pattern in envio_patterns:
                     match = re.search(pattern, message_lower)
                     if match:
@@ -930,7 +930,7 @@ Formato de respuesta: texto directo sin JSON.
                         if not destination:
                             destination = dest_word.title()
                         break
-            
+
             # Detectar nombre del cliente con patrones más amplios (español e inglés)
             cliente_nombre = None
             cliente_patterns = [
@@ -949,32 +949,32 @@ Formato de respuesta: texto directo sin JSON.
                 r'mr\s+([a-záéíóúñ\w\s]+?)(?:\s+with|\s+for|\s+price|$)',
                 r'mrs\s+([a-záéíóúñ\w\s]+?)(?:\s+with|\s+for|\s+price|$)'
             ]
-            
+
             for pattern in cliente_patterns:
                 match = re.search(pattern, message_lower)
                 if match:
                     cliente_nombre = match.group(1).strip()
                     # Limpiar palabras comunes que no son nombres (español e inglés)
                     stop_words = [
-                        'el', 'la', 'con', 'de', 'para', 'precio', 'tipo', 'glaseo', 
+                        'el', 'la', 'con', 'de', 'para', 'precio', 'tipo', 'glaseo',
                         'flete', 'producto', 'talla', 'envio', 'destino', 'kilo', 'kilos',
-                        'the', 'with', 'for', 'price', 'type', 'glaze', 'freight', 
+                        'the', 'with', 'for', 'price', 'type', 'glaze', 'freight',
                         'product', 'size', 'shipping', 'destination'
                     ]
                     cliente_words = [word for word in cliente_nombre.split() if word not in stop_words]
                     if cliente_words and len(' '.join(cliente_words)) > 2:
                         cliente_nombre = ' '.join(cliente_words)
                         break
-            
+
             # Detectar idioma
             english_keywords = ['quote', 'price', 'cost', 'freight', 'shipping', 'quotation', 'shrimp', 'product']
             spanish_keywords = ['proforma', 'cotizacion', 'precio', 'flete', 'envio', 'camaron', 'producto', 'glaseo']
-            
+
             english_count = sum(1 for keyword in english_keywords if keyword in message_lower)
             spanish_count = sum(1 for keyword in spanish_keywords if keyword in message_lower)
-            
+
             language = "en" if english_count > spanish_count else "es"
-            
+
             # Detectar cantidad
             quantity = None
             quantity_patterns = [
@@ -984,20 +984,20 @@ Formato de respuesta: texto directo sin JSON.
                 r'(\d+(?:\.\d+)?)\s*(?:mil|thousand)',
                 r'(\d+(?:,\d{3})*)\s*(?:pounds?)'
             ]
-            
+
             for pattern in quantity_patterns:
                 match = re.search(pattern, message_lower)
                 if match:
                     quantity = match.group(1)
                     break
-            
+
             # Determinar confianza basada en información extraída
             confidence = 0.6  # Base
             if size: confidence += 0.2
             if product: confidence += 0.1
             if destination: confidence += 0.1
             if glaseo_factor: confidence += 0.1
-            
+
             return {
                 "intent": "proforma",
                 "product": product,
@@ -1015,7 +1015,7 @@ Formato de respuesta: texto directo sin JSON.
                 "confidence": min(confidence, 0.95),  # Máximo 0.95
                 "suggested_response": "Procesar proforma con datos extraídos"
             }
-        
+
         # Patrones de productos
         product_patterns = ['producto', 'productos', 'camaron', 'camarones', 'hlso', 'hoso', 'p&d']
         if any(pattern in message_lower for pattern in product_patterns):
@@ -1028,7 +1028,7 @@ Formato de respuesta: texto directo sin JSON.
                 "confidence": 0.7,
                 "suggested_response": "Mostrar información de productos"
             }
-        
+
         # Patrones de ayuda
         help_patterns = ['ayuda', 'help', 'como', 'que puedes', 'opciones', '?']
         if any(pattern in message_lower for pattern in help_patterns):
@@ -1041,7 +1041,7 @@ Formato de respuesta: texto directo sin JSON.
                 "confidence": 0.8,
                 "suggested_response": "Mostrar menú de ayuda"
             }
-        
+
         return {
             "intent": "unknown",
             "product": None,
@@ -1051,30 +1051,30 @@ Formato de respuesta: texto directo sin JSON.
             "confidence": 0.3,
             "suggested_response": "Mostrar menú principal"
         }
-    
-    def get_smart_fallback_response(self, user_message: str, intent_data: Dict) -> Optional[str]:
+
+    def get_smart_fallback_response(self, user_message: str, intent_data: dict) -> str | None:
         """
         Genera respuestas inteligentes sin IA basadas en patrones
         """
         intent = intent_data.get('intent', 'unknown')
         message_lower = user_message.lower().strip()
-        
+
         if intent == 'greeting':
             # Respuesta rápida y directa para saludos
             return "¡Hola! 🦐 ¿Qué producto de camarón necesitas? Te genero la cotización al instante 💰"
-        
+
         elif intent == 'pricing':
             return "💰 ¡Perfecto! ¿Qué producto necesitas? HLSO es muy popular. Escribe 'precios' para ver tallas y crear tu proforma 📋"
-        
+
         elif intent == 'product_info':
             return "🦐 Tenemos HLSO, P&D IQF, HOSO y más. ¿Cuál te interesa? Te genero la cotización con precios FOB actualizados 💰"
-        
+
         elif intent == 'help':
             return "🤖 Te ayudo a crear proformas de camarón:\n• Precios FOB actualizados\n• Todas las tallas disponibles\n• PDF profesional\n\n¿Qué producto necesitas? 🦐"
-        
+
         else:
             return "🦐 ¡Hola! Soy ShrimpBot de BGR Export. ¿Qué camarón necesitas? Te genero la proforma al instante 📋💰"
-    
+
     def _clean_problematic_emojis(self, text: str) -> str:
         """
         Limpia emojis que pueden causar problemas de codificación en WhatsApp
@@ -1086,14 +1086,14 @@ Formato de respuesta: texto directo sin JSON.
             '💸': '💰',  # Reemplazar dinero volando por bolsa de dinero
             '🤔': '🤝',  # Reemplazar cara pensando por apretón de manos
         }
-        
+
         cleaned_text = text
         for problematic, replacement in problematic_emojis.items():
             cleaned_text = cleaned_text.replace(problematic, replacement)
-        
+
         return cleaned_text
-    
-    def _make_request_with_retry(self, messages: List[Dict], max_tokens: int = 300, temperature: float = 0.3, max_retries: int = 3) -> Optional[str]:
+
+    def _make_request_with_retry(self, messages: list[dict], max_tokens: int = 300, temperature: float = 0.3, max_retries: int = 3) -> str | None:
         """
         Hace petición a OpenAI con reintentos automáticos
         """
@@ -1102,29 +1102,29 @@ Formato de respuesta: texto directo sin JSON.
                 result = self._make_request(messages, max_tokens, temperature)
                 if result:
                     return result
-                
+
                 # Si falla, esperar un poco antes de reintentar
                 if attempt < max_retries - 1:
                     import time
                     time.sleep(1 * (attempt + 1))  # Backoff exponencial
-                    
+
             except Exception as e:
                 logger.warning(f"⚠️ Intento {attempt + 1}/{max_retries} falló: {str(e)}")
                 if attempt < max_retries - 1:
                     import time
                     time.sleep(1 * (attempt + 1))
-        
+
         return None
-    
-    def _intelligent_fallback(self, user_message: str, session_data: Dict = None) -> Dict:
+
+    def _intelligent_fallback(self, user_message: str, session_data: dict = None) -> dict:
         """
         Fallback inteligente que SIEMPRE responde algo coherente
         Maneja cualquier tipo de solicitud del usuario
         """
         message_lower = user_message.lower().strip()
-        
+
         # Detectar saludos
-        greeting_patterns = [r'\bhola\b', r'\bhello\b', r'\bhi\b', r'\bbuenos\b', r'\bbuenas\b', 
+        greeting_patterns = [r'\bhola\b', r'\bhello\b', r'\bhi\b', r'\bbuenos\b', r'\bbuenas\b',
                            r'\bhey\b', r'\bqué tal\b', r'\bcómo estás\b']
         if any(re.search(pattern, message_lower) for pattern in greeting_patterns):
             return {
@@ -1132,7 +1132,7 @@ Formato de respuesta: texto directo sin JSON.
                 "action": "greeting",
                 "data": {}
             }
-        
+
         # Detectar solicitudes de audio/voz
         audio_patterns = ['audio', 'voz', 'voice', 'nota de voz', 'mensaje de voz', 'grabación']
         if any(pattern in message_lower for pattern in audio_patterns):
@@ -1141,7 +1141,7 @@ Formato de respuesta: texto directo sin JSON.
                 "action": "audio_info",
                 "data": {}
             }
-        
+
         # Detectar preguntas sobre productos
         product_patterns = ['producto', 'productos', 'qué tienen', 'qué venden', 'catálogo', 'opciones']
         if any(pattern in message_lower for pattern in product_patterns):
@@ -1150,7 +1150,7 @@ Formato de respuesta: texto directo sin JSON.
                 "action": "product_list",
                 "data": {}
             }
-        
+
         # Detectar preguntas sobre precios
         price_patterns = ['precio', 'precios', 'cuánto', 'cuanto', 'costo', 'cost', 'value']
         if any(pattern in message_lower for pattern in price_patterns):
@@ -1159,7 +1159,7 @@ Formato de respuesta: texto directo sin JSON.
                 "action": "price_inquiry",
                 "data": {}
             }
-        
+
         # Detectar solicitudes de ayuda
         help_patterns = ['ayuda', 'help', 'cómo', 'como funciona', 'qué puedes', 'opciones']
         if any(pattern in message_lower for pattern in help_patterns):
@@ -1168,7 +1168,7 @@ Formato de respuesta: texto directo sin JSON.
                 "action": "help",
                 "data": {}
             }
-        
+
         # Detectar agradecimientos
         thanks_patterns = ['gracias', 'thanks', 'thank you', 'muchas gracias', 'te agradezco']
         if any(pattern in message_lower for pattern in thanks_patterns):
@@ -1177,7 +1177,7 @@ Formato de respuesta: texto directo sin JSON.
                 "action": "thanks",
                 "data": {}
             }
-        
+
         # Detectar despedidas
         goodbye_patterns = ['adiós', 'adios', 'bye', 'chao', 'hasta luego', 'nos vemos']
         if any(pattern in message_lower for pattern in goodbye_patterns):
@@ -1186,7 +1186,7 @@ Formato de respuesta: texto directo sin JSON.
                 "action": "goodbye",
                 "data": {}
             }
-        
+
         # Detectar tallas específicas (intento de cotización)
         if re.search(r'\d+/\d+', message_lower):
             return {
@@ -1194,7 +1194,7 @@ Formato de respuesta: texto directo sin JSON.
                 "action": "size_detected",
                 "data": {}
             }
-        
+
         # Si tiene contexto de sesión, usar eso
         if session_data and session_data.get('products'):
             products = session_data['products']
@@ -1204,15 +1204,15 @@ Formato de respuesta: texto directo sin JSON.
                 "action": "session_context",
                 "data": session_data
             }
-        
+
         # Respuesta genérica pero útil para CUALQUIER otra cosa
         return {
             "response": "🦐 Soy ShrimpBot de BGR Export.\n\nTe ayudo a crear cotizaciones de camarón premium.\n\n¿Qué producto necesitas?\nEjemplo: HLSO 16/20 💰",
             "action": "general_inquiry",
             "data": {}
         }
-    
-    def process_audio_message(self, audio_file_path: str, session_data: Dict = None, conversation_history: List[Dict] = None) -> Dict:
+
+    def process_audio_message(self, audio_file_path: str, session_data: dict = None, conversation_history: list[dict] = None) -> dict:
         """
         Procesa un mensaje de audio completo: transcribe y responde
         
@@ -1227,7 +1227,7 @@ Formato de respuesta: texto directo sin JSON.
         try:
             # Transcribir audio
             transcription = self.transcribe_audio(audio_file_path)
-            
+
             if not transcription:
                 return {
                     "response": "🎤 No pude entender el audio. ¿Podrías enviarlo de nuevo o escribir tu mensaje? 🦐",
@@ -1235,18 +1235,18 @@ Formato de respuesta: texto directo sin JSON.
                     "data": {},
                     "transcription": None
                 }
-            
+
             logger.info(f"✅ Audio transcrito: '{transcription}'")
-            
+
             # Procesar el mensaje transcrito
             result = self.handle_any_request(transcription, session_data, conversation_history)
-            
+
             # Agregar transcripción al resultado
             result['transcription'] = transcription
             result['input_type'] = 'audio'
-            
+
             return result
-            
+
         except Exception as e:
             logger.error(f"❌ Error procesando audio: {str(e)}")
             return {
@@ -1255,8 +1255,8 @@ Formato de respuesta: texto directo sin JSON.
                 "data": {},
                 "transcription": None
             }
-    
-    def handle_any_request(self, user_message: str, session_data: Dict = None, conversation_history: List[Dict] = None) -> Dict:
+
+    def handle_any_request(self, user_message: str, session_data: dict = None, conversation_history: list[dict] = None) -> dict:
         """
         MÉTODO PRINCIPAL: Maneja CUALQUIER tipo de solicitud del usuario
         Garantiza que siempre haya una respuesta coherente
@@ -1277,10 +1277,10 @@ Formato de respuesta: texto directo sin JSON.
                     "action": "empty_message",
                     "data": {}
                 }
-            
+
             # Limpiar mensaje
             user_message = user_message.strip()
-            
+
             # Intentar con IA primero
             if self.is_available():
                 try:
@@ -1289,10 +1289,10 @@ Formato de respuesta: texto directo sin JSON.
                         return result
                 except Exception as e:
                     logger.warning(f"⚠️ Error en IA, usando fallback: {str(e)}")
-            
+
             # Si falla IA o no está disponible, usar fallback inteligente
             return self._intelligent_fallback(user_message, session_data)
-            
+
         except Exception as e:
             logger.error(f"❌ Error crítico en handle_any_request: {str(e)}")
             # Última línea de defensa: respuesta de emergencia

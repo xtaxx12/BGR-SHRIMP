@@ -1,20 +1,19 @@
-import re
-from typing import Dict, Optional, List
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
-def parse_multiple_products(message: str) -> Optional[List[Dict]]:
+def parse_multiple_products(message: str) -> list[dict] | None:
     """
     Detecta y extrae múltiples productos del mensaje
     Retorna una lista de diccionarios con producto y talla
     """
     if not message:
         return None
-    
+
     message_upper = message.upper()
     products_found = []
-    
+
     # Patrones para productos
     product_patterns = {
         'HOSO': r'\bHOSO\b',
@@ -24,29 +23,29 @@ def parse_multiple_products(message: str) -> Optional[List[Dict]]:
         'EZPEEL': r'\b(?:EZ\s*PEEL|EZPEEL)\b',
         'EZ PEEL': r'\b(?:EZ\s*PEEL|EZPEEL)\b',
     }
-    
+
     # Buscar todas las líneas del mensaje
     lines = message_upper.split('\n')
-    
+
     for line in lines:
         line = line.strip()
         if not line or len(line) < 5:
             continue
-        
+
         # Buscar talla en la línea (formato XX/XX o XX-XX)
         size_match = re.search(r'(\d+)[/-](\d+)', line)
         if not size_match:
             continue
-        
+
         size = f"{size_match.group(1)}/{size_match.group(2)}"
-        
+
         # Buscar producto en la línea
         product_found = None
         for product_name, pattern in product_patterns.items():
             if re.search(pattern, line):
                 product_found = product_name
                 break
-        
+
         # Si no se encontró producto específico, intentar inferir
         if not product_found:
             # Si tiene "BLOCK" o "BLOQUE", es P&D BLOQUE
@@ -55,44 +54,44 @@ def parse_multiple_products(message: str) -> Optional[List[Dict]]:
             # Si tiene "IQF", es P&D IQF
             elif 'IQF' in line:
                 product_found = 'P&D IQF'
-        
+
         if product_found and size:
             products_found.append({
                 'product': product_found,
                 'size': size,
                 'line': line
             })
-    
+
     return products_found if products_found else None
 
-def parse_user_message(message: str) -> Optional[Dict]:
+def parse_user_message(message: str) -> dict | None:
     """
     Parsea el mensaje del usuario para extraer información relevante
     """
     if not message:
         return None
-    
+
     message_original = message.strip()
     message = message_original.upper()
-    
+
     # Excluir saludos simples y mensajes conversacionales
     simple_messages = [
         'HOLA', 'HELLO', 'HI', 'BUENOS DIAS', 'BUENAS TARDES', 'BUENAS NOCHES',
         'COMO ESTAS', 'QUE TAL', 'Q HACES', 'COMO ANDAS', 'AYUDA', 'HELP',
         'MENU', 'GRACIAS', 'THANKS', 'OK', 'SI', 'NO', 'BIEN', 'MAL'
     ]
-    
+
     if message.strip() in simple_messages:
         return None
 
-def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
+def parse_ai_analysis_to_query(ai_analysis: dict) -> dict | None:
     """
     Convierte el análisis de IA en una consulta de precio válida con parámetros personalizados
     IMPORTANTE: NO usa valores por defecto para glaseo - debe ser especificado por el usuario
     """
     if not ai_analysis or ai_analysis.get('intent') not in ['pricing', 'proforma']:
         return None
-    
+
     # Extraer información del análisis de IA
     product = ai_analysis.get('product')
     size = ai_analysis.get('size')
@@ -104,29 +103,29 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
     is_ddp = ai_analysis.get('is_ddp', False)  # Flag para precio DDP (ya incluye flete)
     usar_libras = ai_analysis.get('usar_libras', False)
     cliente_nombre = ai_analysis.get('cliente_nombre')
-    
+
     # Validar que tengamos producto y talla
     if not size:
         return None
-    
+
     # Lógica inteligente: Si no hay producto pero la talla es exclusiva de HOSO, asumir HOSO
     if not product and size:
         # Tallas que solo existen en HOSO según la tabla de precios
         hoso_exclusive_sizes = ['20/30', '30/40', '40/50', '50/60', '60/70', '70/80']
         if size in hoso_exclusive_sizes:
             product = 'HOSO'
-    
+
     # Si aún no hay producto después de la lógica inteligente, pedir al usuario que especifique
     if not product:
         return None  # Esto hará que el bot pida al usuario que especifique el producto
-    
+
     # Determinar unidad base según destino
     unit = 'lb' if usar_libras else 'kg'
-    
+
     # Procesar flete personalizado del usuario
     flete_value = None
     flete_solicitado = False
-    
+
     # Si es DDP, SIEMPRE necesitamos el flete para desglosar el precio
     if is_ddp:
         if flete_custom:
@@ -157,7 +156,7 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
     elif destination:
         # Si hay destino, significa que el análisis básico detectó palabras de flete
         flete_solicitado = True
-    
+
     # Procesar factor de glaseo - CRÍTICO: NO USAR VALOR POR DEFECTO
     glaseo_value = None
     if glaseo_factor:
@@ -172,7 +171,7 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
             glaseo_value = None  # NUNCA usar valor por defecto
     else:
         glaseo_value = None  # NUNCA usar valor por defecto - pedir al usuario
-    
+
     # Crear consulta estructurada con parámetros personalizados
     query = {
         'product': product,
@@ -188,14 +187,14 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
         'cliente_nombre': cliente_nombre,
         'custom_calculation': True  # Indica que usa cálculos personalizados
     }
-    
+
     return query
-    
+
     # Patrones para extraer información
     size_pattern = r'\b(\d+/\d+)\b'
     quantity_pattern = r'\b(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*(?:LB|LIBRAS?|POUNDS?|KG|KILOS?)\b'
     destination_pattern = r'(?:DESTINO|PARA|A)\s+([A-Z\s]+?)(?:\s|$)'
-    
+
     # Patrones para productos
     product_patterns = {
         'HOSO': r'\bHOSO\b',
@@ -205,24 +204,24 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
         'PuD-EUROPA': r'\b(?:PUD\s*EUROPA|P&D\s*EUROPA|EUROPA)\b',
         'EZ PEEL': r'\b(?:EZ\s*PEEL|EZPEEL|EASY\s*PEEL)\b'
     }
-    
+
     result = {}
-    
+
     # Extraer producto
     for product, pattern in product_patterns.items():
         if re.search(pattern, message):
             result['product'] = product
             break
-    
+
     # Si no se encuentra producto específico, usar HLSO por defecto
     if 'product' not in result:
         result['product'] = 'HLSO'
-    
+
     # Extraer talla
     size_match = re.search(size_pattern, message)
     if size_match:
         result['size'] = size_match.group(1)
-    
+
     # Extraer cantidad y unidad
     quantity_match = re.search(quantity_pattern, message)
     if quantity_match:
@@ -232,12 +231,12 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
             result['unit'] = 'kg'
         else:
             result['unit'] = 'lb'
-    
+
     # Extraer destino
     destination_match = re.search(destination_pattern, message)
     if destination_match:
         result['destination'] = destination_match.group(1).strip()
-    
+
     # Si no encontramos talla, intentar extraer solo números
     if not result.get('size'):
         # Buscar patrones como "16 20", "16-20", etc.
@@ -245,10 +244,10 @@ def parse_ai_analysis_to_query(ai_analysis: Dict) -> Optional[Dict]:
         alt_match = re.search(alt_size_pattern, message)
         if alt_match:
             result['size'] = f"{alt_match.group(1)}/{alt_match.group(2)}"
-    
+
     return result if result else None
 
-def format_price_response(price_info: Dict) -> str:
+def format_price_response(price_info: dict) -> str:
     """
     Formatea la respuesta con la información de precios calculados dinámicamente
     """
@@ -259,22 +258,22 @@ def format_price_response(price_info: Dict) -> str:
         is_dynamic = price_info.get('calculo_dinamico', False)
         usar_libras = price_info.get('usar_libras', False)
         valores_usuario = price_info.get('valores_usuario', {})
-        
-        response = f"🦐 **BGR EXPORT - Cotización Camarón** 🦐\n\n"
+
+        response = "🦐 **BGR EXPORT - Cotización Camarón** 🦐\n\n"
         response += f"📏 **Talla:** {size}\n"
         response += f"🏷️ **Producto:** {product}\n"
-        
+
         if is_dynamic:
             response += "⚙️ **Cálculo Dinámico (Valores del Usuario)**\n"
-        
+
         response += "\n"
-        
+
         # Verificar si el producto no tiene precio establecido
         has_calculated_prices = (
-            'precio_fob_kg' in price_info and 
+            'precio_fob_kg' in price_info and
             price_info.get('precio_fob_kg', 0) > 0
         )
-        
+
         if not has_calculated_prices and (price_info.get('sin_precio', False) or price_info.get('precio_kg', 0) == 0):
             response += "⚠️ **SIN PRECIO ESTABLECIDO**\n\n"
             response += "📞 Para obtener cotización de este producto, contacta directamente con BGR Export.\n\n"
@@ -283,20 +282,20 @@ def format_price_response(price_info: Dict) -> str:
             response += "📱 WhatsApp: +593 98-805-7425\n"
             response += "🌐 Web: www.bgrexport.com"
             return response
-        
+
         response += "💰 **PRECIOS CALCULADOS:**\n\n"
-        
+
         # Mostrar origen del precio base
         precio_base_especificado = valores_usuario.get('precio_base_especificado')
         if precio_base_especificado:
             response += f"📊 **Precio Base (Usuario):** ${precio_base_especificado:.2f}/kg\n\n"
         elif 'precio_kg' in price_info:
             response += f"📊 **Precio Base (Excel):** ${price_info['precio_kg']:.2f}/kg\n\n"
-        
+
         # Determinar si es Houston (solo kilos) o otras ciudades USA (libras)
         destination = price_info.get('destination', '')
         is_houston = destination and destination.lower() == 'houston'
-        
+
         # Precios FOB
         if 'precio_fob_kg' in price_info:
             response += "🚢 **Precio FOB (Base - Costo Fijo):**\n"
@@ -304,16 +303,16 @@ def format_price_response(price_info: Dict) -> str:
                 response += f"   • ${price_info['precio_fob_kg']:.2f}/kg\n\n"
             else:
                 response += f"   • ${price_info['precio_fob_kg']:.2f}/kg - ${price_info['precio_fob_lb']:.2f}/lb\n\n"
-        
+
         # Determinar qué precio mostrar según si incluye flete
         incluye_flete = price_info.get('incluye_flete', False)
-        
+
         if incluye_flete:
             # Mostrar precio CFR (con flete)
             if 'precio_final_kg' in price_info:
                 flete_value = price_info.get('flete', 0)
                 flete_especificado = valores_usuario.get('flete_especificado')
-                
+
                 if flete_especificado:
                     response += f"✈️ **Precio CFR (Glaseo + Costo Fijo + Flete Usuario ${flete_value:.2f}):**\n"
                 elif is_houston:
@@ -322,7 +321,7 @@ def format_price_response(price_info: Dict) -> str:
                     response += f"✈️ **Precio CFR (Glaseo + Costo Fijo + Flete USA ${flete_value:.2f}):**\n"
                 else:
                     response += f"✈️ **Precio CFR (Glaseo + Costo Fijo + Flete ${flete_value:.2f}):**\n"
-                
+
                 if is_houston:
                     response += f"   • ${price_info['precio_final_kg']:.2f}/kg\n\n"
                 else:
@@ -332,47 +331,47 @@ def format_price_response(price_info: Dict) -> str:
             if 'precio_glaseo_kg' in price_info:
                 glaseo_factor = price_info.get('factor_glaseo', 0)
                 glaseo_especificado = valores_usuario.get('glaseo_especificado')
-                
+
                 if glaseo_especificado:
                     glaseo_percent = glaseo_especificado * 100
                     response += f"❄️ **Precio con Glaseo ({glaseo_percent:.0f}% - Usuario):**\n"
                 else:
                     glaseo_percent = glaseo_factor * 100
                     response += f"❄️ **Precio con Glaseo ({glaseo_percent:.0f}%):**\n"
-                
+
                 if is_houston:
                     response += f"   • ${price_info['precio_glaseo_kg']:.2f}/kg\n\n"
-                    
+
                 else:
                     response += f"   • ${price_info['precio_glaseo_kg']:.2f}/kg - ${price_info['precio_glaseo_lb']:.2f}/lb\n\n"
-        
+
         # Información adicional
         if price_info.get('destination'):
             response += f"🌍 **Destino:** {price_info['destination']}\n"
-        
+
         if price_info.get('quantity'):
             response += f"📦 **Cantidad:** {price_info['quantity']}\n"
-        
+
         if price_info.get('cliente_nombre'):
             response += f"👤 **Cliente:** {price_info['cliente_nombre']}\n"
-        
+
         # Factores utilizados
         response += "\n📋 **Factores aplicados:**\n"
         response += f"• Costo fijo: ${price_info.get('costo_fijo', 0.29):.2f}\n"
-        
+
         glaseo_factor = price_info.get('factor_glaseo', 0)
         glaseo_especificado = valores_usuario.get('glaseo_especificado')
         if glaseo_especificado:
             response += f"• Factor glaseo: {glaseo_factor:.1%} (especificado por usuario)\n"
         else:
             response += f"• Factor glaseo: {glaseo_factor:.1%}\n"
-        
+
         # Solo mostrar flete si se incluye en el cálculo
         if incluye_flete:
             flete_value = price_info.get('flete', 0)
             flete_especificado = valores_usuario.get('flete_especificado')
             destination = price_info.get('destination', '')
-            
+
             if flete_especificado:
                 response += f"• Flete: ${flete_value:.2f} (especificado por usuario)\n"
             elif destination and destination.lower() == 'houston':
@@ -381,33 +380,33 @@ def format_price_response(price_info: Dict) -> str:
                 response += f"• Flete: ${flete_value:.2f} (USA - desde Sheets)\n"
             else:
                 response += f"• Flete: ${flete_value:.2f} (desde Sheets)\n"
-        
+
         response += "\n📋 _Precios FOB sujetos a confirmación final_\n"
         response += "📞 **Contacto:** BGR Export\n"
         response += "💡 _Escribe 'confirmar' para generar PDF_"
-        
+
         return response
-        
+
     except Exception as e:
         logger.error(f"Error formateando respuesta de precio: {str(e)}")
         return "❌ Error generando cotización. Intenta nuevamente."
 
-def extract_size_from_text(text: str) -> Optional[str]:
+def extract_size_from_text(text: str) -> str | None:
     """
     Extrae la talla del camarón del texto
     """
     if not text:
         return None
-    
+
     # Patrones comunes para tallas
     patterns = [
         r'\b(\d+/\d+)\b',  # 16/20
         r'\b(\d+)\s*[-/]\s*(\d+)\b',  # 16-20, 16 / 20
         r'\b(\d+)\s+(\d+)\b'  # 16 20
     ]
-    
+
     text = text.upper().strip()
-    
+
     for pattern in patterns:
         match = re.search(pattern, text)
         if match:
@@ -415,5 +414,5 @@ def extract_size_from_text(text: str) -> Optional[str]:
                 return match.group(1)
             else:
                 return f"{match.group(1)}/{match.group(2)}"
-    
+
     return None

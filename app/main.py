@@ -1,25 +1,27 @@
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import PlainTextResponse, JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
-import uvicorn
-from dotenv import load_dotenv
-import os
 import time
 from contextlib import asynccontextmanager
+
+import uvicorn
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 # Cargar variables de entorno ANTES de importar servicios
 load_dotenv()
 
-from app.routes import webhook_router
-from app.config import settings
-from app.logging_config import setup_logging, log_api_request
-from app.exceptions import (
-    BusinessException, ValidationError, business_exception_handler,
-    validation_exception_handler, general_exception_handler
-)
-from app.security import add_security_headers
 import logging
+
+from app.config import settings
+from app.exceptions import (
+    BusinessException,
+    ValidationError,
+    business_exception_handler,
+    general_exception_handler,
+    validation_exception_handler,
+)
+from app.logging_config import setup_logging
+from app.routes import webhook_router
 
 # Configurar logging mejorado
 setup_logging()
@@ -32,7 +34,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting BGR Export WhatsApp Bot")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
     logger.info(f"Debug mode: {settings.DEBUG}")
-    
+
     # Validar configuración en producción
     if settings.is_production:
         try:
@@ -41,9 +43,9 @@ async def lifespan(app: FastAPI):
         except ValueError as e:
             logger.error(f"Configuration error: {e}")
             raise
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down BGR Export WhatsApp Bot")
 
@@ -77,14 +79,14 @@ if settings.is_production:
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.time()
-    
+
     # Generar request ID
     import uuid
     request_id = str(uuid.uuid4())
-    
+
     # Agregar request ID a los logs
     logger.info(
-        f"Request started",
+        "Request started",
         extra={
             "request_id": request_id,
             "method": request.method,
@@ -92,31 +94,31 @@ async def log_requests(request: Request, call_next):
             "client": request.client.host if request.client else "unknown"
         }
     )
-    
+
     try:
         response = await call_next(request)
         process_time = time.time() - start_time
-        
+
         # Log de respuesta exitosa
         logger.info(
-            f"Request completed",
+            "Request completed",
             extra={
                 "request_id": request_id,
                 "status_code": response.status_code,
                 "process_time": round(process_time, 3)
             }
         )
-        
+
         # Agregar headers de seguridad y métricas
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Process-Time"] = str(process_time)
-        
+
         return response
-        
+
     except Exception as e:
         process_time = time.time() - start_time
         logger.error(
-            f"Request failed",
+            "Request failed",
             extra={
                 "request_id": request_id,
                 "error": str(e),
@@ -157,12 +159,12 @@ async def health_check():
             "openai_configured": bool(settings.OPENAI_API_KEY)
         }
     }
-    
+
     # Verificar si hay problemas
     if not health_status["components"]["twilio_configured"]:
         health_status["status"] = "degraded"
         health_status["message"] = "Twilio not configured"
-        
+
     return health_status
 
 @app.get("/metrics", tags=["system"])
@@ -170,7 +172,7 @@ async def metrics():
     """Endpoint básico de métricas"""
     if not settings.DEBUG:
         raise HTTPException(status_code=404)
-        
+
     # TODO: Implementar métricas reales con Prometheus o similar
     return {
         "uptime_seconds": time.time(),
