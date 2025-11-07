@@ -1,12 +1,13 @@
-import time
 import logging
-from typing import Callable, Any, Tuple
+import time
+from collections.abc import Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 
-def retry(func: Callable, retries: int = 3, delay: float = 0.5, exceptions: Tuple = (Exception,), args: tuple = (), kwargs: dict = None) -> Any:
+def retry(func: Callable, retries: int = 3, delay: float = 0.5, exceptions: tuple = (Exception,), args: tuple = (), kwargs: dict = None) -> Any:
 	"""Simple retry helper with fixed backoff.
 
 	Parameters:

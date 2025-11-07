@@ -1,13 +1,13 @@
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
-from datetime import datetime
-import os
-from typing import Dict
 import logging
+import os
+from datetime import datetime
+
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.pagesizes import A4, letter
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import inch
+from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 logger = logging.getLogger(__name__)
 
@@ -15,15 +15,15 @@ class PDFGenerator:
     def __init__(self):
         self.output_dir = "generated_pdfs"
         self.ensure_output_dir()
-    
+
     def ensure_output_dir(self):
         """
         Asegura que el directorio de salida existe
         """
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
-    
-    def generate_quote_pdf(self, price_info: Dict, user_phone: str = None, language: str = "es") -> str:
+
+    def generate_quote_pdf(self, price_info: dict, user_phone: str = None, language: str = "es") -> str:
         """
         Genera un PDF dinámico (FOB/CFR) y multiidioma según las reglas de negocio
         
@@ -34,7 +34,7 @@ class PDFGenerator:
         """
         try:
             logger.debug(f"🔍 Iniciando generación PDF con datos: {price_info}")
-            
+
             # Generar nombre único para el archivo
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             if user_phone:
@@ -44,7 +44,7 @@ class PDFGenerator:
                 phone_suffix = "0000"
             filename = f"cotizacion_BGR_{timestamp}_{phone_suffix}.pdf"
             filepath = os.path.join(self.output_dir, filename)
-            
+
             # Crear documento PDF
             doc = SimpleDocTemplate(
                 filepath,
@@ -54,20 +54,20 @@ class PDFGenerator:
                 topMargin=40,
                 bottomMargin=40
             )
-            
+
             story = []
             styles = getSampleStyleSheet()
-            
+
             # Colores corporativos BGR Export
             azul_marino = colors.HexColor('#1e3a8a')  # Azul marino
             naranja = colors.HexColor('#ea580c')      # Naranja
             gris_claro = colors.HexColor('#f8fafc')   # Gris muy claro
-            
+
             # === REGLAS DE NEGOCIO ===
             # Determinar si es FOB o CFR basado en si se solicitó flete
             flete_incluido = price_info.get('incluye_flete', False)
             destino_completo = price_info.get('destination', '')
-            
+
             # Extraer solo el país del destino (antes de "Para")
             if destino_completo and " para " in destino_completo.lower():
                 destino_pais = destino_completo.split(" para ")[0].strip()
@@ -75,7 +75,7 @@ class PDFGenerator:
                 destino_pais = destino_completo.split(" Para ")[0].strip()
             else:
                 destino_pais = destino_completo
-            
+
             # Crear título dinámico con destino para CFR
             if flete_incluido and destino_pais:
                 tipo_cotizacion = f"CFR A {destino_pais.upper()}"
@@ -83,7 +83,7 @@ class PDFGenerator:
                 tipo_cotizacion = "CFR"
             else:
                 tipo_cotizacion = "FOB"
-            
+
             # === TRADUCCIONES ===
             translations = {
                 "es": {
@@ -115,10 +115,10 @@ class PDFGenerator:
                     "especificacion": "Specification"
                 }
             }
-            
+
             # Seleccionar idioma
             t = translations.get(language, translations["es"])
-            
+
             # === LOGO Y ENCABEZADO ===
             logo_path = os.path.join("data", "logoBGR.png")
             if os.path.exists(logo_path):
@@ -131,9 +131,9 @@ class PDFGenerator:
                     story.append(logo_img)
                 except Exception as e:
                     logger.warning(f"No se pudo cargar el logo: {e}")
-            
+
             story.append(Spacer(1, 15))  # Reducir espacio después del logo
-            
+
             # === SIN TÍTULO PRINCIPAL (eliminado según solicitud) ===
 
             # === INFORMACIÓN GENERAL ===
@@ -146,7 +146,7 @@ class PDFGenerator:
             glaseo_factor = price_info.get('factor_glaseo') or price_info.get('glaseo_factor')
             glaseo_percentage = price_info.get('glaseo_percentage')  # Porcentaje original
             fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
-            
+
             # Calcular porcentaje de glaseo para mostrar en el PDF
             if glaseo_percentage:
                 glaseo_display = f"{glaseo_percentage}%"
@@ -154,7 +154,7 @@ class PDFGenerator:
                 glaseo_display = f"{int(glaseo_factor * 100)}%"
             else:
                 glaseo_display = "N/A"
-            
+
             # Tabla de información general (multiidioma)
             info_data = [
                 [t["fecha_cotizacion"], fecha_actual],
@@ -164,9 +164,9 @@ class PDFGenerator:
                 [t["destino"], destino],
                 [t["glaseo_solicitado"], glaseo_display]
             ]
-            
+
             # Nota: Información de flete eliminada por solicitud del usuario
-            
+
             info_table = Table(info_data, colWidths=[2.5*inch, 3*inch])
             info_table.setStyle(TableStyle([
                 # Encabezados con fondo azul marino
@@ -183,10 +183,10 @@ class PDFGenerator:
                 ('TOPPADDING', (0, 0), (-1, -1), 8),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
             ]))
-            
+
             story.append(info_table)
             story.append(Spacer(1, 20))  # Reducir espacio antes del título FOB
-            
+
             # === TÍTULO COTIZACIÓN (FOB/CFR dinámico) ===
             cotizacion_title_style = ParagraphStyle(
                 'CotizacionTitle',
@@ -198,14 +198,14 @@ class PDFGenerator:
                 fontName='Helvetica-Bold'
             )
             story.append(Paragraph(t["cotizacion"], cotizacion_title_style))
-            
+
             # === PRECIO PRINCIPAL (FOB/CFR dinámico) ===
             precio_final = price_info.get('precio_final_kg', 0)
-            
+
             # Debug: Verificar qué precio se está usando
             logger.info(f"🔍 PDF Generator - Precio CFR: ${precio_final:.2f}")
             logger.info(f"🔍 PDF Generator - price_info keys: {list(price_info.keys())}")
-            logger.info(f"🔍 PDF Generator - Todos los precios:")
+            logger.info("🔍 PDF Generator - Todos los precios:")
             logger.info(f"   - precio_kg: ${price_info.get('precio_kg', 0):.2f}")
             logger.info(f"   - precio_fob_kg: ${price_info.get('precio_fob_kg', 0):.2f}")
             logger.info(f"   - precio_glaseo_kg: ${price_info.get('precio_glaseo_kg', 0):.2f}")
@@ -213,7 +213,7 @@ class PDFGenerator:
             logger.info(f"   - precio_final_kg: ${price_info.get('precio_final_kg', 0):.2f}")
             logger.info(f"   - flete: ${price_info.get('flete', 0):.2f}")
             logger.info(f"   - factor_glaseo: {price_info.get('factor_glaseo', 0)}")
-            
+
             # Tabla del precio con diseño destacado
             precio_data = [[t["precio_header"]], [f'${precio_final:.2f}']]
             precio_table = Table(precio_data, colWidths=[3*inch])
@@ -239,20 +239,20 @@ class PDFGenerator:
                 ('TOPPADDING', (0, 1), (0, 1), 15),      # Precio - más padding arriba
                 ('BOTTOMPADDING', (0, 1), (0, 1), 15),   # Precio - más padding abajo
             ]))
-            
+
             # Centrar la tabla del precio
             precio_centered = Table([[precio_table]], colWidths=[doc.width])
             precio_centered.setStyle(TableStyle([
                 ('ALIGN', (0, 0), (0, 0), 'CENTER'),
                 ('VALIGN', (0, 0), (0, 0), 'MIDDLE'),
             ]))
-            
+
             story.append(precio_centered)
             # === TABLA DE DETALLES ELIMINADA (según solicitud) ===
-            
+
             # Generar PDF
             doc.build(story)
-            
+
             # Verificar que el archivo se creó correctamente
             if os.path.exists(filepath):
                 file_size = os.path.getsize(filepath)
@@ -262,11 +262,11 @@ class PDFGenerator:
             else:
                 logger.error(f"❌ PDF no se creó en la ruta esperada: {filepath}")
                 return None
-            
+
         except Exception as e:
             logger.error(f"❌ Error generando PDF: {str(e)}")
             return None
-    
+
     def generate_consolidated_quote_pdf(self, products_info: list, user_phone: str = None, language: str = "es", glaseo_percentage: int = 20, destination: str = None) -> str:
         """
         Genera un PDF consolidado con múltiples productos
@@ -280,7 +280,7 @@ class PDFGenerator:
         """
         try:
             logger.info(f"📄 Generando PDF consolidado con {len(products_info)} productos")
-            
+
             # Generar nombre único para el archivo
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             if user_phone:
@@ -290,7 +290,7 @@ class PDFGenerator:
                 phone_suffix = "0000"
             filename = f"cotizacion_BGR_consolidada_{timestamp}_{phone_suffix}.pdf"
             filepath = os.path.join(self.output_dir, filename)
-            
+
             # Crear documento PDF
             doc = SimpleDocTemplate(
                 filepath,
@@ -300,14 +300,14 @@ class PDFGenerator:
                 topMargin=0.5*inch,
                 bottomMargin=0.5*inch
             )
-            
+
             # Contenedor para elementos del PDF
             story = []
-            
+
             # Colores corporativos
             azul_marino = colors.HexColor('#1e3a8a')
             naranja = colors.HexColor('#f97316')
-            
+
             # === LOGO ===
             logo_path = "app/static/logo_bgr.png"
             if os.path.exists(logo_path):
@@ -315,10 +315,10 @@ class PDFGenerator:
                 logo.hAlign = 'CENTER'
                 story.append(logo)
                 story.append(Spacer(1, 0.3*inch))
-            
+
             # === INFORMACIÓN GENERAL ===
             styles = getSampleStyleSheet()
-            
+
             # Traducciones
             translations = {
                 "es": {
@@ -352,9 +352,9 @@ class PDFGenerator:
                     "contacto": "Contact: BGR Export | amerino@bgrexport.com | +593 98-805-7425"
                 }
             }
-            
+
             t = translations.get(language, translations["es"])
-            
+
             # Título
             title_style = ParagraphStyle(
                 'CustomTitle',
@@ -366,18 +366,18 @@ class PDFGenerator:
                 fontName='Helvetica-Bold'
             )
             story.append(Paragraph(t["titulo"], title_style))
-            
+
             # Información general
             fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
             info_data = [
                 [t["fecha"], fecha_actual],
             ]
-            
+
             if destination:
                 info_data.append([t["destino"], destination])
-            
+
             info_data.append([t["glaseo"], f"{glaseo_percentage}%"])
-            
+
             info_table = Table(info_data, colWidths=[2.5*inch, 4*inch])
             info_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e5e7eb')),
@@ -393,7 +393,7 @@ class PDFGenerator:
             ]))
             story.append(info_table)
             story.append(Spacer(1, 0.3*inch))
-            
+
             # === TABLA DE PRODUCTOS ===
             # Encabezados
             table_data = [[
@@ -402,21 +402,21 @@ class PDFGenerator:
                 t["precio_fob"],
                 t["precio_cfr"]
             ]]
-            
+
             # Agregar cada producto
             for product_info in products_info:
                 producto = product_info.get('producto', 'N/A')
                 talla = product_info.get('talla', 'N/A')
                 precio_fob = product_info.get('precio_fob_kg', 0)
                 precio_cfr = product_info.get('precio_final_kg', 0)
-                
+
                 table_data.append([
                     producto,
                     talla,
                     f"${precio_fob:.2f}",
                     f"${precio_cfr:.2f}"
                 ])
-            
+
             # Crear tabla
             products_table = Table(table_data, colWidths=[2*inch, 1.2*inch, 1.7*inch, 1.7*inch])
             products_table.setStyle(TableStyle([
@@ -441,13 +441,13 @@ class PDFGenerator:
                 ('LEFTPADDING', (0, 0), (-1, -1), 8),
                 ('RIGHTPADDING', (0, 0), (-1, -1), 8),
                 # Alternar colores de filas
-                *[('BACKGROUND', (0, i), (-1, i), colors.HexColor('#f3f4f6')) 
+                *[('BACKGROUND', (0, i), (-1, i), colors.HexColor('#f3f4f6'))
                   for i in range(2, len(table_data), 2)]
             ]))
-            
+
             story.append(products_table)
             story.append(Spacer(1, 0.3*inch))
-            
+
             # === NOTAS ===
             notes_style = ParagraphStyle(
                 'Notes',
@@ -456,13 +456,13 @@ class PDFGenerator:
                 textColor=colors.black,
                 spaceAfter=5
             )
-            
+
             story.append(Paragraph(f"<b>{t['notas']}</b>", notes_style))
             story.append(Paragraph(t['nota1'], notes_style))
             story.append(Paragraph(t['nota2'], notes_style))
             story.append(Paragraph(t['nota3'], notes_style))
             story.append(Spacer(1, 0.2*inch))
-            
+
             # === CONTACTO ===
             contact_style = ParagraphStyle(
                 'Contact',
@@ -472,29 +472,29 @@ class PDFGenerator:
                 alignment=TA_CENTER
             )
             story.append(Paragraph(t['contacto'], contact_style))
-            
+
             # Generar PDF
             doc.build(story)
-            
+
             if os.path.exists(filepath):
                 logger.info(f"✅ PDF consolidado generado: {filepath}")
                 return filepath
             else:
                 logger.error(f"❌ Error: PDF no se creó en {filepath}")
                 return None
-                
+
         except Exception as e:
             logger.error(f"❌ Error generando PDF consolidado: {str(e)}")
             import traceback
             traceback.print_exc()
             return None
-    
+
     def get_language_options(self) -> str:
         """
         Retorna las opciones de idioma para el PDF
         """
         return "🌐 **Seleccione idioma del PDF:**\n\n1️⃣ 🇪🇸 Español\n2️⃣ 🇺🇸 English\n\n💡 Responda con el número de su opción"
-    
+
     def parse_language_selection(self, user_input: str) -> str:
         """
         Parsea la selección de idioma del usuario
@@ -503,21 +503,21 @@ class PDFGenerator:
             "es" para español, "en" para inglés, None si no es válido
         """
         user_input = user_input.lower().strip()
-        
+
         # Opciones numéricas
         if user_input in ['1', '1️⃣']:
             return "es"
         elif user_input in ['2', '2️⃣']:
             return "en"
-        
+
         # Opciones por nombre
         if any(word in user_input for word in ['español', 'spanish', 'es', 'esp']):
             return "es"
         elif any(word in user_input for word in ['english', 'inglés', 'ingles', 'en', 'eng']):
             return "en"
-        
+
         return None
-    
+
     def cleanup_old_pdfs(self, days_old: int = 7):
         """
         Limpia PDFs antiguos para ahorrar espacio
@@ -526,15 +526,15 @@ class PDFGenerator:
             import time
             current_time = time.time()
             cutoff_time = current_time - (days_old * 24 * 60 * 60)
-            
+
             for filename in os.listdir(self.output_dir):
                 if filename.endswith('.pdf'):
                     filepath = os.path.join(self.output_dir, filename)
                     file_time = os.path.getmtime(filepath)
-                    
+
                     if file_time < cutoff_time:
                         os.remove(filepath)
                         logger.info(f"🗑️ PDF antiguo eliminado: {filename}")
-                        
+
         except Exception as e:
             logger.error(f"❌ Error limpiando PDFs antiguos: {str(e)}")

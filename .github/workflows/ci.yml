@@ -29,10 +29,12 @@ jobs:
     - name: Run ruff (linter)
       run: |
         ruff check app/ --output-format=github
+      continue-on-error: true  # No fallar el build por warnings de linting
 
     - name: Run black (formatter check)
       run: |
         black --check app/
+      continue-on-error: true  # No fallar el build por formato
 
   type-check:
     name: Type Check

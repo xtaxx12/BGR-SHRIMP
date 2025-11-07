@@ -99,7 +99,7 @@ class TestWebhookBasicFunctionality:
             "NumMedia": "0",
         }
 
-        with patch('app.routes.validate_twilio_webhook', return_value=True):
+        with patch('app.security.validate_twilio_webhook', return_value=True):
             response = test_client.post("/webhook/whatsapp", data=payload)
 
         assert response.status_code == 200
@@ -116,7 +116,7 @@ class TestWebhookBasicFunctionality:
             "NumMedia": "0",
         }
 
-        with patch('app.routes.validate_twilio_webhook', return_value=True):
+        with patch('app.security.validate_twilio_webhook', return_value=True):
             response = test_client.post("/webhook/whatsapp", data=payload)
 
         assert response.status_code == 400
@@ -132,7 +132,7 @@ class TestWebhookBasicFunctionality:
             "NumMedia": "0",
         }
 
-        with patch('app.routes.validate_twilio_webhook', return_value=True):
+        with patch('app.security.validate_twilio_webhook', return_value=True):
             response = test_client.post("/webhook/whatsapp", data=payload)
 
         # Debería procesar el mensaje pero sin el script
@@ -153,7 +153,7 @@ class TestMessageDeduplication:
             "NumMedia": "0",
         }
 
-        with patch('app.routes.validate_twilio_webhook', return_value=True):
+        with patch('app.security.validate_twilio_webhook', return_value=True):
             # Primera vez: debe procesarse
             response1 = test_client.post("/webhook/whatsapp", data=payload)
             assert response1.status_code == 200
@@ -182,7 +182,7 @@ class TestMessageDeduplication:
             "NumMedia": "0",
         }
 
-        with patch('app.routes.validate_twilio_webhook', return_value=True):
+        with patch('app.security.validate_twilio_webhook', return_value=True):
             response = test_client.post("/webhook/whatsapp", data=payload)
 
         # El mensaje antiguo debe haber sido limpiado
@@ -207,7 +207,7 @@ class TestAudioMessages:
             "MediaContentType0": "audio/ogg",
         }
 
-        with patch('app.routes.validate_twilio_webhook', return_value=True), \
+        with patch('app.security.validate_twilio_webhook', return_value=True), \
              patch('app.routes.AudioHandler') as mock_audio_handler:
 
             audio_handler_instance = MagicMock()
@@ -233,7 +233,7 @@ class TestPricingWorkflow:
             "NumMedia": "0",
         }
 
-        with patch('app.routes.validate_twilio_webhook', return_value=True):
+        with patch('app.security.validate_twilio_webhook', return_value=True):
             response = test_client.post("/webhook/whatsapp", data=payload)
 
         assert response.status_code == 200
@@ -259,7 +259,7 @@ class TestPricingWorkflow:
             "NumMedia": "0",
         }
 
-        with patch('app.routes.validate_twilio_webhook', return_value=True):
+        with patch('app.security.validate_twilio_webhook', return_value=True):
             response = test_client.post("/webhook/whatsapp", data=payload)
 
         assert response.status_code == 200
@@ -287,7 +287,7 @@ class TestSessionManagement:
             "NumMedia": "0",
         }
 
-        with patch('app.routes.validate_twilio_webhook', return_value=True):
+        with patch('app.security.validate_twilio_webhook', return_value=True):
             response = test_client.post("/webhook/whatsapp", data=payload)
 
         assert response.status_code == 200
@@ -312,7 +312,7 @@ class TestSessionManagement:
             "NumMedia": "0",
         }
 
-        with patch('app.routes.validate_twilio_webhook', return_value=True):
+        with patch('app.security.validate_twilio_webhook', return_value=True):
             response = test_client.post("/webhook/whatsapp", data=payload)
 
         session = session_manager.get_session(user_id)
@@ -338,7 +338,7 @@ class TestCommandProcessing:
             "NumMedia": "0",
         }
 
-        with patch('app.routes.validate_twilio_webhook', return_value=True):
+        with patch('app.security.validate_twilio_webhook', return_value=True):
             response = test_client.post("/webhook/whatsapp", data=payload)
 
         assert response.status_code == 200
@@ -361,7 +361,7 @@ class TestErrorHandling:
             "NumMedia": "0",
         }
 
-        with patch('app.routes.validate_twilio_webhook', return_value=True):
+        with patch('app.security.validate_twilio_webhook', return_value=True):
             response = test_client.post("/webhook/whatsapp", data=payload)
 
         # El webhook debe responder, aunque haya error interno
@@ -376,7 +376,7 @@ class TestErrorHandling:
             "Body": "Test",
         }
 
-        with patch('app.routes.validate_twilio_webhook', return_value=True):
+        with patch('app.security.validate_twilio_webhook', return_value=True):
             response = test_client.post("/webhook/whatsapp", data=payload)
 
         # Debe retornar error 422 (Unprocessable Entity) por campo faltante
@@ -409,7 +409,7 @@ class TestCompleteFlows:
             "NumMedia": "0",
         }
 
-        with patch('app.routes.validate_twilio_webhook', return_value=True):
+        with patch('app.security.validate_twilio_webhook', return_value=True):
             response1 = test_client.post("/webhook/whatsapp", data=payload1)
             assert response1.status_code == 200
 
@@ -423,7 +423,7 @@ class TestCompleteFlows:
             "NumMedia": "0",
         }
 
-        with patch('app.routes.validate_twilio_webhook', return_value=True):
+        with patch('app.security.validate_twilio_webhook', return_value=True):
             response2 = test_client.post("/webhook/whatsapp", data=payload2)
             assert response2.status_code == 200
 
@@ -437,7 +437,7 @@ class TestCompleteFlows:
             "NumMedia": "0",
         }
 
-        with patch('app.routes.validate_twilio_webhook', return_value=True):
+        with patch('app.security.validate_twilio_webhook', return_value=True):
             response3 = test_client.post("/webhook/whatsapp", data=payload3)
             assert response3.status_code == 200
 
