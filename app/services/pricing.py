@@ -16,8 +16,10 @@ def precise_round(value: float, decimals: int = 2) -> float:
 
 class PricingService:
     def __init__(self):
-        self.excel_service = ExcelService()
+        # Create a single GoogleSheetsService instance to be shared
         self.sheets_service = GoogleSheetsService()
+        # Pass the sheets_service to ExcelService to avoid creating another instance
+        self.excel_service = ExcelService(google_sheets_service=self.sheets_service)
         self.calculator_service = ExcelLocalCalculatorService()
 
     def calculate_final_price(self, base_price: float, fixed_cost: float,
