@@ -7,8 +7,8 @@ httpx==0.27.2  # For testing FastAPI async endpoints
 
 # Type checking
 mypy==1.13.0
-types-requests==2.32.0.20250118
-types-redis==4.6.0.20250118
+types-requests>=2.32.4.20250913
+types-redis>=4.6.0.20241004
 
 # Code quality
 black==24.10.0
