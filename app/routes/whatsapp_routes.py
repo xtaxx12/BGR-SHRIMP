@@ -5,7 +5,6 @@ import time
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import PlainTextResponse
-from fastapi.security import HTTPAuthorizationCredentials
 from twilio.twiml.messaging_response import MessagingResponse
 
 from app.config import settings
@@ -14,118 +13,22 @@ from app.security import (
     add_security_headers,
     rate_limit,
     sanitize_input,
-    security,
     validate_phone_number,
-    verify_admin_token,
 )
 from app.services.audio_handler import AudioHandler
-from app.services.interactive import InteractiveMessageService
-from app.services.openai_service import OpenAIService
-from app.services.pdf_generator import PDFGenerator
-from app.services.pricing import PricingService
-from app.services.session import session_manager
 from app.services.utils import format_price_response, parse_ai_analysis_to_query, parse_user_message
 from app.services.utils_new import retry
-from app.services.whatsapp_sender import WhatsAppSender
+from app.utils.language_utils import detect_language, glaseo_percentage_to_factor
+from app.utils.message_utils import is_duplicate_message
+from app.utils.service_utils import get_services
+from app.services.session import session_manager
 
 logger = logging.getLogger(__name__)
 
-def glaseo_percentage_to_factor(percentage: int) -> float:
-    """
-    Convierte porcentaje de glaseo a factor
-    Fórmula: Factor = 1 - (percentage / 100)
-    
-    Ejemplos:
-    - 10% glaseo → factor = 1 - 0.10 = 0.90
-    - 15% glaseo → factor = 1 - 0.15 = 0.85
-    - 20% glaseo → factor = 1 - 0.20 = 0.80
-    - 25% glaseo → factor = 1 - 0.25 = 0.75
-    """
-    return 1 - (percentage / 100)
+whatsapp_router = APIRouter()
 
 
-def _detect_language(message: str, ai_analysis: dict = None) -> str:
-    """Detecta idioma preferido del usuario.
-    - Primero usa el resultado del análisis de IA si viene con 'language'.
-    - Si no, usa una heurística simple basada en palabras comunes en cada idioma.
-    Retorna 'es' o 'en'.
-    """
-    if ai_analysis:
-        lang = ai_analysis.get('language')
-        if lang in ('es', 'en'):
-            return lang
-
-    text = (message or "").lower()
-    # Palabras comunes para cada idioma
-    english_words = ['please', 'hello', 'hi', 'thanks', 'thank', 'price', 'quote', 'proforma', 'ddp', 'cif', 'fob']
-    spanish_words = ['por favor', 'hola', 'gracias', 'precio', 'precios', 'proforma', 'cotización', 'cotizacion', 'ddp', 'flete']
-
-    en_score = sum(text.count(w) for w in english_words)
-    es_score = sum(text.count(w) for w in spanish_words)
-
-    return 'en' if en_score > es_score else 'es'
-
-webhook_router = APIRouter()
-
-# Servicios se inicializarán de manera lazy
-pricing_service = None
-interactive_service = None
-pdf_generator = None
-openai_service = None
-whatsapp_sender = None
-
-# Cache para deduplicación de mensajes
-processed_messages: set[str] = set()
-message_timestamps = {}
-
-def cleanup_old_messages():
-    """
-    Limpia mensajes procesados antiguos (más de 5 minutos)
-    """
-    current_time = time.time()
-    expired_messages = []
-
-    for message_sid, timestamp in message_timestamps.items():
-        if current_time - timestamp > 300:  # 5 minutos
-            expired_messages.append(message_sid)
-
-    for message_sid in expired_messages:
-        processed_messages.discard(message_sid)
-        message_timestamps.pop(message_sid, None)
-
-def is_duplicate_message(message_sid: str) -> bool:
-    """
-    Verifica si un mensaje ya fue procesado
-    """
-    cleanup_old_messages()
-
-    if message_sid in processed_messages:
-        logger.warning(f"🔄 Mensaje duplicado detectado: {message_sid}")
-        return True
-
-    # Marcar como procesado
-    processed_messages.add(message_sid)
-    message_timestamps[message_sid] = time.time()
-    return False
-
-def get_services():
-    """
-    Inicializa los servicios de manera lazy
-    """
-    global pricing_service, interactive_service, pdf_generator, whatsapp_sender, openai_service
-
-    if pricing_service is None:
-        pricing_service = PricingService()
-        # Pasar el servicio de Excel al servicio interactivo para compartir datos
-        interactive_service = InteractiveMessageService(pricing_service.excel_service)
-        pdf_generator = PDFGenerator()
-        whatsapp_sender = WhatsAppSender()
-        openai_service = OpenAIService()
-        logger.debug("✅ Servicios inicializados")
-
-    return pricing_service, interactive_service, pdf_generator, whatsapp_sender, openai_service
-
-@webhook_router.post("/whatsapp")
+@whatsapp_router.post("/whatsapp")
 @rate_limit(lambda req, **kwargs: kwargs.get('From', 'unknown'))
 async def whatsapp_webhook(request: Request,
     Body: str = Form(""),
@@ -245,7 +148,8 @@ async def whatsapp_webhook(request: Request,
                         logger.debug(f"✅ Datos de proforma validados con glaseo {glaseo_percentage}%")
 
                         # Detectar idioma automáticamente y generar PDF
-                        user_lang = _detect_language(Body, ai_analysis)
+                        ai_analysis = {}
+                        user_lang = detect_language(Body, ai_analysis)
                         session_manager.set_last_quote(user_id, price_info)
                         session_manager.set_user_language(user_id, user_lang)
 
@@ -271,7 +175,7 @@ async def whatsapp_webhook(request: Request,
                                 f"Cotización BGR Export - {product_name} {size}"
                             )
                             if pdf_sent:
-                                response.message(f"✅ Proforma generada y enviada en {'Español' if user_lang == 'es' else 'English'} �🇸�🇺🇸")
+                                response.message(f"✅ Proforma generada y enviada en {'Español' if user_lang == 'es' else 'English'} 🇪🇸🇺🇸")
                             else:
                                 filename = os.path.basename(pdf_path)
                                 base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
@@ -922,7 +826,7 @@ U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60
 2️⃣ **Talla:**
 • 16/20, 21/25, 26/30, etc.
 
-💡 **Ejemplo completo:** 
+💡 **Ejemplo completo:**
 "Proforma HLSO 16/20" o "Cotización P&D IQF 21/25"
 
 ¿Qué producto y talla necesitas? 🤔"""
@@ -938,7 +842,7 @@ U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60
                     logger.debug(f"✅ Datos de proforma validados para: {ai_query}")
 
                     # Detectar idioma automáticamente y generar PDF
-                    user_lang = _detect_language(Body, ai_analysis)
+                    user_lang = detect_language(Body, ai_analysis)
                     session_manager.set_last_quote(user_id, price_info)
                     session_manager.set_user_language(user_id, user_lang)
 
@@ -986,7 +890,7 @@ U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60
 
 📋 **Opciones de glaseo disponibles:**
 • **10%** glaseo (factor 0.90)
-• **20%** glaseo (factor 0.80) 
+• **20%** glaseo (factor 0.80)
 • **30%** glaseo (factor 0.70)
 
 💡 **Ejemplos:**
@@ -1401,7 +1305,7 @@ Responde con el número o escribe:
 
                     if products_info:
                         # Guardar como última cotización consolidada y generar PDF automáticamente
-                        user_lang = _detect_language(Body, ai_analysis)
+                        user_lang = detect_language(Body, ai_analysis)
                         last = {
                             'consolidated': True,
                             'products_info': products_info,
@@ -1548,7 +1452,7 @@ Responde con el número o escribe:
 
 📋 **Opciones de glaseo disponibles:**
 • **10%** glaseo (factor 0.90)
-• **20%** glaseo (factor 0.80) 
+• **20%** glaseo (factor 0.80)
 • **30%** glaseo (factor 0.70)
 
 💡 **Ejemplos:**
@@ -1865,289 +1769,10 @@ Responde con el número o escribe:
         logger.info(f"Enviando respuesta de error XML: {response_xml}")
         return add_security_headers(PlainTextResponse(response_xml, media_type="application/xml"))
 
-@webhook_router.get("/whatsapp")
+
+@whatsapp_router.get("/whatsapp")
 async def whatsapp_webhook_verification(request: Request):
     """
     Verificación del webhook de Twilio
     """
     return {"status": "webhook_ready"}
-
-@webhook_router.post("/test")
-async def test_webhook():
-    """
-    Endpoint de prueba para verificar respuestas XML
-    """
-    response = MessagingResponse()
-    response.message("Mensaje de prueba desde ShrimpBot")
-    response_xml = str(response)
-    logger.info(f"Respuesta de prueba XML: {response_xml}")
-    return PlainTextResponse(response_xml, media_type="application/xml")
-
-@webhook_router.post("/simple")
-async def simple_webhook(
-    Body: str = Form(...),
-    From: str = Form(...),
-    To: str = Form(...),
-    MessageSid: str = Form(...)
-):
-    """
-    Webhook simplificado para debugging
-    """
-    logger.info(f"SIMPLE: Mensaje de {From}: {Body}")
-
-    response = MessagingResponse()
-    response.message("✅ Mensaje recibido correctamente!")
-
-    response_xml = str(response)
-    logger.info(f"SIMPLE: Enviando XML: {response_xml}")
-
-    return PlainTextResponse(response_xml, media_type="application/xml")
-
-@webhook_router.post("/test-response")
-async def test_response():
-    """
-    Endpoint para probar respuestas TwiML
-    """
-    response = MessagingResponse()
-    response.message("🦐 Mensaje de prueba desde BGR Export Bot")
-
-    response_xml = str(response)
-    logger.info(f"TEST: XML generado: {response_xml}")
-
-    return PlainTextResponse(response_xml, media_type="application/xml")
-
-@webhook_router.post("/reload-data")
-async def reload_data(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """
-    Endpoint para recargar datos desde Google Sheets
-    """
-    # Verificar token de administrador
-    if not verify_admin_token(credentials):
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-    try:
-        # Reinicializar servicios con variables de entorno actuales
-        global pricing_service, interactive_service, pdf_generator, whatsapp_sender, openai_service
-
-        # Forzar reinicialización
-        pricing_service = None
-        interactive_service = None
-        pdf_generator = None
-        whatsapp_sender = None
-        openai_service = None
-
-        # Inicializar servicios
-        pricing_service, interactive_service, pdf_generator, whatsapp_sender, openai_service = get_services()
-
-        # Contar datos cargados
-        total_prices = sum(len(product_data) for product_data in pricing_service.excel_service.prices_data.values())
-        products = [p for p in pricing_service.excel_service.prices_data.keys() if pricing_service.excel_service.prices_data[p]]
-
-        return {
-            "status": "success",
-            "message": "Servicios reinicializados y datos recargados",
-            "total_prices": total_prices,
-            "products": products,
-            "google_sheets_id": os.getenv('GOOGLE_SHEETS_ID', 'No configurado')[:20] + "..."
-        }
-    except Exception as e:
-        logger.error(f"Error recargando datos: {str(e)}")
-        import traceback
-        return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
-
-@webhook_router.get("/data-status")
-async def data_status(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """
-    Endpoint para verificar el estado de los datos
-    """
-    # Verificar token de administrador
-    if not verify_admin_token(credentials):
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-    try:
-        # Inicializar servicios si no están inicializados
-        pricing_service, interactive_service, pdf_generator, whatsapp_sender, openai_service = get_services()
-
-        # Verificar datos actuales
-        total_prices = sum(len(product_data) for product_data in pricing_service.excel_service.prices_data.values())
-        products = [p for p in pricing_service.excel_service.prices_data.keys() if pricing_service.excel_service.prices_data[p]]
-
-        # Verificar configuración de Google Sheets
-        sheets_id = os.getenv('GOOGLE_SHEETS_ID')
-        sheets_credentials = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
-
-        # Verificar si el servicio de Google Sheets está funcionando
-        sheets_service_status = "No inicializado"
-        if hasattr(pricing_service.excel_service, 'google_sheets_service'):
-            if pricing_service.excel_service.google_sheets_service.sheet:
-                sheets_service_status = "Conectado"
-            else:
-                sheets_service_status = "Error de conexión"
-
-        return {
-            "status": "success",
-            "data_source": "Google Sheets" if sheets_id and sheets_credentials else "Local Excel",
-            "total_prices": total_prices,
-            "products": products,
-            "google_sheets_configured": bool(sheets_id and sheets_credentials),
-            "google_sheets_id": sheets_id[:20] + "..." if sheets_id else None,
-            "sheets_service_status": sheets_service_status,
-            "env_loaded": bool(sheets_id)
-        }
-    except Exception as e:
-        logger.error(f"Error verificando estado: {str(e)}")
-        return {"status": "error", "message": str(e)}
-
-@webhook_router.get("/test-twilio")
-async def test_twilio(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """
-    Endpoint para probar las credenciales de Twilio
-    """
-    # Verificar token de administrador
-    if not verify_admin_token(credentials):
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-    try:
-        from twilio.rest import Client
-
-        account_sid = settings.TWILIO_ACCOUNT_SID
-        auth_token = settings.TWILIO_AUTH_TOKEN
-        whatsapp_number = settings.TWILIO_WHATSAPP_NUMBER
-
-        if not all([account_sid, auth_token, whatsapp_number]):
-            return {
-                "status": "error",
-                "message": "Credenciales de Twilio no configuradas",
-                "config": {
-                    "account_sid": bool(account_sid),
-                    "auth_token": bool(auth_token),
-                    "whatsapp_number": bool(whatsapp_number)
-                }
-            }
-
-        client = Client(account_sid, auth_token)
-
-        # Probar conexión obteniendo información de la cuenta
-        account = client.api.accounts(account_sid).fetch()
-
-        return {
-            "status": "success",
-            "message": "Credenciales de Twilio válidas",
-            "account_name": account.friendly_name,
-            "account_status": account.status,
-            "whatsapp_number": whatsapp_number
-        }
-
-    except Exception as e:
-        logger.error(f"Error probando Twilio: {str(e)}")
-        return {"status": "error", "message": str(e)}
-
-@webhook_router.post("/test-pdf-send")
-async def test_pdf_send(
-    phone_number: str = Form(...),
-    credentials: HTTPAuthorizationCredentials = Depends(security)
-):
-    """
-    Endpoint para probar el envío de PDFs
-    """
-    # Verificar token de administrador
-    if not verify_admin_token(credentials):
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-    # Validar número de teléfono
-    if not phone_number.startswith("whatsapp:"):
-        phone_number = f"whatsapp:{phone_number}"
-
-    if not validate_phone_number(phone_number):
-        raise HTTPException(status_code=400, detail="Invalid phone number format")
-
-    try:
-        # Crear una cotización de prueba
-        test_quote = {
-            'size': '16/20',
-            'product': 'HLSO',
-            'quantity': 15000,
-            'destination': 'China',
-            'fob_price': 5.50,
-            'glaseo_price': 6.05,
-            'final_price': 6.85,
-            'freight_cost': 0.80,
-            'total_value': 102750.00
-        }
-
-        # Inicializar servicios si no están inicializados
-        pricing_service, interactive_service, pdf_generator, whatsapp_sender, openai_service = get_services()
-
-        # Generar PDF de prueba
-        pdf_path = pdf_generator.generate_quote_pdf(test_quote, f"whatsapp:{phone_number}")
-
-        if pdf_path:
-            # Intentar enviar por WhatsApp
-            pdf_sent = whatsapp_sender.send_pdf_document(
-                f"whatsapp:{phone_number}",
-                pdf_path,
-                "📄 PDF de prueba - BGR Export"
-            )
-
-
-
-
-            filename = os.path.basename(pdf_path)
-            download_url = f" https://e28980114917.ngrok-free.app/webhook/download-pdf/{filename}"
-
-            return {
-                "status": "success" if pdf_sent else "partial",
-                "message": "PDF enviado por WhatsApp" if pdf_sent else "PDF generado, pero no enviado por WhatsApp",
-                "pdf_generated": True,
-                "pdf_sent_whatsapp": pdf_sent,
-                "download_url": download_url
-            }
-        else:
-            return {
-                "status": "error",
-                "message": "Error generando PDF de prueba"
-            }
-
-    except Exception as e:
-        logger.error(f"Error en test de PDF: {str(e)}")
-        return {"status": "error", "message": str(e)}
-
-@webhook_router.get("/download-pdf/{filename}")
-async def download_pdf(filename: str):
-    """
-    Endpoint para descargar PDFs generados
-    """
-    try:
-        from fastapi.responses import FileResponse
-
-        pdf_path = os.path.join("generated_pdfs", filename)
-        logger.info(f"🔍 Buscando PDF en: {pdf_path}")
-        logger.info(f"📁 Directorio actual: {os.getcwd()}")
-
-        # Listar archivos en el directorio
-        if os.path.exists("generated_pdfs"):
-            files = os.listdir("generated_pdfs")
-            logger.info(f"📄 Archivos en generated_pdfs: {files}")
-        else:
-            logger.error("❌ Directorio generated_pdfs no existe")
-
-        if os.path.exists(pdf_path):
-            logger.debug(f"✅ PDF encontrado: {pdf_path}")
-            return FileResponse(
-                path=pdf_path,
-                filename=filename,
-                media_type='application/pdf',
-                headers={
-                    "Content-Disposition": f"attachment; filename={filename}",
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "GET",
-                    "Access-Control-Allow-Headers": "*"
-                }
-            )
-        else:
-            logger.error(f"❌ PDF no encontrado en: {pdf_path}")
-            raise HTTPException(status_code=404, detail="PDF no encontrado")
-
-    except Exception as e:
-        logger.error(f"Error descargando PDF: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error interno del servidor")
