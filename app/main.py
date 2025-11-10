@@ -21,7 +21,10 @@ from app.exceptions import (
     validation_exception_handler,
 )
 from app.logging_config import setup_logging
-from app.routes import webhook_router
+from app.routes.whatsapp_routes import whatsapp_router
+from app.routes.admin_routes import admin_router
+from app.routes.test_routes import test_router
+from app.routes.pdf_routes import pdf_router
 
 # Configurar logging mejorado
 setup_logging()
@@ -133,7 +136,10 @@ app.add_exception_handler(ValidationError, validation_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
 
 # Incluir rutas
-app.include_router(webhook_router, prefix="/webhook", tags=["webhook"])
+app.include_router(whatsapp_router, prefix="/webhook", tags=["whatsapp"])
+app.include_router(admin_router, prefix="/webhook", tags=["admin"])
+app.include_router(test_router, prefix="/webhook", tags=["test"])
+app.include_router(pdf_router, prefix="/webhook", tags=["pdf"])
 
 # Endpoints de sistema
 @app.get("/", tags=["system"])
