@@ -4,7 +4,7 @@ from typing import Optional
 
 import pandas as pd
 
-from app.services.google_sheets import GoogleSheetsService
+from app.services.google_sheets import get_google_sheets_service, GoogleSheetsService
 
 logger = logging.getLogger(__name__)
 
@@ -13,8 +13,8 @@ class ExcelService:
         self.excel_path = excel_path
         self.prices_data = None
         self._data_loaded = False
-        # Usar Google Sheets como fuente principal
-        self.google_sheets_service = google_sheets_service if google_sheets_service else GoogleSheetsService()
+        # Usar Google Sheets como fuente principal (singleton)
+        self.google_sheets_service = google_sheets_service if google_sheets_service else get_google_sheets_service()
         self.load_data()
 
     def load_data(self) -> bool:
