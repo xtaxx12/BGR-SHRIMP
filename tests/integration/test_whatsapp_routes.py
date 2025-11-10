@@ -76,7 +76,8 @@ class TestWhatsAppWebhook:
         """Test endpoint de verificación GET /whatsapp"""
         response = client.get("/webhook/whatsapp")
         assert response.status_code == 200
-        assert response.text == "Webhook de WhatsApp activo"
+        # El endpoint ahora retorna JSON
+        assert response.json() == {"status": "webhook_ready"}
 
 
 class TestWhatsAppAudioMessages:
