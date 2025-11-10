@@ -3,7 +3,7 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from app.services.excel import ExcelService
 from app.services.excel_local_calculator import ExcelLocalCalculatorService
-from app.services.google_sheets import GoogleSheetsService
+from app.services.google_sheets import get_google_sheets_service
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +16,8 @@ def precise_round(value: float, decimals: int = 2) -> float:
 
 class PricingService:
     def __init__(self):
-        # Create a single GoogleSheetsService instance to be shared
-        self.sheets_service = GoogleSheetsService()
+        # Get singleton GoogleSheetsService instance
+        self.sheets_service = get_google_sheets_service()
         # Pass the sheets_service to ExcelService to avoid creating another instance
         self.excel_service = ExcelService(google_sheets_service=self.sheets_service)
         self.calculator_service = ExcelLocalCalculatorService()

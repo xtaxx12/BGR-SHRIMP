@@ -8,6 +8,27 @@ from google.oauth2.service_account import Credentials
 
 logger = logging.getLogger(__name__)
 
+# Singleton instance
+_google_sheets_instance = None
+_instance_lock = None
+
+def get_google_sheets_service():
+    """
+    Retorna una instancia singleton de GoogleSheetsService
+    """
+    global _google_sheets_instance, _instance_lock
+    
+    if _instance_lock is None:
+        import threading
+        _instance_lock = threading.Lock()
+    
+    if _google_sheets_instance is None:
+        with _instance_lock:
+            if _google_sheets_instance is None:
+                _google_sheets_instance = GoogleSheetsService()
+    
+    return _google_sheets_instance
+
 class GoogleSheetsService:
     def __init__(self):
         self.gc = None
@@ -15,6 +36,8 @@ class GoogleSheetsService:
         self.prices_data = None
         self._connection_initialized = False
         self._data_loaded = False
+        self._last_load_time = 0
+        self._load_cooldown = 300  # 5 minutos entre recargas
         self.setup_google_sheets()
 
     def setup_google_sheets(self):
@@ -23,53 +46,78 @@ class GoogleSheetsService:
         """
         if self._connection_initialized:
             return
-            
-        try:
-            # Obtener credenciales desde variables de entorno
-            credentials_json = os.getenv("GOOGLE_SHEETS_CREDENTIALS")
-            sheet_id = os.getenv("GOOGLE_SHEETS_ID")
+        
+        import time
+        from gspread.exceptions import APIError
+        
+        max_retries = 3
+        retry_delay = 2  # segundos
+        
+        for attempt in range(max_retries):
+            try:
+                # Obtener credenciales desde variables de entorno
+                credentials_json = os.getenv("GOOGLE_SHEETS_CREDENTIALS")
+                sheet_id = os.getenv("GOOGLE_SHEETS_ID")
 
-            if not credentials_json or not sheet_id:
-                logger.warning("Credenciales de Google Sheets no configuradas, usando datos de ejemplo")
-                self.create_sample_data()
-                self._data_loaded = True
+                if not credentials_json or not sheet_id:
+                    logger.warning("Credenciales de Google Sheets no configuradas, usando datos de ejemplo")
+                    self.create_sample_data()
+                    self._data_loaded = True
+                    self._connection_initialized = True
+                    return
+
+                # Parsear las credenciales JSON
+                logger.debug("Parseando credenciales JSON...")
+                credentials_dict = json.loads(credentials_json)
+                logger.debug(f"Service account: {credentials_dict.get('client_email', 'N/A')}")
+
+                # Configurar los scopes necesarios
+                scopes = [
+                    'https://www.googleapis.com/auth/spreadsheets.readonly',
+                    'https://www.googleapis.com/auth/drive.readonly'
+                ]
+                logger.debug(f"Configurando scopes: {scopes}")
+
+                # Crear credenciales
+                logger.debug("Creando credenciales...")
+                credentials = Credentials.from_service_account_info(
+                    credentials_dict,
+                    scopes=scopes
+                )
+
+                # Conectar con Google Sheets
+                logger.debug("Autorizando cliente gspread...")
+                self.gc = gspread.authorize(credentials)
+
+                logger.debug(f"Abriendo hoja con ID: {sheet_id}")
+                self.sheet = self.gc.open_by_key(sheet_id)
+
+                logger.debug("Conexión con Google Sheets establecida exitosamente")
                 self._connection_initialized = True
-                return
+                self.load_sheets_data()
+                break  # Éxito, salir del loop de reintentos
 
-            # Parsear las credenciales JSON
-            logger.debug("Parseando credenciales JSON...")
-            credentials_dict = json.loads(credentials_json)
-            logger.debug(f"Service account: {credentials_dict.get('client_email', 'N/A')}")
+            except APIError as e:
+                if '429' in str(e):
+                    logger.warning(f"⚠️ Rate limit alcanzado (intento {attempt + 1}/{max_retries})")
+                    if attempt < max_retries - 1:
+                        wait_time = retry_delay * (2 ** attempt)  # Exponential backoff
+                        logger.info(f"⏳ Esperando {wait_time}s antes de reintentar...")
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        logger.error("❌ Rate limit excedido después de todos los reintentos")
+                        self.create_sample_data()
+                        break
+                else:
+                    raise  # Re-raise si no es error 429
 
-            # Configurar los scopes necesarios
-            scopes = [
-                'https://www.googleapis.com/auth/spreadsheets.readonly',
-                'https://www.googleapis.com/auth/drive.readonly'
-            ]
-            logger.debug(f"Configurando scopes: {scopes}")
-
-            # Crear credenciales
-            logger.debug("Creando credenciales...")
-            credentials = Credentials.from_service_account_info(
-                credentials_dict,
-                scopes=scopes
-            )
-
-            # Conectar con Google Sheets
-            logger.debug("Autorizando cliente gspread...")
-            self.gc = gspread.authorize(credentials)
-
-            logger.debug(f"Abriendo hoja con ID: {sheet_id}")
-            self.sheet = self.gc.open_by_key(sheet_id)
-
-            logger.debug("Conexión con Google Sheets establecida exitosamente")
-            self.load_sheets_data()
-
-        except Exception as e:
-            logger.error(f"Error configurando Google Sheets: {str(e)}")
-            import traceback
-            logger.error(f"Traceback completo: {traceback.format_exc()}")
-            self.create_sample_data()
+            except Exception as e:
+                logger.error(f"Error configurando Google Sheets: {str(e)}")
+                import traceback
+                logger.error(f"Traceback completo: {traceback.format_exc()}")
+                self.create_sample_data()
+                break
 
     def _ensure_connection(self):
         """
@@ -82,11 +130,19 @@ class GoogleSheetsService:
         """
         Carga los datos desde Google Sheets (hoja PRECIOS FOB)
         """
+        import time
+        
         # Check if data is already loaded to avoid redundant loading
         if self._data_loaded and self.prices_data:
-            logger.debug("📦 Datos ya cargados, usando caché")
-            return True
+            current_time = time.time()
+            time_since_load = current_time - self._last_load_time
             
+            if time_since_load < self._load_cooldown:
+                logger.debug(f"📦 Datos en caché (cargados hace {int(time_since_load)}s)")
+                return True
+            else:
+                logger.info(f"🔄 Recargando datos (última carga hace {int(time_since_load)}s)")
+        
         # Ensure connection is established
         self._ensure_connection()
         
@@ -285,6 +341,11 @@ class GoogleSheetsService:
             for product, tallas in self.prices_data.items():
                 logger.debug(f"  {product}: {len(tallas)} tallas")
 
+            # Marcar como cargado y actualizar timestamp
+            self._data_loaded = True
+            import time
+            self._last_load_time = time.time()
+
             return True
 
         except Exception as e:
@@ -325,6 +386,12 @@ class GoogleSheetsService:
         Crea datos de ejemplo si no se puede conectar con Google Sheets
         """
         logger.info("Creando datos de ejemplo...")
+        
+        # Marcar como cargado para evitar reintentos
+        self._data_loaded = True
+        import time
+        self._last_load_time = time.time()
+        
         self.prices_data = {
             'HLSO': {
                 "16/20": {"precio_kg": 8.55, "precio_lb": 3.88, "producto": "HLSO", "talla": "16/20", "costo_fijo": 0.25, "factor_glaseo": 0.7, "flete": 0.20},
