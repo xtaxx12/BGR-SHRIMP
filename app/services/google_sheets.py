@@ -71,6 +71,13 @@ class GoogleSheetsService:
             logger.error(f"Traceback completo: {traceback.format_exc()}")
             self.create_sample_data()
 
+    def _ensure_connection(self):
+        """
+        Asegura que la conexión con Google Sheets esté establecida
+        """
+        if not self._connection_initialized:
+            self.setup_google_sheets()
+    
     def load_sheets_data(self) -> bool:
         """
         Carga los datos desde Google Sheets (hoja PRECIOS FOB)
