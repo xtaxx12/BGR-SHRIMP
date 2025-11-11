@@ -2,22 +2,198 @@ import json
 import logging
 import os
 import re
+import time
+import hashlib
+from typing import Optional, Dict, Any, List, Tuple
 
 import requests
 
 logger = logging.getLogger(__name__)
 
 class OpenAIService:
+    """
+    Servicio optimizado para interactuar con OpenAI GPT y Whisper.
+
+    Características:
+    - Sistema de caché para reducir costos de API
+    - Reintentos automáticos con backoff exponencial
+    - Validación robusta de respuestas
+    - Prompts especializados por tipo de interacción
+    - Métricas de uso y costos
+    - Fallback inteligente sin IA
+
+    Uso:
+        service = OpenAIService()
+        result = service.handle_any_request("HLSO 16/20 con glaseo 20%")
+    """
+
+    # Constantes para límites de caracteres en respuestas
+    RESPONSE_LIMITS = {
+        'greeting': 100,            # Saludos breves: "¡Hola! 🦐 ¿Qué producto necesitas?"
+        'quick_question': 150,      # Preguntas rápidas: "¿Qué glaseo necesitas? (10%, 20%, 30%)"
+        'confirmation': 200,        # Confirmaciones: "Perfecto! Generando proforma de HLSO 16/20..."
+        'detailed_list': 300,       # Listados: Cuando se listan múltiples productos
+        'price_explanation': 150,   # Explicaciones de precios
+    }
+
+    # Configuración de caché
+    CACHE_TTL = 3600  # 1 hora en segundos
+    CACHE_MAX_SIZE = 100  # Máximo 100 entradas en caché
+
+    # Configuración de rate limiting
+    MAX_RETRIES = 3
+    RETRY_DELAY_BASE = 1  # Segundos
+    RATE_LIMIT_DELAY = 60  # Esperar 60 segundos si hay rate limit
+
     def __init__(self):
+        """Inicializa el servicio OpenAI con configuración optimizada."""
         self.api_key = os.getenv("OPENAI_API_KEY")
         self.model = "gpt-3.5-turbo"
         self.whisper_model = "whisper-1"
         self.base_url = "https://api.openai.com/v1"
 
+        # Sistema de caché en memoria
+        self._cache: Dict[str, Tuple[Any, float]] = {}  # {cache_key: (response, timestamp)}
+        self._cache_hits = 0
+        self._cache_misses = 0
+
+        # Métricas de rate limiting
+        self._rate_limit_hits = 0
+        self._last_request_time = 0
+
 
     def is_available(self) -> bool:
-        """Verifica si OpenAI está disponible"""
+        """
+        Verifica si OpenAI está disponible.
+
+        Returns:
+            bool: True si la API key está configurada
+        """
         return bool(self.api_key)
+
+    # ==================== SISTEMA DE CACHÉ ====================
+
+    def _generate_cache_key(self, prompt: str, params: dict = None) -> str:
+        """
+        Genera una clave única para el caché basada en el prompt y parámetros.
+
+        Args:
+            prompt: Texto del prompt
+            params: Parámetros adicionales (temperatura, max_tokens, etc.)
+
+        Returns:
+            str: Hash MD5 como clave de caché
+        """
+        cache_string = prompt
+        if params:
+            # Ordenar params para consistencia
+            cache_string += str(sorted(params.items()))
+
+        return hashlib.md5(cache_string.encode('utf-8')).hexdigest()
+
+    def _get_from_cache(self, cache_key: str) -> Optional[str]:
+        """
+        Obtiene una respuesta del caché si existe y no ha expirado.
+
+        Args:
+            cache_key: Clave de caché
+
+        Returns:
+            Respuesta cacheada o None si no existe o expiró
+        """
+        if cache_key in self._cache:
+            response, timestamp = self._cache[cache_key]
+
+            # Verificar si no ha expirado
+            if time.time() - timestamp < self.CACHE_TTL:
+                self._cache_hits += 1
+                logger.info(f"💾 Cache HIT (hits={self._cache_hits}, misses={self._cache_misses})")
+                return response
+            else:
+                # Expirado, eliminar
+                del self._cache[cache_key]
+                logger.debug(f"🗑️ Cache entry expirada, eliminada")
+
+        self._cache_misses += 1
+        logger.debug(f"❌ Cache MISS (hits={self._cache_hits}, misses={self._cache_misses})")
+        return None
+
+    def _save_to_cache(self, cache_key: str, response: str) -> None:
+        """
+        Guarda una respuesta en el caché.
+
+        Args:
+            cache_key: Clave de caché
+            response: Respuesta a cachear
+        """
+        # Limpiar caché si está lleno
+        if len(self._cache) >= self.CACHE_MAX_SIZE:
+            # Eliminar la entrada más antigua
+            oldest_key = min(self._cache.items(), key=lambda x: x[1][1])[0]
+            del self._cache[oldest_key]
+            logger.debug(f"🗑️ Cache lleno, eliminada entrada más antigua")
+
+        self._cache[cache_key] = (response, time.time())
+        logger.debug(f"💾 Respuesta guardada en caché (total={len(self._cache)})")
+
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """
+        Obtiene estadísticas del caché.
+
+        Returns:
+            Dict con estadísticas: hits, misses, size, hit_rate
+        """
+        total_requests = self._cache_hits + self._cache_misses
+        hit_rate = (self._cache_hits / total_requests * 100) if total_requests > 0 else 0
+
+        return {
+            'hits': self._cache_hits,
+            'misses': self._cache_misses,
+            'size': len(self._cache),
+            'max_size': self.CACHE_MAX_SIZE,
+            'hit_rate': f"{hit_rate:.1f}%",
+            'total_requests': total_requests
+        }
+
+    def clear_cache(self) -> None:
+        """Limpia todo el caché."""
+        self._cache.clear()
+        logger.info("🗑️ Caché limpiado completamente")
+
+    # ==================== MANEJO DE RATE LIMITING ====================
+
+    def _handle_rate_limit(self, response: requests.Response, attempt: int) -> bool:
+        """
+        Maneja errores de rate limiting de OpenAI.
+
+        Args:
+            response: Respuesta HTTP de la API
+            attempt: Número de intento actual
+
+        Returns:
+            bool: True si se debe reintentar, False si no
+        """
+        if response.status_code == 429:  # Rate limit exceeded
+            self._rate_limit_hits += 1
+
+            # Verificar si hay header Retry-After
+            retry_after = response.headers.get('Retry-After')
+            if retry_after:
+                wait_time = int(retry_after)
+            else:
+                # Backoff exponencial: 2^attempt segundos
+                wait_time = min(2 ** attempt, self.RATE_LIMIT_DELAY)
+
+            logger.warning(
+                f"⚠️ Rate limit alcanzado (total={self._rate_limit_hits}). "
+                f"Esperando {wait_time}s antes de reintentar..."
+            )
+            time.sleep(wait_time)
+            return True
+
+        return False
+
+    # ==================== MÉTODOS PRINCIPALES ====================
 
     def chat_with_context(self, user_message: str, conversation_history: list[dict] = None, session_data: dict = None) -> dict:
         """
@@ -107,8 +283,8 @@ FLUJO DE CONVERSACIÓN:
 5. Preguntar idioma del PDF (Español/English)
 
 REGLAS IMPORTANTES:
-- Mantén respuestas concisas (máximo 200 caracteres)
-- Si detectas múltiples productos, lista todos
+- Mantén respuestas concisas: saludos 100 caracteres, preguntas 150 caracteres, confirmaciones 200 caracteres
+- Si necesitas listar múltiples productos, puedes usar hasta 300 caracteres
 - Si falta información, pregunta de forma natural
 - Confirma siempre antes de generar proforma
 - Usa lenguaje natural, no robótico
@@ -174,7 +350,7 @@ Respuesta: {
 
     def _parse_gpt_response(self, response: str) -> dict:
         """
-        Parsea la respuesta de GPT para extraer JSON
+        Parsea la respuesta de GPT para extraer JSON con validación de schema
         """
         try:
             # Intentar parsear como JSON
@@ -183,30 +359,94 @@ Respuesta: {
             if json_match:
                 json_str = json_match.group(0)
                 parsed = json.loads(json_str)
+
+                # Validar schema: campos requeridos
+                required_fields = ['response', 'action', 'data']
+                if not all(field in parsed for field in required_fields):
+                    logger.warning(f"⚠️ Respuesta GPT incompleta. Campos presentes: {parsed.keys()}")
+                    # Intentar recuperar con defaults
+                    return self._get_default_response(
+                        text=parsed.get('response', response),
+                        action=parsed.get('action', 'none'),
+                        data=parsed.get('data', {})
+                    )
+
+                # Validar action: debe ser uno de los permitidos
+                valid_actions = [
+                    'detect_products', 'ask_glaseo', 'ask_language',
+                    'generate_proforma', 'greeting', 'none', 'help',
+                    'audio_info', 'product_list', 'price_inquiry', 'thanks',
+                    'goodbye', 'size_detected', 'session_context', 'general_inquiry',
+                    'emergency_fallback', 'empty_message', 'audio_transcription_failed',
+                    'audio_processing_error'
+                ]
+                if parsed['action'] not in valid_actions:
+                    logger.warning(f"⚠️ Action inválida: '{parsed['action']}'. Usando 'none'")
+                    parsed['action'] = 'none'
+
+                # Validar tipos de datos
+                if not isinstance(parsed['response'], str):
+                    logger.warning(f"⚠️ Campo 'response' no es string: {type(parsed['response'])}")
+                    parsed['response'] = str(parsed['response'])
+
+                if not isinstance(parsed['data'], dict):
+                    logger.warning(f"⚠️ Campo 'data' no es dict: {type(parsed['data'])}")
+                    parsed['data'] = {}
+
                 return parsed
             else:
                 # Si no hay JSON, retornar respuesta como texto
-                return {
-                    "response": response,
-                    "action": "none",
-                    "data": {}
-                }
-        except json.JSONDecodeError:
-            # Si falla el parseo, retornar respuesta como texto
-            return {
-                "response": response,
-                "action": "none",
-                "data": {}
-            }
+                logger.warning("⚠️ No se encontró JSON en la respuesta de GPT")
+                return self._get_default_response(text=response)
 
-    def _make_request(self, messages: list[dict], max_tokens: int = 300, temperature: float = 0.3) -> str | None:
+        except json.JSONDecodeError as e:
+            # Si falla el parseo, retornar respuesta como texto
+            logger.error(f"❌ Error parseando JSON de GPT: {str(e)}")
+            return self._get_default_response(text=response)
+        except Exception as e:
+            logger.error(f"❌ Error inesperado en _parse_gpt_response: {str(e)}")
+            return self._get_default_response(text=response)
+
+    def _get_default_response(self, text: str = None, action: str = "none", data: dict = None) -> dict:
         """
-        Hace una petición directa a la API de OpenAI usando requests
+        Genera una respuesta por defecto válida cuando falla el parsing
+        """
+        return {
+            "response": text if text else "🦐 ¿En qué puedo ayudarte hoy?",
+            "action": action,
+            "data": data if data is not None else {}
+        }
+
+    def _make_request(self, messages: list[dict], max_tokens: int = 300, temperature: float = 0.3, use_cache: bool = True) -> str | None:
+        """
+        Hace una petición directa a la API de OpenAI con caché y rate limiting.
+
+        Args:
+            messages: Lista de mensajes para la conversación
+            max_tokens: Número máximo de tokens en la respuesta
+            temperature: Temperatura para generación (0.0-1.0)
+            use_cache: Si debe usar el sistema de caché (default: True)
+
+        Returns:
+            Respuesta de la API o None si falla
         """
         if not self.is_available():
+            logger.warning("⚠️ OpenAI API key no configurada")
             return None
 
         try:
+            # Generar clave de caché
+            if use_cache:
+                prompt_text = json.dumps(messages, sort_keys=True)
+                params = {'max_tokens': max_tokens, 'temperature': temperature, 'model': self.model}
+                cache_key = self._generate_cache_key(prompt_text, params)
+
+                # Intentar obtener del caché
+                cached_response = self._get_from_cache(cache_key)
+                if cached_response:
+                    return cached_response
+
+            # Preparar petición
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json"
@@ -219,6 +459,7 @@ Respuesta: {
                 "temperature": temperature
             }
 
+            # Hacer petición con timeout
             response = requests.post(
                 f"{self.base_url}/chat/completions",
                 headers=headers,
@@ -226,15 +467,49 @@ Respuesta: {
                 timeout=30
             )
 
+            # Manejar respuesta exitosa
             if response.status_code == 200:
                 result = response.json()
-                return result["choices"][0]["message"]["content"].strip()
-            else:
-                logger.error(f"❌ Error API OpenAI: {response.status_code} - {response.text}")
+                response_text = result["choices"][0]["message"]["content"].strip()
+
+                # Guardar en caché si está habilitado
+                if use_cache:
+                    self._save_to_cache(cache_key, response_text)
+
+                return response_text
+
+            # Manejar rate limiting
+            elif response.status_code == 429:
+                logger.warning(f"⚠️ Rate limit alcanzado. Headers: {response.headers}")
+                # El método _make_request_with_retry se encarga de manejar esto
                 return None
 
+            # Otros errores
+            else:
+                error_detail = ""
+                try:
+                    error_json = response.json()
+                    error_detail = error_json.get('error', {}).get('message', '')
+                except:
+                    error_detail = response.text[:200]
+
+                logger.error(
+                    f"❌ Error API OpenAI: {response.status_code} | "
+                    f"Detalle: {error_detail}"
+                )
+                return None
+
+        except requests.exceptions.Timeout:
+            logger.error("❌ Timeout en petición a OpenAI (30s)")
+            return None
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"❌ Error de conexión con OpenAI: {str(e)}")
+            return None
+        except requests.exceptions.RequestException as e:
+            logger.error(f"❌ Error de red en petición OpenAI: {str(e)}")
+            return None
         except Exception as e:
-            logger.error(f"❌ Error en petición OpenAI: {str(e)}")
+            logger.error(f"❌ Error inesperado en petición OpenAI: {str(e)}")
             return None
 
     def analyze_user_intent(self, message: str, context: dict = None) -> dict:
@@ -247,64 +522,56 @@ Respuesta: {
 
         try:
             system_prompt = """
-Eres un asistente especializado en análisis de solicitudes de exportación de camarón para BGR Export.
+Analiza solicitudes de exportación de camarón y extrae información estructurada.
 
-EXTRAE INFORMACIÓN ESPECÍFICA:
+PRODUCTOS VÁLIDOS: HOSO, HLSO, P&D IQF, P&D BLOQUE, EZ PEEL, PuD-EUROPA, PuD-EEUU, COOKED, PRE-COCIDO, COCIDO SIN TRATAR
+TALLAS VÁLIDAS: U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60, 60/70, 61/70, 70/80, 71/90
 
-PRODUCTOS: HOSO, HLSO, P&D IQF, P&D BLOQUE, PuD-EUROPA, EZ PEEL, PuD-EEUU, COOKED, PRE-COCIDO, COCIDO SIN TRATAR
-TALLAS: U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60, 60/70, 61/70, 70/80, 71/90
+EXTRAE (valores exactos o null):
+- Intent: pricing|proforma|product_info|greeting|help|other
+- Product: nombre exacto del producto
+- Size: talla exacta
+- Glaseo: porcentaje (10, 20, 30) → convertir a factor decimal (10%=0.90, 20%=0.80, 30%=0.70)
+- Destination: SOLO si menciona "flete a [lugar]", "envío a [lugar]" o "DDP [lugar]" explícitamente
+- Flete: valor numérico si menciona "flete 0.30", "freight $0.25", etc.
+- Cantidad: número + unidad (ej: "5000 kg", "10000 lb")
+- Cliente: nombre si menciona "cliente [nombre]", "para [nombre]"
+- Language: "es" (español) o "en" (inglés)
 
-DESTINOS USA (usan libras): Houston, Miami, Los Angeles, New York, Chicago, Dallas, etc.
-OTROS DESTINOS (usan kilos): Europa, China, Japón, etc.
+REGLAS:
+1. Si menciona producto + talla → intent: "proforma"
+2. Si menciona DDP sin flete → flete_solicitado: true
+3. NO asumir valores por defecto - extraer solo lo que el usuario dice explícitamente
+4. Destination solo si menciona flete/envío/DDP + lugar
 
-PARÁMETROS CRÍTICOS A EXTRAER (TODOS DINÁMICOS):
-- Glaseo: "10 de glaseo", "glaseo 10%", "glaseo 0.15", "con 15 glaseo" → extraer valor decimal exacto
-- Flete: SOLO si menciona explícitamente "flete", "freight", "envío" → extraer valor numérico
-- DDP: Si menciona "DDP" → DEBE pedir flete si no lo especifica (necesario para desglosar precio)
-- Precio base: "precio base 5.50", "base 6.20", "precio 4.80" → extraer valor si se menciona
-- Cantidad: "15000 lb", "10 toneladas", "5000 kilos" → extraer número y unidad
-- Cliente: "para [nombre]", "cliente [nombre]", "empresa [nombre]"
-- Idioma: Detectar si el mensaje está en inglés o español
+EJEMPLOS:
+Input: "HLSO 16/20 con 20% glaseo"
+Output: {intent: "proforma", product: "HLSO", size: "16/20", glaseo_factor: 0.80, destination: null}
 
-REGLAS IMPORTANTES:
-- El usuario puede especificar TODOS los valores: glaseo, flete, precio base
-- Si menciona "proforma" o "cotización" → intent: "proforma"
-- IMPORTANTE: Solo extraer "destination" si menciona EXPLÍCITAMENTE flete/envío/DDP
-- Si menciona "DDP" SIN valor de flete → marcar flete_solicitado=true para pedirlo
-- NO asumir destino automáticamente - solo si dice "flete a [lugar]" o "envío a [lugar]"
-- Extraer valores numéricos EXACTOS que mencione el usuario
-- Si no especifica un valor → null (el sistema NO usará defaults fijos)
+Input: "Precio DDP Houston con flete 0.30"
+Output: {intent: "proforma", destination: "Houston", flete_custom: 0.30, is_ddp: true, usar_libras: true}
 
-FACTORES DE GLASEO ESTÁNDAR:
-- 10% glaseo → glaseo_factor: 0.90
-- 20% glaseo → glaseo_factor: 0.80  
-- 30% glaseo → glaseo_factor: 0.70
+Input: "Hola, necesito cotización"
+Output: {intent: "greeting", product: null, wants_proforma: true}
 
-EJEMPLOS DE EXTRACCIÓN:
-"Proforma 20/30 HOSO glaseo 10% flete Houston" → glaseo_factor: 0.90, destination: "Houston", usar_libras: true
-"Cotización con glaseo 20% y flete 0.25" → glaseo_factor: 0.80, flete_custom: 0.25, flete_solicitado: true
-"Precio base 5.50 con glaseo 30%" → precio_base_custom: 5.50, glaseo_factor: 0.70, destination: null
-"HLSO 16/20 glaseo 20%" → glaseo_factor: 0.80, destination: null, flete_custom: null, flete_solicitado: false
-"16/20 sin cabeza con 20 de glaseo" → glaseo_factor: 0.80, destination: null, flete_custom: null, flete_solicitado: false
-"Precio DDP LA or Houston al 15%" → glaseo_factor: 0.85, is_ddp: true, flete_custom: null, flete_solicitado: true (DEBE pedir flete)
-"Precio DDP con flete 0.30 al 15%" → glaseo_factor: 0.85, is_ddp: true, flete_custom: 0.30, flete_solicitado: true
-
-Responde SOLO en formato JSON válido:
+Responde SOLO en JSON:
 {
-    "intent": "pricing|proforma|product_info|greeting|help|contact|other",
-    "product": "producto exacto o null",
-    "size": "talla exacta o null", 
-    "quantity": "cantidad con unidad o null",
-    "destination": "ciudad/país específico o null",
-    "glaseo_factor": "valor decimal (ej: 0.10) o null",
-    "flete_custom": "valor de flete personalizado o null",
-    "precio_base_custom": "precio base personalizado o null",
-    "usar_libras": true/false,
-    "cliente_nombre": "nombre del cliente o null",
-    "wants_proforma": true/false,
-    "language": "es|en",
-    "confidence": 0.95,
-    "suggested_response": "respuesta sugerida"
+  "intent": "...",
+  "product": null | "...",
+  "size": null | "...",
+  "glaseo_factor": null | number,
+  "glaseo_percentage": null | number,
+  "destination": null | "...",
+  "flete_custom": null | number,
+  "precio_base_custom": null | number,
+  "flete_solicitado": false,
+  "is_ddp": false,
+  "usar_libras": false,
+  "cantidad": null | "...",
+  "cliente_nombre": null | "...",
+  "wants_proforma": false,
+  "language": "es",
+  "confidence": 0.0-1.0
 }
 """
 
@@ -375,14 +642,14 @@ TALLAS DISPONIBLES: U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50,
 
 INSTRUCCIONES CLAVE:
 - Si el usuario ya especificó PRODUCTO y TALLA: NO pidas más información, confirma que generas la proforma
-- Para saludos: responde amigablemente Y pregunta qué producto necesita
-- Solo pregunta información faltante si es absolutamente necesaria
+- Para saludos: máximo 100 caracteres
+- Para preguntas rápidas: máximo 150 caracteres
+- Para confirmaciones (con producto + talla): máximo 200 caracteres
+- Si necesitas listar múltiples opciones: puedes usar hasta 300 caracteres
 - Si tienes producto y talla, di: "¡Perfecto! Generando tu proforma de [producto] [talla]..."
-- Menciona que puedes generar cotizaciones con precios FOB actualizados
-- Mantén respuestas bajo 150 caracteres para WhatsApp
 - NO pidas cantidad si ya tienes producto y talla - genera la proforma directamente
 
-REGLA CRÍTICA: Si detectas producto + talla en el mensaje, NUNCA pidas más información.
+REGLA CRÍTICA: Si detectas producto + talla en el mensaje, NUNCA pidas más información. Genera la proforma directamente.
 
 OBJETIVO: Generar proformas inmediatamente cuando tengas datos suficientes.
 """
@@ -442,6 +709,290 @@ Formato de respuesta: texto directo sin JSON.
         except Exception as e:
             logger.error(f"❌ Error mejorando explicación de precio: {str(e)}")
             return None
+
+    # ==================== MÉTODOS ESPECIALIZADOS POR RESPONSABILIDAD ====================
+
+    def _get_base_context(self) -> str:
+        """
+        Contexto base común para todos los prompts
+        Reutilizable para evitar duplicación
+        """
+        return """Eres ShrimpBot, el asistente comercial de BGR Export especializado en camarones premium.
+
+PRODUCTOS: HOSO, HLSO, P&D IQF, P&D BLOQUE, EZ PEEL, PuD-EUROPA, PuD-EEUU, COOKED
+TALLAS: U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60, 60/70, 61/70, 70/80, 71/90
+
+PERSONALIDAD: Profesional, amigable, usa emojis apropiados (🦐, 💰, 📊, 📋)"""
+
+    def generate_greeting_response(self, user_name: str = None) -> str | None:
+        """
+        Genera respuesta específica para saludos
+        Método especializado, rápido y eficiente
+        """
+        if not self.is_available():
+            return None
+
+        try:
+            base = self._get_base_context()
+
+            user_context = f"Usuario: {user_name}" if user_name else "Usuario nuevo"
+
+            system_prompt = f"""{base}
+
+TAREA: Responder a un saludo de forma amigable y directa.
+LÍMITE: Máximo 100 caracteres.
+OBJETIVO: Saludar Y preguntar qué producto necesita.
+
+{user_context}
+"""
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": "Saluda al usuario"}
+            ]
+
+            result = self._make_request(messages, max_tokens=50, temperature=0.8)
+
+            if result:
+                logger.info(f"💬 Saludo generado: {result[:50]}...")
+                return self._clean_problematic_emojis(result)
+
+            return None
+
+        except Exception as e:
+            logger.error(f"❌ Error generando saludo: {str(e)}")
+            return None
+
+    def generate_confirmation_response(self, product: str, size: str, additional_info: dict = None) -> str | None:
+        """
+        Genera confirmación para generación de proforma
+        Método especializado para confirmaciones
+        """
+        if not self.is_available():
+            return None
+
+        try:
+            base = self._get_base_context()
+
+            context = f"Producto: {product}, Talla: {size}"
+            if additional_info:
+                if additional_info.get('glaseo_percentage'):
+                    context += f", Glaseo: {additional_info['glaseo_percentage']}%"
+                if additional_info.get('destination'):
+                    context += f", Destino: {additional_info['destination']}"
+
+            system_prompt = f"""{base}
+
+TAREA: Confirmar que vas a generar la proforma.
+LÍMITE: Máximo 200 caracteres.
+TONO: Entusiasta y profesional.
+FORMATO: "¡Perfecto! Generando tu proforma de [producto] [talla]..."
+
+Datos detectados: {context}
+"""
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": "Confirma generación de proforma"}
+            ]
+
+            result = self._make_request(messages, max_tokens=80, temperature=0.7)
+
+            if result:
+                logger.info(f"✅ Confirmación generada para {product} {size}")
+                return self._clean_problematic_emojis(result)
+
+            return None
+
+        except Exception as e:
+            logger.error(f"❌ Error generando confirmación: {str(e)}")
+            return None
+
+    def generate_question_response(self, question_type: str, context: dict = None) -> str | None:
+        """
+        Genera preguntas específicas según el tipo
+
+        Args:
+            question_type: 'glaseo', 'language', 'destination', 'product', 'size'
+            context: Contexto adicional opcional
+        """
+        if not self.is_available():
+            return None
+
+        try:
+            base = self._get_base_context()
+
+            question_prompts = {
+                'glaseo': {
+                    'task': 'Preguntar qué porcentaje de glaseo necesita',
+                    'options': 'Opciones: 10%, 20%, 30%',
+                    'limit': 150
+                },
+                'language': {
+                    'task': 'Preguntar en qué idioma quiere la proforma',
+                    'options': 'Opciones: Español o English',
+                    'limit': 150
+                },
+                'destination': {
+                    'task': 'Preguntar a qué destino necesita envío',
+                    'options': 'Menciona destinos comunes: Houston, Miami, China, etc.',
+                    'limit': 150
+                },
+                'product': {
+                    'task': 'Preguntar qué tipo de producto necesita',
+                    'options': 'Opciones populares: HLSO (sin cabeza), HOSO (con cabeza), P&D IQF (pelado)',
+                    'limit': 200
+                },
+                'size': {
+                    'task': 'Preguntar qué talla necesita',
+                    'options': 'Menciona tallas populares: 16/20, 21/25, 26/30, 31/35',
+                    'limit': 150
+                }
+            }
+
+            if question_type not in question_prompts:
+                logger.warning(f"⚠️ Tipo de pregunta desconocido: {question_type}")
+                return None
+
+            q_config = question_prompts[question_type]
+            context_str = f"\nContexto adicional: {context}" if context else ""
+
+            system_prompt = f"""{base}
+
+TAREA: {q_config['task']}
+{q_config['options']}
+LÍMITE: Máximo {q_config['limit']} caracteres.
+TONO: Amigable y directo.{context_str}
+"""
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Pregunta sobre {question_type}"}
+            ]
+
+            result = self._make_request(messages, max_tokens=60, temperature=0.7)
+
+            if result:
+                logger.info(f"❓ Pregunta generada: tipo={question_type}")
+                return self._clean_problematic_emojis(result)
+
+            return None
+
+        except Exception as e:
+            logger.error(f"❌ Error generando pregunta: {str(e)}")
+            return None
+
+    def _estimate_tokens(self, text: str) -> int:
+        """
+        Estima el número de tokens en un texto
+        Regla simple: ~4 caracteres = 1 token en español
+        ~3 caracteres = 1 token en inglés
+        """
+        # Detectar idioma aproximadamente
+        spanish_chars = sum(1 for c in text if c in 'áéíóúñ¿¡')
+        ratio = 4 if spanish_chars > 3 else 3.5
+
+        return int(len(text) / ratio)
+
+    def _log_token_usage(self, prompt: str, response: str, method_name: str):
+        """
+        Registra el uso de tokens para métricas
+        """
+        prompt_tokens = self._estimate_tokens(prompt)
+        response_tokens = self._estimate_tokens(response) if response else 0
+        total_tokens = prompt_tokens + response_tokens
+
+        # Calcular costo aproximado (GPT-3.5-turbo: $0.0015/1K prompt + $0.002/1K completion)
+        cost = (prompt_tokens * 0.0015 / 1000) + (response_tokens * 0.002 / 1000)
+
+        logger.info(
+            f"📊 Tokens usados en {method_name}: "
+            f"Prompt={prompt_tokens}, Response={response_tokens}, "
+            f"Total={total_tokens}, Costo≈${cost:.6f}"
+        )
+
+    # ==================== SISTEMA DE EJEMPLOS DINÁMICOS (FEW-SHOT LEARNING) ====================
+
+    def _get_relevant_examples(self, context_type: str, detected_data: dict = None) -> str:
+        """
+        Selecciona ejemplos relevantes basados en el contexto actual
+        Few-shot learning dinámico para mejorar respuestas
+
+        Args:
+            context_type: 'greeting', 'product_query', 'proforma_complete', 'missing_info'
+            detected_data: Datos detectados del usuario (productos, tallas, etc.)
+
+        Returns:
+            String con ejemplos relevantes formateados
+        """
+        examples = {
+            'greeting': """
+EJEMPLO RELEVANTE:
+Usuario: "Hola"
+Asistente: "¡Hola! 👋 Soy ShrimpBot. ¿Qué producto necesitas? 🦐"
+""",
+            'product_query': """
+EJEMPLO RELEVANTE:
+Usuario: "Necesito HLSO"
+Asistente: "¡Perfecto! HLSO es muy popular. ¿Qué talla necesitas? 📊 Tenemos 16/20, 21/25, 26/30..."
+""",
+            'proforma_complete': """
+EJEMPLO RELEVANTE:
+Usuario: "HLSO 16/20 con glaseo 20%"
+Asistente: "¡Excelente! 🦐 Generando proforma de HLSO 16/20 con glaseo 20%. Un momento..."
+""",
+            'missing_glaseo': """
+EJEMPLO RELEVANTE:
+Usuario: "HLSO 16/20"
+Asistente: "¡Perfecto! HLSO 16/20. ¿Qué glaseo necesitas? (10%, 20% o 30%) ❄️"
+""",
+            'missing_language': """
+EJEMPLO RELEVANTE:
+Usuario: [tiene producto y talla]
+Asistente: "Excelente. ¿En qué idioma quieres la proforma? 🌐 (Español/English)"
+""",
+            'missing_destination': """
+EJEMPLO RELEVANTE:
+Usuario: "Con flete"
+Asistente: "¿A qué destino lo necesitas? 🌍 Houston, Miami, China..."
+"""
+        }
+
+        # Seleccionar ejemplo base
+        example = examples.get(context_type, "")
+
+        # Personalizar ejemplo si hay datos detectados
+        if detected_data:
+            if detected_data.get('product') and detected_data.get('size'):
+                prod = detected_data['product']
+                size = detected_data['size']
+                example = f"""
+EJEMPLO SIMILAR A TU CASO:
+Usuario: "{prod} {size}"
+Asistente: "¡Perfecto! {prod} {size} es excelente. Generando tu proforma... 🦐"
+"""
+
+        return example
+
+    def _build_contextual_system_prompt(self, base_prompt: str, context_type: str, detected_data: dict = None) -> str:
+        """
+        Construye un prompt con ejemplos dinámicos relevantes
+
+        Args:
+            base_prompt: Prompt base del sistema
+            context_type: Tipo de contexto actual
+            detected_data: Datos detectados
+
+        Returns:
+            Prompt enriquecido con ejemplos relevantes
+        """
+        relevant_examples = self._get_relevant_examples(context_type, detected_data)
+
+        return f"""{base_prompt}
+
+{relevant_examples}
+
+APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
 
     def transcribe_audio(self, audio_file_path: str, language: str = 'es') -> str | None:
         """

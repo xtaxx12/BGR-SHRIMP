@@ -330,10 +330,6 @@ class PDFGenerator:
                     "talla": "TALLA",
                     "precio_fob": "PRECIO FOB USD/KG",
                     "precio_cfr": "PRECIO CFR USD/KG",
-                    "notas": "Notas:",
-                    "nota1": "• Precios sujetos a confirmación final",
-                    "nota2": f"• Glaseo aplicado: {glaseo_percentage}%",
-                    "nota3": "• Flete incluido en precio CFR",
                     "contacto": "Contacto: BGR Export | amerino@bgrexport.com | +593 98-805-7425"
                 },
                 "en": {
@@ -345,10 +341,6 @@ class PDFGenerator:
                     "talla": "SIZE",
                     "precio_fob": "FOB PRICE USD/KG",
                     "precio_cfr": "CFR PRICE USD/KG",
-                    "notas": "Notes:",
-                    "nota1": "• Prices subject to final confirmation",
-                    "nota2": f"• Glaze applied: {glaseo_percentage}%",
-                    "nota3": "• Freight included in CFR price",
                     "contacto": "Contact: BGR Export | amerino@bgrexport.com | +593 98-805-7425"
                 }
             }
