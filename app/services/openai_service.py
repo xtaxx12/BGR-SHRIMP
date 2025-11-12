@@ -581,20 +581,29 @@ EXTRAE (valores exactos o null):
 
 REGLAS IMPORTANTES:
 1. Si menciona tallas (ej: 20/30, 21/25) → intent: "proforma" (incluso si empieza con saludo)
-2. Si menciona CFR/CIF → flete_solicitado: true, extraer destino
-3. Si menciona "Cocedero" + "Inteiro" → multiple_presentations: true, needs_product_type: true, clarification_needed
-4. Si menciona "Cocedero" + "Colas" → product: "COOKED" (colas cocidas)
-5. Si menciona solo "Cocedero" → product: null, needs_product_type: true
-6. Si detecta múltiples tallas → multiple_sizes: true, listar todas en array
-7. Si detecta "Inteiro" y "Colas" en el mismo mensaje → separar tallas: sizes_inteiro y sizes_colas
-8. NO asumir valores por defecto - extraer solo lo que el usuario dice explícitamente
+2. Si menciona CFR/CIF sin glaseo → flete_solicitado: true, glaseo_factor: null (cálculo CFR simple)
+3. Si menciona CFR/CIF con glaseo (ej: "CFR con 15%") → flete_solicitado: true, glaseo_factor: 0.85
+4. Si menciona "Cocedero" + "Inteiro" → multiple_presentations: true, needs_product_type: true, clarification_needed
+5. Si menciona "Cocedero" + "Colas" → product: "COOKED" (colas cocidas)
+6. Si menciona solo "Cocedero" → product: null, needs_product_type: true
+7. Si detecta múltiples tallas → multiple_sizes: true, listar todas en array
+8. Si detecta "Inteiro" y "Colas" en el mismo mensaje → separar tallas: sizes_inteiro y sizes_colas
+9. NO asumir valores por defecto - extraer solo lo que el usuario dice explícitamente
+10. CFR sin glaseo = Precio FOB + Flete (simple)
+11. CFR con glaseo = Precio FOB + Glaseo + Flete (completo)
 
 EJEMPLOS:
 Input: "HLSO 16/20 con 20% glaseo"
 Output: {intent: "proforma", product: "HLSO", size: "16/20", glaseo_factor: 0.80, destination: null, confidence: 0.9}
 
 Input: "Buenas Tardes. Necesito precios Lagostino Cocedero CFR Lisboa: Inteiro 20/30, 30/40. Colas 21/25, 31/35"
-Output: {intent: "proforma", product: null, needs_product_type: true, product_category: "cocido", sizes_inteiro: ["20/30", "30/40"], sizes_colas: ["21/25", "31/35"], destination: "Lisboa", flete_solicitado: true, multiple_sizes: true, multiple_presentations: true, clarification_needed: "Cliente solicita 'Inteiro Cocedero' y 'Colas Cocedero'. Confirmar si desea productos cocidos o crudos para cada presentación.", confidence: 0.95}
+Output: {intent: "proforma", product: null, needs_product_type: true, product_category: "cocido", sizes_inteiro: ["20/30", "30/40"], sizes_colas: ["21/25", "31/35"], destination: "Lisboa", flete_solicitado: true, glaseo_factor: null, multiple_sizes: true, multiple_presentations: true, clarification_needed: "Cliente solicita 'Inteiro Cocedero' y 'Colas Cocedero'. Confirmar si desea productos cocidos o crudos para cada presentación.", confidence: 0.95}
+
+Input: "Precio CFR Houston HLSO 16/20"
+Output: {intent: "proforma", product: "HLSO", size: "16/20", destination: "Houston", flete_solicitado: true, glaseo_factor: null, confidence: 0.9}
+
+Input: "Precio CFR Houston HLSO 16/20 con 15% glaseo"
+Output: {intent: "proforma", product: "HLSO", size: "16/20", destination: "Houston", flete_solicitado: true, glaseo_factor: 0.85, glaseo_percentage: 15, confidence: 0.95}
 
 Input: "Precio DDP Houston con flete 0.30"
 Output: {intent: "proforma", destination: "Houston", flete_custom: 0.30, is_ddp: true, usar_libras: false, confidence: 0.9}

@@ -79,10 +79,20 @@ class ExcelLocalCalculatorService:
         except (ValueError, TypeError):
             return False
 
-    def calculate_prices(self, precio_fob_kg: float, glaseo_factor: float = None, flete: float = None) -> dict[str, float]:
+    def calculate_prices(self, precio_fob_kg: float, glaseo_factor: float = None, flete: float = None, glaseo_especificado: bool = False) -> dict[str, float]:
         """
         Calcula todos los precios usando las fórmulas del Excel con máxima precisión
         Recibe el precio FOB como parámetro (no el precio base)
+        
+        Args:
+            precio_fob_kg: Precio FOB base en kg
+            glaseo_factor: Factor de glaseo (0.85 para 15%, 0.80 para 20%, etc.)
+            flete: Valor del flete por kg
+            glaseo_especificado: True si el usuario especificó glaseo explícitamente
+        
+        Reglas de cálculo CFR:
+        - Si glaseo_especificado=False: CFR = FOB + Flete (simple)
+        - Si glaseo_especificado=True: CFR = (FOB con glaseo) + Flete (completo)
         """
         try:
             # Usar factores personalizados o por defecto
@@ -90,7 +100,7 @@ class ExcelLocalCalculatorService:
             flete_value = flete if flete is not None else self.flete
 
             logger.info(f"🧮 Calculando precios para FOB ${precio_fob_kg}/kg")
-            logger.info(f"   Factores: glaseo={glaseo}, flete={flete_value}, costo_fijo={self.costo_fijo}")
+            logger.info(f"   Factores: glaseo={glaseo}, flete={flete_value}, costo_fijo={self.costo_fijo}, glaseo_especificado={glaseo_especificado}")
 
             # Correcciones especiales para valores que se muestran redondeados en Excel
 
@@ -124,8 +134,15 @@ class ExcelLocalCalculatorService:
             # 3. Precio FOB con glaseo = Precio glaseo + Costo fijo (según tu Excel: 11.75 + 0.29 = 12.04)
             precio_fob_con_glaseo_kg = precio_glaseo_kg + self.costo_fijo
 
-            # 4. Precio final CFR = Precio FOB con glaseo + Flete
-            precio_final_kg = precio_fob_con_glaseo_kg + flete_value
+            # 4. Precio final CFR - LÓGICA CORREGIDA
+            if glaseo_especificado:
+                # Usuario especificó glaseo → CFR = (FOB con glaseo) + Flete
+                precio_final_kg = precio_fob_con_glaseo_kg + flete_value
+                logger.info(f"   📊 CFR con glaseo: ${precio_fob_con_glaseo_kg:.2f} + ${flete_value:.2f} = ${precio_final_kg:.2f}")
+            else:
+                # Usuario NO especificó glaseo → CFR = FOB + Flete (simple)
+                precio_final_kg = precio_fob_kg + flete_value
+                logger.info(f"   📊 CFR sin glaseo: ${precio_fob_kg:.2f} + ${flete_value:.2f} = ${precio_final_kg:.2f}")
 
             # Convertir a libras con máxima precisión (1 kg = 2.20462262185 lb - valor exacto)
             lb_conversion = 2.20462262185
