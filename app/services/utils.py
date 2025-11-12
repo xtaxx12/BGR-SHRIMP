@@ -7,6 +7,7 @@ def parse_multiple_products(message: str) -> list[dict] | None:
     """
     Detecta y extrae múltiples productos del mensaje
     Retorna una lista de diccionarios con producto y talla
+    Soporta términos en español, inglés y portugués
     """
     if not message:
         return None
@@ -14,52 +15,68 @@ def parse_multiple_products(message: str) -> list[dict] | None:
     message_upper = message.upper()
     products_found = []
 
-    # Patrones para productos
+    # Patrones para productos (expandidos con términos en español/portugués)
     product_patterns = {
-        'HOSO': r'\bHOSO\b',
+        'HOSO': r'\b(?:HOSO|INTEIRO|ENTERO|WHOLE)\b',
         'HLSO': r'\bHLSO\b',
         'P&D IQF': r'\b(?:P&D|PYD|P\s*&\s*D)\s*(?:IQF|TAIL\s*OFF)?\b',
         'P&D BLOQUE': r'\b(?:P&D|PYD)\s*(?:BLOQUE|BLOCK)\b',
         'EZPEEL': r'\b(?:EZ\s*PEEL|EZPEEL)\b',
         'EZ PEEL': r'\b(?:EZ\s*PEEL|EZPEEL)\b',
+        'COOKED': r'\b(?:COOKED|COCIDO|COCEDERO|COZIDO)\b',
+        'PRE-COCIDO': r'\b(?:PRE-COCIDO|PRECOCIDO|PRE\s*COOKED)\b',
+        'COCIDO SIN TRATAR': r'\b(?:COCIDO\s*SIN\s*TRATAR|UNTREATED\s*COOKED)\b',
     }
 
-    # Buscar todas las líneas del mensaje
-    lines = message_upper.split('\n')
+    # Detectar si menciona "Colas" o "Tails" (productos pelados)
+    has_colas = bool(re.search(r'\b(?:COLAS|TAILS|COLA|TAIL)\b', message_upper))
+    
+    # Detectar si menciona términos de producto cocido
+    has_cocido = bool(re.search(r'\b(?:COCIDO|COCEDERO|COOKED|COZIDO)\b', message_upper))
 
-    for line in lines:
-        line = line.strip()
-        if not line or len(line) < 5:
-            continue
-
-        # Buscar talla en la línea (formato XX/XX o XX-XX)
-        size_match = re.search(r'(\d+)[/-](\d+)', line)
-        if not size_match:
-            continue
-
-        size = f"{size_match.group(1)}/{size_match.group(2)}"
-
-        # Buscar producto en la línea
+    # Buscar todas las tallas en el mensaje (formato XX/XX)
+    size_matches = re.finditer(r'(\d+)[/](\d+)', message)
+    
+    for match in size_matches:
+        size = f"{match.group(1)}/{match.group(2)}"
+        
+        # Obtener contexto alrededor de la talla (50 caracteres antes y después)
+        start = max(0, match.start() - 50)
+        end = min(len(message), match.end() + 50)
+        context = message[start:end].upper()
+        
+        # Buscar producto en el contexto
         product_found = None
         for product_name, pattern in product_patterns.items():
-            if re.search(pattern, line):
+            if re.search(pattern, context):
                 product_found = product_name
                 break
 
         # Si no se encontró producto específico, intentar inferir
         if not product_found:
+            # Si menciona "Colas" y producto cocido, probablemente COOKED
+            if has_colas and has_cocido:
+                product_found = 'COOKED'
+            # Si menciona "Inteiro" o "Entero", probablemente HOSO
+            elif 'INTEIRO' in context or 'ENTERO' in context:
+                product_found = 'HOSO'
             # Si tiene "BLOCK" o "BLOQUE", es P&D BLOQUE
-            if 'BLOCK' in line or 'BLOQUE' in line:
+            elif 'BLOCK' in context or 'BLOQUE' in context:
                 product_found = 'P&D BLOQUE'
             # Si tiene "IQF", es P&D IQF
-            elif 'IQF' in line:
+            elif 'IQF' in context:
                 product_found = 'P&D IQF'
+            # Si menciona cocido sin especificar, usar COOKED
+            elif has_cocido:
+                product_found = 'COOKED'
 
-        if product_found and size:
+        if size:
             products_found.append({
-                'product': product_found,
+                'product': product_found,  # Puede ser None si no se detectó
                 'size': size,
-                'line': line
+                'context': context.strip(),
+                'has_colas': has_colas,
+                'has_cocido': has_cocido
             })
 
     return products_found if products_found else None

@@ -254,7 +254,7 @@ class OpenAIService:
 
 TU PERSONALIDAD:
 - Profesional pero amigable y conversacional
-- Experto en productos de camarón
+- Experto en productos de camarón y langostino
 - Proactivo en ayudar al cliente
 - Usas emojis apropiados (🦐, 💰, 📊, 📋, ❄️, 🌍)
 - Mantienes conversaciones naturales y fluidas
@@ -269,34 +269,54 @@ PRODUCTOS DISPONIBLES:
 - PuD-EUROPA - Calidad premium para Europa
 - PuD-EEUU - Calidad para Estados Unidos
 - COOKED - Cocido listo para consumo
+- PRE-COCIDO - Pre-cocido para procesamiento
+- COCIDO SIN TRATAR - Cocido sin tratamiento adicional
+
+RECONOCIMIENTO DE TÉRMINOS:
+- "Cocedero", "Cocido", "Cooked" → COOKED, PRE-COCIDO, o COCIDO SIN TRATAR
+- "Inteiro", "Entero", "Whole" → HOSO o HLSO
+- "Colas", "Tails", "Cola" → P&D IQF, COOKED (colas peladas)
+- "Lagostino", "Vannamei", "Camarón" → Todos son válidos
+- "CFR", "CIF", "FOB" → Términos de flete (detectar destino)
 
 TALLAS: U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60, 60/70, 61/70, 70/80, 71/90
 
 TU OBJETIVO:
 Ayudar al cliente a generar cotizaciones y proformas de camarón.
 
+DETECCIÓN INTELIGENTE DE SOLICITUDES COMPLEJAS:
+Cuando el usuario envía un mensaje con múltiples tallas y productos:
+1. Extrae TODAS las tallas mencionadas (ej: 20/30, 30/40, 40/50, 21/25, 31/35, etc.)
+2. Agrupa las tallas por tipo de producto si se menciona (ej: "Inteiro" vs "Colas")
+3. Detecta el destino si menciona ciudades o términos CFR/CIF
+4. Resume claramente lo que detectaste
+5. Pregunta por la información faltante (glaseo, cantidades, confirmación de producto)
+
 FLUJO DE CONVERSACIÓN:
 1. Detectar qué productos y tallas necesita el cliente
 2. Preguntar por glaseo si no lo especificó (10%, 20%, 30%)
-3. Preguntar por destino si necesita flete
-4. Confirmar datos antes de generar proforma
-5. Preguntar idioma del PDF (Español/English)
+3. Preguntar por cantidades si no las especificó
+4. Confirmar destino si menciona CFR/CIF
+5. Confirmar datos antes de generar proforma
+6. Preguntar idioma del PDF (Español/English)
 
 REGLAS IMPORTANTES:
-- Mantén respuestas concisas: saludos 100 caracteres, preguntas 150 caracteres, confirmaciones 200 caracteres
-- Si necesitas listar múltiples productos, puedes usar hasta 300 caracteres
-- Si falta información, pregunta de forma natural
+- Mantén respuestas concisas pero completas cuando hay múltiples tallas
+- Si detectas múltiples tallas, lista todas claramente
+- Si falta información crítica (glaseo, producto específico), pregunta de forma natural
 - Confirma siempre antes de generar proforma
 - Usa lenguaje natural, no robótico
+- Si el usuario menciona "Cocedero" o "Cocido", ofrece las opciones: COOKED, PRE-COCIDO, COCIDO SIN TRATAR
 
 FORMATO DE RESPUESTA:
 Responde en formato JSON con esta estructura:
 {
     "response": "Tu respuesta natural al usuario",
-    "action": "detect_products|ask_glaseo|ask_language|generate_proforma|none",
+    "action": "detect_products|ask_glaseo|ask_product_type|ask_language|generate_proforma|none",
     "data": {
         "products": [...],
         "glaseo": 20,
+        "destination": "Lisboa",
         "language": "es",
         ...
     }
@@ -317,11 +337,16 @@ Respuesta: {
     "data": {"products": [{"product": "HLSO", "size": "16/20"}]}
 }
 
-Usuario: "20%"
+Usuario: "Necesito precios Lagostino Cocedero CFR Lisboa: Inteiro 20/30, 30/40, 40/50. Colas 21/25, 31/35, 36/40, 41/50"
 Respuesta: {
-    "response": "Excelente, glaseo 20%. 🌐 ¿En qué idioma quieres la proforma? (Español/English)",
-    "action": "ask_language",
-    "data": {"glaseo": 20}
+    "response": "🦐 ¡Hola! Entiendo que necesitas cotización para langostino cocido CFR Lisboa.\n\nHe detectado las siguientes tallas:\n📏 Inteiro: 20/30, 30/40, 40/50\n📏 Colas: 21/25, 31/35, 36/40, 41/50\n\nPara generar tu cotización necesito confirmar:\n1️⃣ ¿Qué porcentaje de glaseo necesitas? (10%, 20%, 30%)\n2️⃣ ¿Cantidad aproximada por talla?\n3️⃣ ¿Confirmas destino Lisboa?\n\n💡 Nuestros productos cocidos disponibles:\n- COOKED\n- PRE-COCIDO\n- COCIDO SIN TRATAR\n\n¿Con cuál deseas cotizar? 🦐",
+    "action": "ask_product_type",
+    "data": {
+        "sizes_inteiro": ["20/30", "30/40", "40/50"],
+        "sizes_colas": ["21/25", "31/35", "36/40", "41/50"],
+        "destination": "Lisboa",
+        "product_category": "cocido"
+    }
 }"""
 
     def _build_context_message(self, session_data: dict) -> str:
@@ -373,7 +398,7 @@ Respuesta: {
 
                 # Validar action: debe ser uno de los permitidos
                 valid_actions = [
-                    'detect_products', 'ask_glaseo', 'ask_language',
+                    'detect_products', 'ask_glaseo', 'ask_language', 'ask_product_type',
                     'generate_proforma', 'greeting', 'none', 'help',
                     'audio_info', 'product_list', 'price_inquiry', 'thanks',
                     'goodbye', 'size_detected', 'session_context', 'general_inquiry',
@@ -1226,7 +1251,7 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
             destination = None
             usar_libras = False
 
-            # Detectar productos con patrones más amplios
+            # Detectar productos con patrones más amplios (incluyendo términos en español/portugués)
             product_patterns = {
                 'HLSO': [
                     'sin cabeza', 'hlso', 'head less', 'headless', 'descabezado',
@@ -1234,7 +1259,7 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
                 ],
                 'HOSO': [
                     'con cabeza', 'hoso', 'head on', 'entero', 'completo',
-                    'con cabezas', 'tipo con cabeza'
+                    'con cabezas', 'tipo con cabeza', 'inteiro', 'whole'
                 ],
                 'P&D IQF': [
                     'p&d iqf', 'pd iqf', 'p&d', 'pelado', 'peeled', 'deveined',
@@ -1254,7 +1279,8 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
                     'pud eeuu', 'pud-eeuu', 'eeuu', 'usa', 'estados unidos'
                 ],
                 'COOKED': [
-                    'cooked', 'cocinado', 'cocido', 'preparado'
+                    'cooked', 'cocinado', 'cocido', 'preparado', 'cocedero', 'cozido',
+                    'colas', 'tails', 'tail'
                 ],
                 'PRE-COCIDO': [
                     'pre-cocido', 'pre cocido', 'precocido', 'pre-cooked', 'pre cooked'
@@ -1378,8 +1404,8 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
                     except ValueError:
                         continue
 
-            # Detectar destinos si se menciona flete o DDP
-            flete_keywords = ['flete', 'freight', 'envio', 'envío', 'shipping', 'transporte', 'ddp']
+            # Detectar destinos si se menciona flete, DDP, CFR o CIF
+            flete_keywords = ['flete', 'freight', 'envio', 'envío', 'shipping', 'transporte', 'ddp', 'cfr', 'cif', 'c&f']
             menciona_flete = any(keyword in message_lower for keyword in flete_keywords)
 
             if menciona_flete:
@@ -1392,10 +1418,20 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
                     'Chicago': ['chicago', 'chicaco'],
                     'Dallas': ['dallas', 'dalas'],
 
+                    # Ciudades Europa
+                    'Lisboa': ['lisboa', 'lisbon', 'portugal'],
+                    'Madrid': ['madrid', 'españa', 'spain'],
+                    'Barcelona': ['barcelona'],
+                    'Paris': ['paris', 'france', 'francia'],
+                    'Londres': ['londres', 'london', 'uk', 'reino unido'],
+                    'Roma': ['roma', 'rome', 'italy', 'italia'],
+                    'Berlin': ['berlin', 'germany', 'alemania'],
+                    'Amsterdam': ['amsterdam', 'netherlands', 'holanda'],
+
                     # Países y regiones
                     'China': ['china', 'beijing', 'shanghai'],
                     'Japón': ['japon', 'japón', 'japan', 'tokyo', 'nippon'],
-                    'Europa': ['europa', 'europe', 'spain', 'italy', 'france', 'germany', 'alemania'],
+                    'Europa': ['europa', 'europe'],
                     'Brasil': ['brasil', 'brazil', 'sao paulo', 'rio'],
                     'México': ['mexico', 'méxico', 'guadalajara', 'monterrey'],
                     'Canadá': ['canada', 'toronto', 'vancouver'],
@@ -1422,8 +1458,11 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
 
             # También detectar patrones de envío específicos (solo si ya menciona flete)
             if menciona_flete and not destination:
-                # Patrones más específicos para detectar destinos
+                # Patrones más específicos para detectar destinos (incluyendo CFR/CIF)
                 envio_specific_patterns = [
+                    r'cfr\s+([a-záéíóúñ\w\s]+?)(?:\s+para|\s+con|\s+de|$)',        # "CFR Lisboa"
+                    r'cif\s+([a-záéíóúñ\w\s]+?)(?:\s+para|\s+con|\s+de|$)',        # "CIF Lisboa"
+                    r'c&f\s+([a-záéíóúñ\w\s]+?)(?:\s+para|\s+con|\s+de|$)',        # "C&F Lisboa"
                     r'flete\s+a\s+([a-záéíóúñ\w\s]+?)(?:\s+para|\s+con|\s+de|$)',  # "flete a japón"
                     r'envio\s+a\s+([a-záéíóúñ\w\s]+?)(?:\s+para|\s+con|\s+de|$)',  # "envío a china"
                     r'hacia\s+([a-záéíóúñ\w\s]+?)(?:\s+para|\s+con|\s+de|$)',      # "hacia europa"
