@@ -919,13 +919,16 @@ U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60
                 else:
                     # Verificar qué información falta específicamente
                     glaseo_factor = ai_query.get('glaseo_factor') if ai_query else None
+                    glaseo_percentage = ai_query.get('glaseo_percentage') if ai_query else None
                     flete_solicitado = ai_query.get('flete_solicitado', False) if ai_query else False
                     flete_custom = ai_query.get('flete_custom') if ai_query else None
                     destination = ai_query.get('destination') if ai_query else None
 
-                    logger.info(f"🔍 Verificando datos faltantes: glaseo_factor={glaseo_factor}, flete_solicitado={flete_solicitado}, flete_custom={flete_custom}, destination={destination}")
+                    logger.info(f"🔍 Verificando datos faltantes: glaseo_factor={glaseo_factor}, glaseo_percentage={glaseo_percentage}, flete_solicitado={flete_solicitado}, flete_custom={flete_custom}, destination={destination}")
 
-                    if glaseo_factor is None:
+                    # IMPORTANTE: Si glaseo_percentage es 0, significa "sin glaseo" (ya especificado)
+                    # No pedir glaseo en este caso
+                    if glaseo_factor is None and glaseo_percentage != 0:
                         # Falta el glaseo - pedir al usuario que lo especifique
                         product = ai_query.get('product', 'producto') if ai_query else 'producto'
                         size = ai_query.get('size', 'talla') if ai_query else 'talla'
@@ -1489,7 +1492,11 @@ Responde con el número o escribe:
                 # Verificar que price_info tenga glaseo antes de generar PDF
                 if price_info:
                     glaseo_factor = price_info.get('factor_glaseo') or price_info.get('glaseo_factor')
-                    if not glaseo_factor:
+                    glaseo_percentage = price_info.get('glaseo_percentage')
+                    
+                    # IMPORTANTE: Si glaseo_percentage es 0, significa "sin glaseo" (ya especificado)
+                    # No pedir glaseo en este caso
+                    if not glaseo_factor and glaseo_percentage != 0:
                         # Falta el glaseo - pedir al usuario que lo especifique
                         product = price_info.get('producto', 'producto')
                         size = price_info.get('talla', 'talla')

@@ -175,8 +175,13 @@ def parse_ai_analysis_to_query(ai_analysis: dict) -> dict | None:
         flete_solicitado = True
 
     # Procesar factor de glaseo - CRÍTICO: NO USAR VALOR POR DEFECTO
+    # IMPORTANTE: Si glaseo_percentage es 0, significa "sin glaseo" (especificado explícitamente)
     glaseo_value = None
-    if glaseo_factor:
+    if glaseo_percentage == 0:
+        # Usuario especificó 0% glaseo → Sin glaseo (CFR simple)
+        glaseo_value = None
+        logger.info("📊 Glaseo 0% detectado en análisis → Sin glaseo (CFR simple)")
+    elif glaseo_factor:
         try:
             # Si viene como "10" convertir a 0.10
             glaseo_num = float(glaseo_factor)
