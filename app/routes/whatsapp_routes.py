@@ -791,6 +791,38 @@ async def whatsapp_webhook(request: Request,
             ai_query = parse_ai_analysis_to_query(ai_analysis)
             logger.info(f"🤖 Consulta generada por IA: {ai_query}")
 
+            # PRIMERO: Verificar si necesita aclaración sobre tipo de producto (Cocedero + Inteiro/Colas)
+            if ai_analysis.get('needs_product_type') or ai_analysis.get('multiple_presentations'):
+                clarification = ai_analysis.get('clarification_needed', '')
+                sizes_inteiro = ai_analysis.get('sizes_inteiro', [])
+                sizes_colas = ai_analysis.get('sizes_colas', [])
+                destination = ai_analysis.get('destination', '')
+                
+                clarification_message = "🦐 **Solicitud detectada:**\n\n"
+                
+                if sizes_inteiro:
+                    clarification_message += f"📏 **Inteiro (Entero):** {', '.join(sizes_inteiro)}\n"
+                if sizes_colas:
+                    clarification_message += f"📏 **Colas:** {', '.join(sizes_colas)}\n"
+                if destination:
+                    clarification_message += f"🌍 **Destino:** {destination}\n"
+                
+                clarification_message += "\n⚠️ **Necesito aclaración:**\n"
+                clarification_message += "Mencionas 'Cocedero' (cocido) pero también 'Inteiro' (entero).\n\n"
+                clarification_message += "💡 **¿Qué productos necesitas?**\n\n"
+                clarification_message += "**Para Inteiro (Entero):**\n"
+                clarification_message += "• HOSO - Camarón entero crudo (con cabeza)\n"
+                clarification_message += "• HLSO - Sin cabeza crudo\n\n"
+                clarification_message += "**Para Colas (Cocidas):**\n"
+                clarification_message += "• COOKED - Colas cocidas\n"
+                clarification_message += "• PRE-COCIDO - Pre-cocidas\n"
+                clarification_message += "• COCIDO SIN TRATAR - Cocidas sin tratamiento\n\n"
+                clarification_message += "📝 **Por favor especifica:**\n"
+                clarification_message += "Ejemplo: 'HOSO para inteiro y COOKED para colas'"
+                
+                response.message(clarification_message)
+                return PlainTextResponse(str(response), media_type="application/xml")
+            
             # Verificar si falta información crítica
             if not ai_query:
                 # Verificar qué información específica falta
