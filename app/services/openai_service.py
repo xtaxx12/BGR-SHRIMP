@@ -600,8 +600,8 @@ EJEMPLOS:
 Input: "HLSO 16/20 con 20% glaseo"
 Output: {intent: "proforma", product: "HLSO", size: "16/20", glaseo_factor: 0.80, destination: null, confidence: 0.9}
 
-Input: "Buenas Tardes. Necesito precios Lagostino Cocedero CFR Lisboa: Inteiro 20/30, 30/40. Colas 21/25, 31/35"
-Output: {intent: "proforma", product: null, needs_product_type: true, product_category: "cocido", sizes_inteiro: ["20/30", "30/40"], sizes_colas: ["21/25", "31/35"], destination: "Lisboa", flete_solicitado: true, glaseo_factor: null, multiple_sizes: true, multiple_presentations: true, clarification_needed: "Cliente solicita 'Inteiro Cocedero' y 'Colas Cocedero'. Confirmar si desea productos cocidos o crudos para cada presentación.", confidence: 0.95}
+Input: "Buenas Tardes. Necesito precios Lagostino Cocedero CFR Lisboa: Inteiro 0% 20/30, 30/40, 40/50. Colas 21/25, 31/35, 36/40, 41/50"
+Output: {intent: "proforma", product: null, needs_product_type: true, product_category: "cocido", sizes_inteiro: ["20/30", "30/40", "40/50"], sizes_colas: ["21/25", "31/35", "36/40", "41/50"], destination: "Lisboa", flete_solicitado: true, glaseo_factor: null, glaseo_percentage: 0, multiple_sizes: true, multiple_presentations: true, clarification_needed: "Cliente solicita 'Inteiro Cocedero' y 'Colas Cocedero'. Confirmar productos específicos.", confidence: 0.95}
 
 Input: "Precio CFR Houston HLSO 16/20"
 Output: {intent: "proforma", product: "HLSO", size: "16/20", destination: "Houston", flete_solicitado: true, glaseo_factor: null, confidence: 0.9}
@@ -1146,6 +1146,7 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
         """
         Detecta múltiples productos en un mensaje
         Retorna lista de diccionarios con producto y talla
+        Detecta patrones como "Inteiro" y "Colas" con múltiples tallas
         """
         if not message:
             return []
@@ -1153,13 +1154,29 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
         message_upper = message.upper()
         products_found = []
 
-        # Patrones para productos
+        # PRIMERO: Detectar si menciona "Inteiro" y "Colas" (patrón especial)
+        has_inteiro = any(term in message_upper for term in ['INTEIRO', 'ENTERO'])
+        has_colas = any(term in message_upper for term in ['COLAS', 'COLA', 'TAILS', 'TAIL'])
+        
+        if has_inteiro or has_colas:
+            # Buscar todas las tallas en el mensaje
+            all_sizes = re.findall(r'(\d+)/(\d+)', message)
+            
+            if len(all_sizes) > 1:
+                # Múltiples tallas detectadas con Inteiro/Colas
+                # Retornar lista vacía para forzar el flujo de aclaración
+                logger.info(f"🔍 Detectado patrón Inteiro/Colas con {len(all_sizes)} tallas → Requiere aclaración")
+                # Retornar lista con marcador especial
+                return [{'special': 'inteiro_colas', 'count': len(all_sizes)}]
+
+        # Patrones para productos específicos
         product_patterns = {
             'HOSO': r'\bHOSO\b',
             'HLSO': r'\bHLSO\b',
             'P&D IQF': r'\b(?:P&D|PYD|P\s*&\s*D)\s*(?:IQF|TAIL\s*OFF)?\b',
             'P&D BLOQUE': r'\b(?:P&D|PYD)\s*(?:BLOQUE|BLOCK)\b',
-            'EZ PEEL': r'\b(?:EZ\s*PEEL|EZPEEL)\b',  # Usar "EZ PEEL" con espacio como en Excel
+            'EZ PEEL': r'\b(?:EZ\s*PEEL|EZPEEL)\b',
+            'COOKED': r'\b(?:COOKED|COCIDO|COCEDERO)\b',
         }
 
         # Buscar todas las líneas del mensaje
