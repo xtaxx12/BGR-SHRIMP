@@ -158,9 +158,18 @@ class PricingService:
             else:
                 flete_value = 0  # No aplicar flete si no se solicitó
 
-            # Verificar que se haya especificado glaseo
-            if glaseo_factor is None:
-                logger.warning("❌ Glaseo no especificado - se requiere para calcular CFR")
+            # Determinar si el glaseo fue especificado explícitamente por el usuario
+            glaseo_especificado = glaseo_factor is not None
+            
+            # Si solicita flete (CFR) pero NO especificó glaseo → Cálculo CFR simple
+            # Si solicita flete (CFR) Y especificó glaseo → Cálculo CFR completo
+            if flete_solicitado and not glaseo_especificado:
+                logger.info("📊 CFR sin glaseo especificado → Cálculo simple: FOB + Flete")
+                # Usar glaseo por defecto solo para cálculos internos, pero no aplicarlo al CFR
+                glaseo_factor = 0.80  # Valor por defecto para cálculos internos
+            elif not flete_solicitado and not glaseo_especificado:
+                # No solicita flete ni glaseo → Requiere al menos uno
+                logger.warning("❌ Se requiere glaseo o flete para generar cotización")
                 return None
 
             # Usar el calculador corregido con máxima precisión
@@ -168,7 +177,8 @@ class PricingService:
             calculated_result = self.calculator_service.calculate_prices(
                 precio_fob_kg=base_price_kg,
                 glaseo_factor=glaseo_factor,
-                flete=flete_value
+                flete=flete_value,
+                glaseo_especificado=glaseo_especificado
             )
 
             if not calculated_result:
@@ -210,11 +220,12 @@ class PricingService:
                 'precio_glaseo_lb': precio_glaseo_lb,
                 'precio_fob_con_glaseo_kg': precio_fob_con_glaseo_kg,  # Glaseo + costo fijo (precio para PDF)
                 'precio_fob_con_glaseo_lb': precio_fob_con_glaseo_lb,
-                'precio_final_kg': precio_final_kg,  # CFR (glaseo + costo fijo + flete)
+                'precio_final_kg': precio_final_kg,  # CFR (simple o con glaseo según glaseo_especificado)
                 'precio_final_lb': precio_final_lb,
                 'costo_fijo': calculated_result.get('costo_fijo_used'),
                 'factor_glaseo': calculated_result.get('glaseo_factor_used'),
                 'glaseo_percentage': glaseo_percentage,  # Porcentaje original solicitado
+                'glaseo_especificado': glaseo_especificado,  # Flag para saber si usuario especificó glaseo
                 'flete': calculated_result.get('flete_used'),
                 'destination': destination,
                 'quantity': user_params.get('quantity', ''),
@@ -222,7 +233,7 @@ class PricingService:
                 'calculo_dinamico': True,
                 'incluye_flete': incluye_flete,  # Flag para determinar qué precio mostrar
                 'valores_usuario': {
-                    'glaseo_especificado': glaseo_factor,
+                    'glaseo_especificado': glaseo_factor if glaseo_especificado else None,
                     'flete_especificado': flete_custom,
                     'precio_base_especificado': user_params.get('precio_base_custom')
                 }

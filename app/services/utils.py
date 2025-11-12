@@ -329,20 +329,30 @@ def format_price_response(price_info: dict) -> str:
             if 'precio_final_kg' in price_info:
                 flete_value = price_info.get('flete', 0)
                 flete_especificado = valores_usuario.get('flete_especificado')
+                glaseo_especificado_flag = price_info.get('glaseo_especificado', False)
 
-                if flete_especificado:
-                    response += f"✈️ **Precio CFR (Glaseo + Costo Fijo + Flete Usuario ${flete_value:.2f}):**\n"
-                elif is_houston:
-                    response += f"✈️ **Precio CFR (Glaseo + Costo Fijo + Flete Houston ${flete_value:.2f}):**\n"
-                elif usar_libras:
-                    response += f"✈️ **Precio CFR (Glaseo + Costo Fijo + Flete USA ${flete_value:.2f}):**\n"
+                # Determinar el tipo de cálculo CFR
+                if glaseo_especificado_flag:
+                    # CFR con glaseo especificado
+                    if flete_especificado:
+                        response += f"✈️ **Precio CFR (FOB + Glaseo + Flete ${flete_value:.2f}):**\n"
+                    elif is_houston:
+                        response += f"✈️ **Precio CFR (FOB + Glaseo + Flete Houston ${flete_value:.2f}):**\n"
+                    elif usar_libras:
+                        response += f"✈️ **Precio CFR (FOB + Glaseo + Flete USA ${flete_value:.2f}):**\n"
+                    else:
+                        response += f"✈️ **Precio CFR (FOB + Glaseo + Flete ${flete_value:.2f}):**\n"
                 else:
-                    response += f"✈️ **Precio CFR (Glaseo + Costo Fijo + Flete ${flete_value:.2f}):**\n"
+                    # CFR simple (sin glaseo)
+                    if flete_especificado:
+                        response += f"✈️ **Precio CFR (FOB + Flete ${flete_value:.2f}):**\n"
+                    else:
+                        response += f"✈️ **Precio CFR (FOB + Flete ${flete_value:.2f}):**\n"
 
                 if is_houston:
                     response += f"   • ${price_info['precio_final_kg']:.2f}/kg\n\n"
                 else:
-                    response += f"   • ${price_info['precio_final_kg']  :.2f}/kg - ${price_info['precio_final_lb']:.2f}/lb\n\n"
+                    response += f"   • ${price_info['precio_final_kg']:.2f}/kg - ${price_info['precio_final_lb']:.2f}/lb\n\n"
         else:
             # Mostrar solo precio con glaseo (sin flete)
             if 'precio_glaseo_kg' in price_info:
