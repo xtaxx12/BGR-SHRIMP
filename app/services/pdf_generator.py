@@ -148,10 +148,13 @@ class PDFGenerator:
             fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
 
             # Calcular porcentaje de glaseo para mostrar en el PDF
-            if glaseo_percentage:
+            # IMPORTANTE: glaseo_percentage puede ser 0 (sin glaseo)
+            if glaseo_percentage is not None:
                 glaseo_display = f"{glaseo_percentage}%"
             elif glaseo_factor:
-                glaseo_display = f"{int(glaseo_factor * 100)}%"
+                # Calcular porcentaje desde el factor: factor 0.80 = 20% glaseo
+                glaseo_percent_calc = int((1 - glaseo_factor) * 100)
+                glaseo_display = f"{glaseo_percent_calc}%"
             else:
                 glaseo_display = "N/A"
 
