@@ -553,9 +553,16 @@ PRODUCTOS VÁLIDOS: HOSO, HLSO, P&D IQF, P&D BLOQUE, EZ PEEL, PuD-EUROPA, PuD-EE
 TALLAS VÁLIDAS: U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60, 60/70, 61/70, 70/80, 71/90
 
 RECONOCIMIENTO DE TÉRMINOS (español/portugués/inglés):
-- "Cocedero", "Cocido", "Cooked", "Cozido" → COOKED (o solicitar especificar: COOKED, PRE-COCIDO, COCIDO SIN TRATAR)
-- "Inteiro", "Entero", "Whole" → HOSO
-- "Colas", "Tails", "Cola" → COOKED (colas peladas)
+IMPORTANTE: "Cocedero"/"Cocido" es la CALIDAD/PROCESAMIENTO, NO el producto final.
+
+COMBINACIONES VÁLIDAS:
+- "Inteiro Cocedero" / "Entero Cocido" → Solicitar aclaración (¿HOSO cocido? ¿COOKED entero?)
+- "Colas Cocedero" / "Colas Cocidas" → COOKED (colas peladas cocidas)
+- Solo "Cocedero" sin especificar → Solicitar tipo: COOKED, PRE-COCIDO, COCIDO SIN TRATAR
+- "Inteiro" solo (sin cocedero) → HOSO (camarón entero crudo)
+- "Colas" solo (sin cocedero) → P&D IQF (colas peladas crudas)
+
+OTROS TÉRMINOS:
 - "Lagostino", "Vannamei", "Camarón", "Shrimp" → Todos válidos
 - "CFR [ciudad]", "CIF [ciudad]" → Detectar destino y marcar flete_solicitado: true
 - "Contenedor" → Solicitud de cotización grande
@@ -575,16 +582,19 @@ EXTRAE (valores exactos o null):
 REGLAS IMPORTANTES:
 1. Si menciona tallas (ej: 20/30, 21/25) → intent: "proforma" (incluso si empieza con saludo)
 2. Si menciona CFR/CIF → flete_solicitado: true, extraer destino
-3. Si menciona "Cocedero" sin especificar tipo → product: null, needs_product_type: true
-4. Si detecta múltiples tallas → multiple_sizes: true, listar todas en array
-5. NO asumir valores por defecto - extraer solo lo que el usuario dice explícitamente
+3. Si menciona "Cocedero" + "Inteiro" → multiple_presentations: true, needs_product_type: true, clarification_needed
+4. Si menciona "Cocedero" + "Colas" → product: "COOKED" (colas cocidas)
+5. Si menciona solo "Cocedero" → product: null, needs_product_type: true
+6. Si detecta múltiples tallas → multiple_sizes: true, listar todas en array
+7. Si detecta "Inteiro" y "Colas" en el mismo mensaje → separar tallas: sizes_inteiro y sizes_colas
+8. NO asumir valores por defecto - extraer solo lo que el usuario dice explícitamente
 
 EJEMPLOS:
 Input: "HLSO 16/20 con 20% glaseo"
 Output: {intent: "proforma", product: "HLSO", size: "16/20", glaseo_factor: 0.80, destination: null, confidence: 0.9}
 
 Input: "Buenas Tardes. Necesito precios Lagostino Cocedero CFR Lisboa: Inteiro 20/30, 30/40. Colas 21/25, 31/35"
-Output: {intent: "proforma", product: null, needs_product_type: true, product_category: "cocido", sizes: ["20/30", "30/40", "21/25", "31/35"], destination: "Lisboa", flete_solicitado: true, multiple_sizes: true, confidence: 0.95}
+Output: {intent: "proforma", product: null, needs_product_type: true, product_category: "cocido", sizes_inteiro: ["20/30", "30/40"], sizes_colas: ["21/25", "31/35"], destination: "Lisboa", flete_solicitado: true, multiple_sizes: true, multiple_presentations: true, clarification_needed: "Cliente solicita 'Inteiro Cocedero' y 'Colas Cocedero'. Confirmar si desea productos cocidos o crudos para cada presentación.", confidence: 0.95}
 
 Input: "Precio DDP Houston con flete 0.30"
 Output: {intent: "proforma", destination: "Houston", flete_custom: 0.30, is_ddp: true, usar_libras: false, confidence: 0.9}
@@ -598,9 +608,13 @@ Responde SOLO en JSON:
   "product": null | "...",
   "size": null | "...",
   "sizes": null | [...],
+  "sizes_inteiro": null | [...],
+  "sizes_colas": null | [...],
   "multiple_sizes": false,
+  "multiple_presentations": false,
   "needs_product_type": false,
   "product_category": null | "cocido",
+  "clarification_needed": null | "...",
   "glaseo_factor": null | number,
   "glaseo_percentage": null | number,
   "destination": null | "...",
@@ -1287,60 +1301,85 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
             destination = None
             usar_libras = False
 
-            # Detectar productos con patrones más amplios (incluyendo términos en español/portugués)
-            product_patterns = {
-                'HLSO': [
-                    'sin cabeza', 'hlso', 'head less', 'headless', 'descabezado',
-                    'sin cabezas', 'tipo sin cabeza', 'cola'
-                ],
-                'HOSO': [
-                    'con cabeza', 'hoso', 'head on', 'entero', 'completo',
-                    'con cabezas', 'tipo con cabeza', 'inteiro', 'whole'
-                ],
-                'P&D IQF': [
-                    'p&d iqf', 'pd iqf', 'p&d', 'pelado', 'peeled', 'deveined',
-                    'limpio', 'procesado', 'pd', 'p d', 'pelado y desvenado'
-                ],
-                'P&D BLOQUE': [
-                    'p&d bloque', 'pd bloque', 'bloque', 'block', 'p&d block',
-                    'pd block', 'pelado bloque'
-                ],
-                'PuD-EUROPA': [
-                    'pud europa', 'pud-europa', 'europa', 'european', 'europeo'
-                ],
-                'EZ PEEL': [
-                    'ez peel', 'ez', 'easy peel', 'facil pelado', 'fácil pelado'
-                ],
-                'PuD-EEUU': [
-                    'pud eeuu', 'pud-eeuu', 'eeuu', 'usa', 'estados unidos'
-                ],
-                'COOKED': [
-                    'cooked', 'cocinado', 'cocido', 'preparado', 'cocedero', 'cozido',
-                    'colas', 'tails', 'tail'
-                ],
-                'PRE-COCIDO': [
-                    'pre-cocido', 'pre cocido', 'precocido', 'pre-cooked', 'pre cooked'
-                ],
-                'COCIDO SIN TRATAR': [
-                    'cocido sin tratar', 'sin tratar', 'untreated', 'natural cocido'
-                ]
-            }
+            # IMPORTANTE: Detectar si menciona "Cocedero" o "Cocido" como CALIDAD
+            # Esto NO define el producto, sino el tipo de procesamiento
+            menciona_cocedero = any(term in message_lower for term in ['cocedero', 'cocido', 'cooked', 'cozido'])
+            
+            # Detectar PRESENTACIÓN del producto (Inteiro vs Colas)
+            menciona_inteiro = any(term in message_lower for term in ['inteiro', 'entero', 'whole'])
+            menciona_colas = any(term in message_lower for term in ['colas', 'tails', 'tail', 'cola'])
+            
+            # Lógica inteligente de detección:
+            # Si menciona "Cocedero" + "Inteiro" → NO es COOKED, es solicitud compleja
+            # Si menciona "Cocedero" + "Colas" → COOKED
+            # Si solo menciona "Cocedero" → Solicitar especificar
+            
+            product = None
+            needs_clarification = False
+            
+            if menciona_cocedero:
+                if menciona_inteiro and menciona_colas:
+                    # Mensaje complejo con múltiples presentaciones
+                    # No asumir producto, dejar que OpenAI lo maneje
+                    product = None
+                    needs_clarification = True
+                elif menciona_inteiro:
+                    # "Inteiro Cocedero" → Probablemente HOSO cocido (no común)
+                    # Mejor solicitar aclaración
+                    product = None
+                    needs_clarification = True
+                elif menciona_colas:
+                    # "Colas Cocedero" → COOKED (colas cocidas)
+                    product = 'COOKED'
+                else:
+                    # Solo "Cocedero" sin especificar presentación
+                    product = None
+                    needs_clarification = True
+            else:
+                # No menciona cocedero, usar lógica normal
+                product_patterns = {
+                    'HLSO': [
+                        'sin cabeza', 'hlso', 'head less', 'headless', 'descabezado',
+                        'sin cabezas', 'tipo sin cabeza'
+                    ],
+                    'HOSO': [
+                        'con cabeza', 'hoso', 'head on', 'entero', 'completo',
+                        'con cabezas', 'tipo con cabeza', 'inteiro', 'whole'
+                    ],
+                    'P&D IQF': [
+                        'p&d iqf', 'pd iqf', 'p&d', 'pelado', 'peeled', 'deveined',
+                        'limpio', 'procesado', 'pd', 'p d', 'pelado y desvenado'
+                    ],
+                    'P&D BLOQUE': [
+                        'p&d bloque', 'pd bloque', 'bloque', 'block', 'p&d block',
+                        'pd block', 'pelado bloque'
+                    ],
+                    'PuD-EUROPA': [
+                        'pud europa', 'pud-europa', 'europa', 'european', 'europeo'
+                    ],
+                    'EZ PEEL': [
+                        'ez peel', 'ez', 'easy peel', 'facil pelado', 'fácil pelado'
+                    ],
+                    'PuD-EEUU': [
+                        'pud eeuu', 'pud-eeuu', 'eeuu', 'usa', 'estados unidos'
+                    ],
+                    'COOKED': [
+                        'cooked', 'cocinado', 'preparado', 'colas', 'tails', 'tail'
+                    ],
+                    'PRE-COCIDO': [
+                        'pre-cocido', 'pre cocido', 'precocido', 'pre-cooked', 'pre cooked'
+                    ],
+                    'COCIDO SIN TRATAR': [
+                        'cocido sin tratar', 'sin tratar', 'untreated', 'natural cocido'
+                    ]
+                }
 
-            # Buscar coincidencias de productos (orden específico para evitar conflictos)
-            # Primero buscar patrones más específicos
-            specific_order = ['COCIDO SIN TRATAR', 'PRE-COCIDO', 'COOKED', 'P&D IQF', 'P&D BLOQUE', 'PuD-EUROPA', 'PuD-EEUU', 'EZ PEEL', 'HLSO', 'HOSO']
+                # Buscar coincidencias de productos (orden específico para evitar conflictos)
+                specific_order = ['COCIDO SIN TRATAR', 'PRE-COCIDO', 'P&D IQF', 'P&D BLOQUE', 'PuD-EUROPA', 'PuD-EEUU', 'EZ PEEL', 'HLSO', 'HOSO', 'COOKED']
 
-            for prod_name in specific_order:
-                if prod_name in product_patterns:
-                    patterns = product_patterns[prod_name]
-                    if any(pattern in message_lower for pattern in patterns):
-                        product = prod_name
-                        break
-
-            # Si no se encontró en el orden específico, buscar en el resto
-            if not product:
-                for prod_name, patterns in product_patterns.items():
-                    if prod_name not in specific_order:
+                for prod_name in specific_order:
+                    if prod_name in product_patterns:
+                        patterns = product_patterns[prod_name]
                         if any(pattern in message_lower for pattern in patterns):
                             product = prod_name
                             break
