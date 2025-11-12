@@ -710,6 +710,13 @@ async def whatsapp_webhook(request: Request,
         # DETECTAR MÚLTIPLES PRODUCTOS PRIMERO
         multiple_products = openai_service.detect_multiple_products(Body)
 
+        # Verificar si es el caso especial de Inteiro/Colas
+        if multiple_products and len(multiple_products) == 1 and multiple_products[0].get('special') == 'inteiro_colas':
+            logger.info(f"🔍 Detectado patrón especial Inteiro/Colas → Forzar análisis de OpenAI")
+            # Forzar que OpenAI analice el mensaje para detectar sizes_inteiro y sizes_colas
+            # No procesar aquí, dejar que el flujo normal lo maneje
+            multiple_products = []  # Limpiar para que no entre en el flujo de múltiples productos estándar
+
         if multiple_products and len(multiple_products) > 1:
             logger.info(f"📋 Detectados {len(multiple_products)} productos en el mensaje")
 
