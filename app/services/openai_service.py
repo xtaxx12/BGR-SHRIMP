@@ -571,7 +571,11 @@ EXTRAE (valores exactos o null):
 - Intent: pricing|proforma|product_info|greeting|help|other
 - Product: nombre exacto del producto (o null si necesita especificar entre COOKED/PRE-COCIDO/COCIDO SIN TRATAR)
 - Size: talla exacta (o array de tallas si menciona múltiples)
-- Glaseo: porcentaje (10, 20, 30) → convertir a factor decimal (10%=0.90, 20%=0.80, 30%=0.70)
+- Glaseo: porcentaje (0, 10, 20, 30) → convertir a factor decimal
+  * 0% = null (sin glaseo, CFR simple)
+  * 10% = 0.90
+  * 20% = 0.80
+  * 30% = 0.70
 - Destination: ciudad/país si menciona "CFR [lugar]", "CIF [lugar]", "flete a [lugar]", "envío a [lugar]"
 - Flete: valor numérico si menciona "flete 0.30", "freight $0.25", etc.
 - Cantidad: número + unidad (ej: "5000 kg", "10000 lb")
@@ -604,6 +608,9 @@ Output: {intent: "proforma", product: "HLSO", size: "16/20", destination: "Houst
 
 Input: "Precio CFR Houston HLSO 16/20 con 15% glaseo"
 Output: {intent: "proforma", product: "HLSO", size: "16/20", destination: "Houston", flete_solicitado: true, glaseo_factor: 0.85, glaseo_percentage: 15, confidence: 0.95}
+
+Input: "Necesito precios CFR Lisboa Inteiro 0% 20/30, 30/40"
+Output: {intent: "proforma", product: null, needs_product_type: true, sizes: ["20/30", "30/40"], destination: "Lisboa", flete_solicitado: true, glaseo_factor: null, glaseo_percentage: 0, confidence: 0.9}
 
 Input: "Precio DDP Houston con flete 0.30"
 Output: {intent: "proforma", destination: "Houston", flete_custom: 0.30, is_ddp: true, usar_libras: false, confidence: 0.9}
@@ -1420,6 +1427,7 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
             # NO asumir producto por defecto para otras tallas - el usuario debe especificarlo
 
             # Detectar glaseo con patrones más amplios (español e inglés)
+            # IMPORTANTE: Detectar también "0%" que significa SIN glaseo
             glaseo_patterns = [
                 # Patrones en español
                 r'(\d+)\s*(?:de\s*)?glaseo',
@@ -1433,6 +1441,9 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
                 r'al\s*(\d+)(?:\s|$)',  # "al 20" (sin %)
                 r'(\d+)\s*%\s*de\s*glaseo',
                 r'(\d+)\s*%\s*glaseo',
+                # Patrón para "Inteiro 0%" o "0%" solo
+                r'(?:inteiro|entero|colas?|tails?)\s+(\d+)\s*%',  # "Inteiro 0%"
+                r'^\s*(\d+)\s*%',  # "0%" al inicio
                 # Patrones en inglés
                 r'(\d+)g?\s*(?:of\s*)?glaze',
                 r'glaze\s*(?:of\s*)?(\d+)g?',
@@ -1449,10 +1460,16 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
                 match = re.search(pattern, message_lower)
                 if match:
                     glaseo_percentage_original = int(match.group(1))
-                    # Convertir porcentaje a factor usando fórmula general
-                    # Factor = 1 - (percentage / 100)
-                    # Ejemplo: 15% glaseo → factor = 1 - 0.15 = 0.85
-                    glaseo_factor = 1 - (glaseo_percentage_original / 100)
+                    
+                    # CASO ESPECIAL: 0% glaseo = Sin glaseo
+                    if glaseo_percentage_original == 0:
+                        glaseo_factor = None  # No aplicar glaseo
+                        logger.info("🔍 Detectado 0% glaseo → Sin glaseo (CFR simple)")
+                    else:
+                        # Convertir porcentaje a factor usando fórmula general
+                        # Factor = 1 - (percentage / 100)
+                        # Ejemplo: 15% glaseo → factor = 1 - 0.15 = 0.85
+                        glaseo_factor = 1 - (glaseo_percentage_original / 100)
                     break
 
             # Detectar si menciona DDP (precio que YA incluye flete)

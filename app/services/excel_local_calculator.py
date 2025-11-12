@@ -96,7 +96,15 @@ class ExcelLocalCalculatorService:
         """
         try:
             # Usar factores personalizados o por defecto
-            glaseo = glaseo_factor if glaseo_factor is not None else self.factor_glaseo
+            # Si glaseo_factor es None y glaseo_especificado es False → usar por defecto para cálculos internos
+            # Si glaseo_factor es None y glaseo_especificado es True → no aplicar glaseo (0%)
+            if glaseo_factor is None and not glaseo_especificado:
+                glaseo = self.factor_glaseo  # Usar por defecto
+            elif glaseo_factor is None and glaseo_especificado:
+                glaseo = 1.0  # 0% glaseo = factor 1.0 (sin reducción)
+            else:
+                glaseo = glaseo_factor
+                
             flete_value = flete if flete is not None else self.flete
 
             logger.info(f"🧮 Calculando precios para FOB ${precio_fob_kg}/kg")
