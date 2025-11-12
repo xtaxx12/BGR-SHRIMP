@@ -203,6 +203,102 @@ async def whatsapp_webhook(request: Request,
                 session_manager.clear_session(user_id)
                 return PlainTextResponse(str(response), media_type="application/xml")
 
+        # Manejar respuesta de aclaración de productos (Inteiro vs Colas)
+        if session['state'] == 'waiting_for_product_clarification':
+            try:
+                sizes_inteiro = session['data'].get('sizes_inteiro', [])
+                sizes_colas = session['data'].get('sizes_colas', [])
+                destination = session['data'].get('destination')
+                glaseo_percentage = session['data'].get('glaseo_percentage')
+                flete_solicitado = session['data'].get('flete_solicitado', False)
+                
+                # Parsear la respuesta del usuario para extraer productos
+                message_upper = Body.upper()
+                
+                # Detectar productos mencionados
+                product_inteiro = None
+                product_colas = None
+                
+                # Patrones para detectar productos
+                if 'HOSO' in message_upper and ('INTEIRO' in message_upper or 'ENTERO' in message_upper or 'PARA INTEIRO' in message_upper or 'INTEIRO' in message_upper):
+                    product_inteiro = 'HOSO'
+                elif 'HLSO' in message_upper and ('INTEIRO' in message_upper or 'ENTERO' in message_upper or 'PARA INTEIRO' in message_upper):
+                    product_inteiro = 'HLSO'
+                
+                if 'COOKED' in message_upper and ('COLAS' in message_upper or 'PARA COLAS' in message_upper or 'COLA' in message_upper):
+                    product_colas = 'COOKED'
+                elif 'PRE-COCIDO' in message_upper or 'PRECOCIDO' in message_upper:
+                    product_colas = 'PRE-COCIDO'
+                elif 'COCIDO SIN TRATAR' in message_upper:
+                    product_colas = 'COCIDO SIN TRATAR'
+                
+                # Si no detectó productos específicos, intentar detectar solo los nombres
+                if not product_inteiro and sizes_inteiro:
+                    if 'HOSO' in message_upper:
+                        product_inteiro = 'HOSO'
+                    elif 'HLSO' in message_upper:
+                        product_inteiro = 'HLSO'
+                
+                if not product_colas and sizes_colas:
+                    if 'COOKED' in message_upper:
+                        product_colas = 'COOKED'
+                    elif 'PRE-COCIDO' in message_upper or 'PRECOCIDO' in message_upper:
+                        product_colas = 'PRE-COCIDO'
+                
+                # Construir lista de productos
+                all_products = []
+                if product_inteiro and sizes_inteiro:
+                    for size in sizes_inteiro:
+                        all_products.append({'product': product_inteiro, 'size': size})
+                if product_colas and sizes_colas:
+                    for size in sizes_colas:
+                        all_products.append({'product': product_colas, 'size': size})
+                
+                if not all_products:
+                    response.message("🤔 No pude identificar los productos. Por favor especifica claramente:\n\nEjemplo: 'HOSO para inteiro y COOKED para colas'")
+                    return PlainTextResponse(str(response), media_type="application/xml")
+                
+                logger.info(f"📋 Productos identificados: {len(all_products)} productos")
+                
+                # Ahora solicitar el flete (ya que es CFR)
+                products_list = "\n".join([f"   {i+1}. {p['product']} {p['size']}" for i, p in enumerate(all_products)])
+                
+                flete_message = f"""✅ **Productos confirmados: {len(all_products)} tallas**
+
+{products_list}
+
+🌍 **Destino:** {destination}
+❄️ **Glaseo:** {glaseo_percentage}%
+
+🚢 **Para calcular el precio CFR necesito el valor del flete a {destination}:**
+
+💡 **Ejemplos:**
+• "flete 0.20"
+• "0.25 de flete"
+• "con flete de 0.22"
+
+¿Cuál es el valor del flete por kilo? 💰"""
+                
+                response.message(flete_message)
+                
+                # Guardar estado para esperar respuesta de flete
+                session_manager.set_session_state(user_id, 'waiting_for_multi_flete', {
+                    'products': all_products,
+                    'glaseo_factor': glaseo_percentage_to_factor(glaseo_percentage) if glaseo_percentage and glaseo_percentage > 0 else None,
+                    'glaseo_percentage': glaseo_percentage,
+                    'destination': destination
+                })
+                
+                return PlainTextResponse(str(response), media_type="application/xml")
+                
+            except Exception as e:
+                logger.error(f"❌ Error procesando aclaración de productos: {str(e)}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                response.message("❌ Error procesando tu respuesta. Por favor intenta nuevamente.")
+                session_manager.clear_session(user_id)
+                return PlainTextResponse(str(response), media_type="application/xml")
+
         # Manejar respuesta de flete para múltiples productos
         if session['state'] == 'waiting_for_multi_flete':
             try:
@@ -624,10 +720,12 @@ async def whatsapp_webhook(request: Request,
             logger.info(f"🔍 Glaseo detectado en análisis: factor={glaseo_factor}, percentage={glaseo_percentage}")
             logger.info(f"🔍 Mensaje completo: {Body}")
 
-            # Si no se detectó glaseo en el análisis, o si el glaseo detectado no es válido (10, 20, 30), intentar detectarlo manualmente
-            if not glaseo_factor or not glaseo_percentage or glaseo_percentage not in [10, 20, 30]:
+            # Si no se detectó glaseo en el análisis, o si el glaseo detectado no es válido (0, 10, 20, 30), intentar detectarlo manualmente
+            # IMPORTANTE: 0% es válido (sin glaseo)
+            if glaseo_percentage is None or (glaseo_percentage not in [0, 10, 20, 30] and not glaseo_factor):
                 message_lower = Body.lower()
                 glaseo_patterns = [
+                    r'(?:inteiro|entero|colas?|tails?)\s+(\d+)\s*%',  # "Inteiro 0%"
                     r'al\s*(\d+)\s*%',
                     r'(\d+)\s*%\s*glaseo',
                     r'glaseo\s*(\d+)\s*%',
@@ -639,12 +737,17 @@ async def whatsapp_webhook(request: Request,
                     match = re.search(pattern, message_lower)
                     if match:
                         glaseo_percentage = int(match.group(1))
-                        glaseo_factor = glaseo_percentage_to_factor(glaseo_percentage)
-                        logger.info(f"✅ Glaseo detectado manualmente: {glaseo_percentage}% (factor {glaseo_factor})")
+                        if glaseo_percentage == 0:
+                            glaseo_factor = None  # Sin glaseo
+                            logger.info(f"✅ Glaseo 0% detectado manualmente → Sin glaseo")
+                        else:
+                            glaseo_factor = glaseo_percentage_to_factor(glaseo_percentage)
+                            logger.info(f"✅ Glaseo detectado manualmente: {glaseo_percentage}% (factor {glaseo_factor})")
                         break
 
-            if glaseo_factor and glaseo_percentage:
-                # El usuario ya especificó el glaseo
+            # Verificar si el glaseo fue especificado (incluyendo 0%)
+            if glaseo_percentage is not None:
+                # El usuario ya especificó el glaseo (puede ser 0%, 10%, 20%, 30%)
                 logger.info(f"✅ Glaseo detectado en mensaje: {glaseo_percentage}%")
 
                 # Verificar si menciona DDP y si especificó el flete
@@ -797,6 +900,7 @@ async def whatsapp_webhook(request: Request,
                 sizes_inteiro = ai_analysis.get('sizes_inteiro', [])
                 sizes_colas = ai_analysis.get('sizes_colas', [])
                 destination = ai_analysis.get('destination', '')
+                glaseo_percentage = ai_analysis.get('glaseo_percentage')
                 
                 clarification_message = "🦐 **Solicitud detectada:**\n\n"
                 
@@ -806,6 +910,8 @@ async def whatsapp_webhook(request: Request,
                     clarification_message += f"📏 **Colas:** {', '.join(sizes_colas)}\n"
                 if destination:
                     clarification_message += f"🌍 **Destino:** {destination}\n"
+                if glaseo_percentage is not None:
+                    clarification_message += f"❄️ **Glaseo:** {glaseo_percentage}%\n"
                 
                 clarification_message += "\n⚠️ **Necesito aclaración:**\n"
                 clarification_message += "Mencionas 'Cocedero' (cocido) pero también 'Inteiro' (entero).\n\n"
@@ -819,6 +925,15 @@ async def whatsapp_webhook(request: Request,
                 clarification_message += "• COCIDO SIN TRATAR - Cocidas sin tratamiento\n\n"
                 clarification_message += "📝 **Por favor especifica:**\n"
                 clarification_message += "Ejemplo: 'HOSO para inteiro y COOKED para colas'"
+                
+                # Guardar estado para procesar la respuesta del usuario
+                session_manager.set_session_state(user_id, 'waiting_for_product_clarification', {
+                    'sizes_inteiro': sizes_inteiro,
+                    'sizes_colas': sizes_colas,
+                    'destination': destination,
+                    'glaseo_percentage': glaseo_percentage,
+                    'flete_solicitado': True  # CFR siempre solicita flete
+                })
                 
                 response.message(clarification_message)
                 return PlainTextResponse(str(response), media_type="application/xml")
