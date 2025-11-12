@@ -159,11 +159,17 @@ class PricingService:
                 flete_value = 0  # No aplicar flete si no se solicitó
 
             # Determinar si el glaseo fue especificado explícitamente por el usuario
-            glaseo_especificado = glaseo_factor is not None
+            # IMPORTANTE: glaseo_percentage = 0 significa "sin glaseo" (especificado explícitamente)
+            glaseo_especificado = glaseo_factor is not None or glaseo_percentage == 0
             
             # Si solicita flete (CFR) pero NO especificó glaseo → Cálculo CFR simple
             # Si solicita flete (CFR) Y especificó glaseo → Cálculo CFR completo
-            if flete_solicitado and not glaseo_especificado:
+            # Si especificó 0% glaseo → Cálculo CFR simple (sin glaseo)
+            if glaseo_percentage == 0:
+                logger.info("📊 Glaseo 0% detectado → CFR simple: FOB + Flete (sin glaseo)")
+                glaseo_factor = None  # No aplicar glaseo
+                glaseo_especificado = False  # Marcar como no especificado para cálculo simple
+            elif flete_solicitado and not glaseo_especificado:
                 logger.info("📊 CFR sin glaseo especificado → Cálculo simple: FOB + Flete")
                 # Usar glaseo por defecto solo para cálculos internos, pero no aplicarlo al CFR
                 glaseo_factor = 0.80  # Valor por defecto para cálculos internos
