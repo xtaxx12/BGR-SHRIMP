@@ -547,43 +547,60 @@ Respuesta: {
 
         try:
             system_prompt = """
-Analiza solicitudes de exportación de camarón y extrae información estructurada.
+Analiza solicitudes de exportación de camarón/langostino y extrae información estructurada.
 
 PRODUCTOS VÁLIDOS: HOSO, HLSO, P&D IQF, P&D BLOQUE, EZ PEEL, PuD-EUROPA, PuD-EEUU, COOKED, PRE-COCIDO, COCIDO SIN TRATAR
 TALLAS VÁLIDAS: U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60, 60/70, 61/70, 70/80, 71/90
 
+RECONOCIMIENTO DE TÉRMINOS (español/portugués/inglés):
+- "Cocedero", "Cocido", "Cooked", "Cozido" → COOKED (o solicitar especificar: COOKED, PRE-COCIDO, COCIDO SIN TRATAR)
+- "Inteiro", "Entero", "Whole" → HOSO
+- "Colas", "Tails", "Cola" → COOKED (colas peladas)
+- "Lagostino", "Vannamei", "Camarón", "Shrimp" → Todos válidos
+- "CFR [ciudad]", "CIF [ciudad]" → Detectar destino y marcar flete_solicitado: true
+- "Contenedor" → Solicitud de cotización grande
+
 EXTRAE (valores exactos o null):
 - Intent: pricing|proforma|product_info|greeting|help|other
-- Product: nombre exacto del producto
-- Size: talla exacta
+- Product: nombre exacto del producto (o null si necesita especificar entre COOKED/PRE-COCIDO/COCIDO SIN TRATAR)
+- Size: talla exacta (o array de tallas si menciona múltiples)
 - Glaseo: porcentaje (10, 20, 30) → convertir a factor decimal (10%=0.90, 20%=0.80, 30%=0.70)
-- Destination: SOLO si menciona "flete a [lugar]", "envío a [lugar]" o "DDP [lugar]" explícitamente
+- Destination: ciudad/país si menciona "CFR [lugar]", "CIF [lugar]", "flete a [lugar]", "envío a [lugar]"
 - Flete: valor numérico si menciona "flete 0.30", "freight $0.25", etc.
 - Cantidad: número + unidad (ej: "5000 kg", "10000 lb")
 - Cliente: nombre si menciona "cliente [nombre]", "para [nombre]"
 - Language: "es" (español) o "en" (inglés)
+- Multiple_sizes: true si detecta múltiples tallas en el mensaje
 
-REGLAS:
-1. Si menciona producto + talla → intent: "proforma"
-2. Si menciona DDP sin flete → flete_solicitado: true
-3. NO asumir valores por defecto - extraer solo lo que el usuario dice explícitamente
-4. Destination solo si menciona flete/envío/DDP + lugar
+REGLAS IMPORTANTES:
+1. Si menciona tallas (ej: 20/30, 21/25) → intent: "proforma" (incluso si empieza con saludo)
+2. Si menciona CFR/CIF → flete_solicitado: true, extraer destino
+3. Si menciona "Cocedero" sin especificar tipo → product: null, needs_product_type: true
+4. Si detecta múltiples tallas → multiple_sizes: true, listar todas en array
+5. NO asumir valores por defecto - extraer solo lo que el usuario dice explícitamente
 
 EJEMPLOS:
 Input: "HLSO 16/20 con 20% glaseo"
-Output: {intent: "proforma", product: "HLSO", size: "16/20", glaseo_factor: 0.80, destination: null}
+Output: {intent: "proforma", product: "HLSO", size: "16/20", glaseo_factor: 0.80, destination: null, confidence: 0.9}
+
+Input: "Buenas Tardes. Necesito precios Lagostino Cocedero CFR Lisboa: Inteiro 20/30, 30/40. Colas 21/25, 31/35"
+Output: {intent: "proforma", product: null, needs_product_type: true, product_category: "cocido", sizes: ["20/30", "30/40", "21/25", "31/35"], destination: "Lisboa", flete_solicitado: true, multiple_sizes: true, confidence: 0.95}
 
 Input: "Precio DDP Houston con flete 0.30"
-Output: {intent: "proforma", destination: "Houston", flete_custom: 0.30, is_ddp: true, usar_libras: true}
+Output: {intent: "proforma", destination: "Houston", flete_custom: 0.30, is_ddp: true, usar_libras: false, confidence: 0.9}
 
 Input: "Hola, necesito cotización"
-Output: {intent: "greeting", product: null, wants_proforma: true}
+Output: {intent: "greeting", product: null, wants_proforma: true, confidence: 0.8}
 
 Responde SOLO en JSON:
 {
   "intent": "...",
   "product": null | "...",
   "size": null | "...",
+  "sizes": null | [...],
+  "multiple_sizes": false,
+  "needs_product_type": false,
+  "product_category": null | "cocido",
   "glaseo_factor": null | number,
   "glaseo_percentage": null | number,
   "destination": null | "...",
@@ -1158,13 +1175,32 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
     def _basic_intent_analysis(self, message: str) -> dict:
         """
         Análisis básico de intenciones sin IA como fallback
+        IMPORTANTE: Detectar cotizaciones ANTES que saludos para evitar falsos positivos
         """
         message_lower = message.lower().strip()
 
+        # PRIMERO: Detectar si hay tallas (fuerte indicador de cotización)
+        has_size = bool(re.search(r'\b\d+/\d+\b', message_lower))
+        
+        # SEGUNDO: Detectar términos de cotización/precio
+        proforma_keywords = [
+            'proforma', 'cotizacion', 'cotizar', 'quote', 'precio', 'precios',
+            'necesito', 'quiero', 'contenedor', 'cfr', 'cif', 'fob',
+            'cocedero', 'cocido', 'lagostino', 'vannamei', 'inteiro', 'colas'
+        ]
+        has_quote_keywords = any(keyword in message_lower for keyword in proforma_keywords)
+        
+        # Si tiene tallas O términos de cotización, NO es solo un saludo
+        # Continuar con el análisis de cotización
+        is_likely_quote = has_size or has_quote_keywords
+        
         # Patrones de saludo (con límites de palabra para evitar falsos positivos)
+        # SOLO considerar saludo si NO tiene indicadores de cotización
         greeting_patterns = [r'\bhola\b', r'\bhello\b', r'\bhi\b', r'\bbuenos\b', r'\bbuenas\b',
                            r'\bcomo estas\b', r'\bque tal\b', r'\bq haces\b']
-        if any(re.search(pattern, message_lower) for pattern in greeting_patterns):
+        has_greeting = any(re.search(pattern, message_lower) for pattern in greeting_patterns)
+        
+        if has_greeting and not is_likely_quote:
             return {
                 "intent": "greeting",
                 "product": None,

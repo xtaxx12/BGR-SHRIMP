@@ -439,10 +439,24 @@ async def whatsapp_webhook(request: Request,
         logger.info(f"🔍 Análisis básico para {user_id}: {ai_analysis}")
         logger.info(f"🔍 Intent: {ai_analysis.get('intent')}, Confidence: {ai_analysis.get('confidence')}, Product: {ai_analysis.get('product')}, Size: {ai_analysis.get('size')}")
 
-        # Solo usar OpenAI para casos complejos (no para saludos simples)
-        if (ai_analysis.get('confidence', 0) < 0.7 and
-            ai_analysis.get('intent') not in ['greeting', 'menu_request'] and
-            openai_service.is_available()):
+        # Detectar si el mensaje tiene indicadores de cotización (tallas, términos específicos)
+        has_size = bool(re.search(r'\b\d+/\d+\b', Body.lower()))
+        quote_keywords = ['proforma', 'cotizacion', 'cotizar', 'precio', 'necesito', 'contenedor', 'cfr', 'cif', 'cocedero', 'lagostino', 'inteiro', 'colas']
+        has_quote_keywords = any(keyword in Body.lower() for keyword in quote_keywords)
+        is_complex_quote = has_size or has_quote_keywords
+
+        # Usar OpenAI para:
+        # 1. Casos complejos (baja confianza)
+        # 2. Mensajes con tallas o términos de cotización (incluso si tienen saludo)
+        # 3. Cualquier mensaje que no sea saludo simple o menú
+        should_use_openai = (
+            (ai_analysis.get('confidence', 0) < 0.7 or is_complex_quote) and
+            ai_analysis.get('intent') not in ['menu_request'] and  # Removido 'greeting' de exclusiones
+            openai_service.is_available()
+        )
+
+        if should_use_openai:
+            logger.info(f"🤖 Usando OpenAI para análisis (complex_quote={is_complex_quote}, confidence={ai_analysis.get('confidence', 0)})")
             openai_analysis = openai_service.analyze_user_intent(Body, session)
             logger.debug(f"🤖 Análisis OpenAI complementario para {user_id}: {openai_analysis}")
 
