@@ -776,17 +776,21 @@ async def whatsapp_webhook(request: Request,
                         sizes_inteiro = []
                         sizes_colas = []
                         
-                        # Buscar tallas cerca de "Inteiro"
-                        inteiro_section = re.search(r'(?:inteiro|entero)[^a-z]*?((?:\d+/\d+[^\d]*?)+)', message_upper, re.IGNORECASE)
-                        if inteiro_section:
-                            sizes_inteiro = re.findall(r'(\d+)/(\d+)', inteiro_section.group(1))
+                        # Buscar tallas cerca de "Inteiro" - buscar hasta encontrar "Colas" o fin
+                        inteiro_match = re.search(r'(?:inteiro|entero)[^a-z]*(.*?)(?:colas?|tails?|$)', message_upper, re.IGNORECASE | re.DOTALL)
+                        if inteiro_match:
+                            inteiro_text = inteiro_match.group(1)
+                            sizes_inteiro = re.findall(r'(\d+)/(\d+)', inteiro_text)
                             sizes_inteiro = [f"{s[0]}/{s[1]}" for s in sizes_inteiro]
+                            logger.info(f"🔍 Texto Inteiro: {inteiro_text[:100]}")
                         
-                        # Buscar tallas cerca de "Colas"
-                        colas_section = re.search(r'(?:colas?|tails?)[^a-z]*?((?:\d+/\d+[^\d]*?)+)', message_upper, re.IGNORECASE)
-                        if colas_section:
-                            sizes_colas = re.findall(r'(\d+)/(\d+)', colas_section.group(1))
+                        # Buscar tallas cerca de "Colas" - buscar desde "Colas" hasta el fin
+                        colas_match = re.search(r'(?:colas?|tails?)[^a-z]*(.*?)$', message_upper, re.IGNORECASE | re.DOTALL)
+                        if colas_match:
+                            colas_text = colas_match.group(1)
+                            sizes_colas = re.findall(r'(\d+)/(\d+)', colas_text)
                             sizes_colas = [f"{s[0]}/{s[1]}" for s in sizes_colas]
+                            logger.info(f"🔍 Texto Colas: {colas_text[:100]}")
                         
                         # Si no se pudieron separar, usar todas las tallas
                         if not sizes_inteiro and not sizes_colas:
