@@ -537,32 +537,92 @@ async def whatsapp_webhook(request: Request,
                 if flete_value and flete_value > 0:
                     logger.info(f"🚢 Flete especificado para cotización mixta: ${flete_value:.2f}")
 
-                    # Ahora solicitar los productos específicos
-                    clarification_message = "✅ **Flete confirmado:** $" + f"{flete_value:.2f}/kg\n\n"
-                    clarification_message += "💡 **¿Qué productos necesitas?**\n\n"
+                    # Asignar productos automáticamente:
+                    # - HOSO para Inteiro
+                    # - COOKED para Colas
+                    all_products = []
                     if sizes_inteiro:
-                        clarification_message += f"**Para Inteiro (Entero) - {', '.join(sizes_inteiro)}:**\n"
-                        clarification_message += "• HOSO - Camarón entero (con cabeza)\n"
-                        clarification_message += "• HLSO - Sin cabeza\n\n"
+                        for size in sizes_inteiro:
+                            all_products.append({'product': 'HOSO', 'size': size})
+                        logger.info(f"✅ Asignado HOSO para Inteiro: {sizes_inteiro}")
                     if sizes_colas:
-                        clarification_message += f"**Para Colas - {', '.join(sizes_colas)}:**\n"
-                        clarification_message += "• COOKED - Colas cocidas\n"
-                        clarification_message += "• P&D IQF - Colas peladas crudas\n\n"
-                    clarification_message += "📝 **Ejemplo:** 'HOSO para inteiro y COOKED para colas'"
+                        for size in sizes_colas:
+                            all_products.append({'product': 'COOKED', 'size': size})
+                        logger.info(f"✅ Asignado COOKED para Colas: {sizes_colas}")
                     
-                    response.message(clarification_message)
+                    logger.info(f"📋 Total productos: {len(all_products)}")
                     
-                    # Actualizar estado para esperar productos
-                    session_manager.set_session_state(user_id, 'waiting_for_product_clarification', {
-                        'sizes_inteiro': sizes_inteiro,
-                        'sizes_colas': sizes_colas,
-                        'destination': destination,
-                        'glaseo_percentage': glaseo_percentage,
-                        'glaseo_factor': glaseo_factor,
-                        'flete_value': flete_value,
-                        'flete_solicitado': True
-                    })
-                    
+                    # Calcular precios para todos los productos con el flete
+                    products_info = []
+                    failed_products = []
+
+                    for product_data in all_products:
+                        try:
+                            query = {
+                                'product': product_data['product'],
+                                'size': product_data['size'],
+                                'glaseo_factor': glaseo_factor,
+                                'glaseo_percentage': glaseo_percentage,
+                                'flete_custom': flete_value,
+                                'flete_solicitado': True,
+                                'custom_calculation': True
+                            }
+
+                            price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(query,))
+
+                            if price_info:
+                                products_info.append(price_info)
+                            else:
+                                failed_products.append(f"{product_data['product']} {product_data['size']}")
+                        except Exception as e:
+                            logger.error(f"❌ Error calculando precio para {product_data['product']} {product_data['size']}: {str(e)}")
+                            failed_products.append(f"{product_data['product']} {product_data['size']}")
+
+                    if products_info:
+                        # Detectar idioma y generar PDF consolidado automáticamente
+                        user_lang = session_manager.get_user_language(user_id) or 'es'
+
+                        # Guardar como última cotización
+                        session_manager.set_last_quote(user_id, {
+                            'consolidated': True,
+                            'products_info': products_info,
+                            'glaseo_percentage': glaseo_percentage,
+                            'failed_products': failed_products,
+                            'flete': flete_value
+                        })
+                        session_manager.set_user_language(user_id, user_lang)
+
+                        logger.info(f"📄 Generando PDF consolidado con flete ${flete_value:.2f}")
+                        pdf_path = pdf_generator.generate_consolidated_quote_pdf(
+                            products_info,
+                            From,
+                            user_lang,
+                            glaseo_percentage
+                        )
+
+                        if pdf_path:
+                            pdf_sent = whatsapp_sender.send_pdf_document(
+                                From,
+                                pdf_path,
+                                f"Cotización Consolidada BGR Export - {len(products_info)} productos"
+                            )
+                            if pdf_sent:
+                                response.message(f"✅ Cotización consolidada generada con flete ${flete_value:.2f} - {len(products_info)} productos 🚢")
+                            else:
+                                filename = os.path.basename(pdf_path)
+                                base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
+                                download_url = f"{base_url}/webhook/download-pdf/{filename}"
+                                response.message(f"✅ Cotización generada\n📄 Descarga: {download_url}")
+
+                            # Limpiar sesión
+                            session_manager.clear_session(user_id)
+                        else:
+                            response.message("❌ Error generando PDF consolidado. Intenta nuevamente.")
+                            session_manager.clear_session(user_id)
+                    else:
+                        response.message("❌ No se pudieron calcular precios para ningún producto.")
+                        session_manager.clear_session(user_id)
+
                     return PlainTextResponse(str(response), media_type="application/xml")
                 else:
                     # Flete no válido
