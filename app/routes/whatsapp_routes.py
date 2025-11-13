@@ -752,12 +752,20 @@ async def whatsapp_webhook(request: Request,
                 # El usuario ya especificó el glaseo (puede ser 0%, 10%, 20%, 30%)
                 logger.info(f"✅ Glaseo detectado en mensaje: {glaseo_percentage}%")
                 
-                # Detectar producto del mensaje o solicitar aclaración
-                product = ai_analysis.get('product') if ai_analysis else None
+                # Detectar producto y destino del mensaje
                 destination = ai_analysis.get('destination') if ai_analysis else None
+                product = ai_analysis.get('product') if ai_analysis else None
                 
-                # Si no hay producto específico, verificar si menciona Inteiro/Colas
-                if not product:
+                # PRIMERO: Verificar si menciona Inteiro/Colas (tiene prioridad sobre producto detectado)
+                message_upper = Body.upper()
+                has_inteiro = any(term in message_upper for term in ['INTEIRO', 'ENTERO'])
+                has_colas = any(term in message_upper for term in ['COLAS', 'COLA', 'TAILS'])
+                
+                # Si menciona Inteiro O Colas, solicitar aclaración (ignorar producto detectado)
+                if has_inteiro or has_colas:
+                    # Ignorar producto detectado, necesita aclaración
+                    product = None
+                    logger.info("🔍 Detectado Inteiro/Colas → Solicitar aclaración (ignorar producto detectado)")
                     message_upper = Body.upper()
                     has_inteiro = any(term in message_upper for term in ['INTEIRO', 'ENTERO'])
                     has_colas = any(term in message_upper for term in ['COLAS', 'COLA', 'TAILS'])
@@ -819,45 +827,17 @@ async def whatsapp_webhook(request: Request,
                         
                         return PlainTextResponse(str(response), media_type="application/xml")
                 
-                # Si hay producto, construir lista de productos y procesarlos
+                # Si hay producto, construir lista de productos y solicitar flete directamente
                 if product:
                     multiple_products = [{'product': product, 'size': size} for size in sizes_list]
                     logger.info(f"📋 Construidos {len(multiple_products)} productos con {product}")
                     
-                    # PROCESAR MÚLTIPLES PRODUCTOS INMEDIATAMENTE
+                    # SOLICITAR FLETE DIRECTAMENTE (sin calcular precios aún)
                     destination = ai_analysis.get('destination') if ai_analysis else None
                     
-                    # Calcular precios para todos los productos
-                    products_info = []
-                    failed_products = []
-
-                    for product_data in multiple_products:
-                        try:
-                            query = {
-                                'product': product_data['product'],
-                                'size': product_data['size'],
-                                'glaseo_factor': glaseo_factor,
-                                'glaseo_percentage': glaseo_percentage,
-                                'flete_solicitado': True,
-                                'destination': destination,
-                                'custom_calculation': True
-                            }
-
-                            price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(query,))
-
-                            if price_info:
-                                products_info.append(price_info)
-                            else:
-                                failed_products.append(f"{product_data['product']} {product_data['size']}")
-                        except Exception as e:
-                            logger.error(f"❌ Error calculando precio para {product_data['product']} {product_data['size']}: {str(e)}")
-                            failed_products.append(f"{product_data['product']} {product_data['size']}")
-
-                    if products_info:
-                        # Solicitar flete
-                        products_list = "\n".join([f"   {i+1}. {p['producto']} {p['talla']}" for i, p in enumerate(products_info)])
-                        
-                        flete_message = f"""✅ **Productos confirmados: {len(products_info)} tallas**
+                    products_list = "\n".join([f"   {i+1}. {product} {size}" for i, size in enumerate(sizes_list, 1)])
+                    
+                    flete_message = f"""✅ **Productos confirmados: {len(multiple_products)} tallas**
 
 {products_list}
 
@@ -872,21 +852,18 @@ async def whatsapp_webhook(request: Request,
 • "con flete de 0.22"
 
 ¿Cuál es el valor del flete por kilo? 💰"""
-                        
-                        response.message(flete_message)
-                        
-                        # Guardar estado para esperar respuesta de flete
-                        session_manager.set_session_state(user_id, 'waiting_for_multi_flete', {
-                            'products': multiple_products,
-                            'glaseo_factor': glaseo_factor,
-                            'glaseo_percentage': glaseo_percentage,
-                            'destination': destination
-                        })
-                        
-                        return PlainTextResponse(str(response), media_type="application/xml")
-                    else:
-                        response.message("❌ No se pudieron calcular precios para ningún producto.")
-                        return PlainTextResponse(str(response), media_type="application/xml")
+                    
+                    response.message(flete_message)
+                    
+                    # Guardar estado para esperar respuesta de flete
+                    session_manager.set_session_state(user_id, 'waiting_for_multi_flete', {
+                        'products': multiple_products,
+                        'glaseo_factor': glaseo_factor,
+                        'glaseo_percentage': glaseo_percentage,
+                        'destination': destination
+                    })
+                    
+                    return PlainTextResponse(str(response), media_type="application/xml")
                 else:
                     # Solicitar producto
                     response.message(f"🦐 Detecté {len(sizes_list)} tallas: {', '.join(sizes_list)}\n\n¿Qué producto necesitas?\n\nEjemplo: 'HLSO' o 'HOSO' o 'COOKED'")
