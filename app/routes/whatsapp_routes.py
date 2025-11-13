@@ -707,15 +707,134 @@ async def whatsapp_webhook(request: Request,
                 response.message("❌ No hay proforma previa para modificar.\n\n💡 Primero genera una proforma y luego podrás modificar el flete.")
                 return PlainTextResponse(str(response), media_type="application/xml")
 
-        # DETECTAR MÚLTIPLES PRODUCTOS PRIMERO
-        multiple_products = openai_service.detect_multiple_products(Body)
+        # DETECTAR MÚLTIPLES TALLAS PRIMERO (simplificado)
+        # Si hay 2 o más tallas en el mensaje, generar cotización consolidada
+        all_sizes_in_message = re.findall(r'(\d+)/(\d+)', Body)
+        
+        if len(all_sizes_in_message) >= 2:
+            logger.info(f"📋 Detectadas {len(all_sizes_in_message)} tallas en el mensaje → Cotización consolidada")
+            
+            # Construir lista de tallas
+            sizes_list = [f"{s[0]}/{s[1]}" for s in all_sizes_in_message]
+            
+            # Verificar si el usuario ya especificó el glaseo en el mensaje
+            glaseo_factor = ai_analysis.get('glaseo_factor') if ai_analysis else None
+            glaseo_percentage = ai_analysis.get('glaseo_percentage') if ai_analysis else None
 
-        # Verificar si es el caso especial de Inteiro/Colas
-        if multiple_products and len(multiple_products) == 1 and multiple_products[0].get('special') == 'inteiro_colas':
-            logger.info(f"🔍 Detectado patrón especial Inteiro/Colas → Forzar análisis de OpenAI")
-            # Forzar que OpenAI analice el mensaje para detectar sizes_inteiro y sizes_colas
-            # No procesar aquí, dejar que el flujo normal lo maneje
-            multiple_products = []  # Limpiar para que no entre en el flujo de múltiples productos estándar
+            logger.info(f"🔍 Glaseo detectado en análisis: factor={glaseo_factor}, percentage={glaseo_percentage}")
+
+            # Detectar glaseo manualmente si no se detectó
+            if glaseo_percentage is None or (glaseo_percentage not in [0, 10, 20, 30] and not glaseo_factor):
+                message_lower = Body.lower()
+                glaseo_patterns = [
+                    r'(?:inteiro|entero|colas?|tails?)\s+(\d+)\s*%',  # "Inteiro 0%"
+                    r'al\s*(\d+)\s*%',
+                    r'(\d+)\s*%\s*glaseo',
+                    r'glaseo\s*(\d+)\s*%',
+                    r'con\s*(\d+)\s*glaseo',
+                    r'(\d+)\s*(?:de\s*)?glaseo',
+                ]
+
+                for pattern in glaseo_patterns:
+                    match = re.search(pattern, message_lower)
+                    if match:
+                        glaseo_percentage = int(match.group(1))
+                        if glaseo_percentage == 0:
+                            glaseo_factor = None  # Sin glaseo
+                            logger.info(f"✅ Glaseo 0% detectado manualmente → Sin glaseo")
+                        else:
+                            glaseo_factor = glaseo_percentage_to_factor(glaseo_percentage)
+                            logger.info(f"✅ Glaseo detectado manualmente: {glaseo_percentage}% (factor {glaseo_factor})")
+                        break
+
+            # Verificar si el glaseo fue especificado (incluyendo 0%)
+            if glaseo_percentage is not None:
+                # El usuario ya especificó el glaseo (puede ser 0%, 10%, 20%, 30%)
+                logger.info(f"✅ Glaseo detectado en mensaje: {glaseo_percentage}%")
+                
+                # Detectar producto del mensaje o solicitar aclaración
+                product = ai_analysis.get('product') if ai_analysis else None
+                destination = ai_analysis.get('destination') if ai_analysis else None
+                
+                # Si no hay producto específico, verificar si menciona Inteiro/Colas
+                if not product:
+                    message_upper = Body.upper()
+                    has_inteiro = any(term in message_upper for term in ['INTEIRO', 'ENTERO'])
+                    has_colas = any(term in message_upper for term in ['COLAS', 'COLA', 'TAILS'])
+                    
+                    if has_inteiro or has_colas:
+                        # Necesita aclaración de productos
+                        # Separar tallas por contexto
+                        sizes_inteiro = []
+                        sizes_colas = []
+                        
+                        # Buscar tallas cerca de "Inteiro"
+                        inteiro_section = re.search(r'(?:inteiro|entero)[^a-z]*?((?:\d+/\d+[^\d]*?)+)', message_upper, re.IGNORECASE)
+                        if inteiro_section:
+                            sizes_inteiro = re.findall(r'(\d+)/(\d+)', inteiro_section.group(1))
+                            sizes_inteiro = [f"{s[0]}/{s[1]}" for s in sizes_inteiro]
+                        
+                        # Buscar tallas cerca de "Colas"
+                        colas_section = re.search(r'(?:colas?|tails?)[^a-z]*?((?:\d+/\d+[^\d]*?)+)', message_upper, re.IGNORECASE)
+                        if colas_section:
+                            sizes_colas = re.findall(r'(\d+)/(\d+)', colas_section.group(1))
+                            sizes_colas = [f"{s[0]}/{s[1]}" for s in sizes_colas]
+                        
+                        # Si no se pudieron separar, usar todas las tallas
+                        if not sizes_inteiro and not sizes_colas:
+                            sizes_inteiro = sizes_list[:len(sizes_list)//2] if len(sizes_list) > 1 else []
+                            sizes_colas = sizes_list[len(sizes_list)//2:] if len(sizes_list) > 1 else sizes_list
+                        
+                        logger.info(f"📏 Tallas Inteiro: {sizes_inteiro}")
+                        logger.info(f"📏 Tallas Colas: {sizes_colas}")
+                        
+                        # Solicitar aclaración
+                        clarification_message = "🦐 **Solicitud detectada:**\n\n"
+                        if sizes_inteiro:
+                            clarification_message += f"📏 **Inteiro (Entero):** {', '.join(sizes_inteiro)}\n"
+                        if sizes_colas:
+                            clarification_message += f"📏 **Colas:** {', '.join(sizes_colas)}\n"
+                        if destination:
+                            clarification_message += f"🌍 **Destino:** {destination}\n"
+                        if glaseo_percentage is not None:
+                            clarification_message += f"❄️ **Glaseo:** {glaseo_percentage}%\n"
+                        
+                        clarification_message += "\n💡 **¿Qué productos necesitas?**\n\n"
+                        if sizes_inteiro:
+                            clarification_message += "**Para Inteiro (Entero):**\n• HOSO - Camarón entero (con cabeza)\n• HLSO - Sin cabeza\n\n"
+                        if sizes_colas:
+                            clarification_message += "**Para Colas:**\n• COOKED - Colas cocidas\n• P&D IQF - Colas peladas crudas\n\n"
+                        clarification_message += "📝 **Ejemplo:** 'HOSO para inteiro y COOKED para colas'"
+                        
+                        response.message(clarification_message)
+                        
+                        # Guardar estado
+                        session_manager.set_session_state(user_id, 'waiting_for_product_clarification', {
+                            'sizes_inteiro': sizes_inteiro,
+                            'sizes_colas': sizes_colas,
+                            'destination': destination,
+                            'glaseo_percentage': glaseo_percentage,
+                            'flete_solicitado': True
+                        })
+                        
+                        return PlainTextResponse(str(response), media_type="application/xml")
+                
+                # Si hay producto, construir lista de productos
+                if product:
+                    multiple_products = [{'product': product, 'size': size} for size in sizes_list]
+                    logger.info(f"📋 Construidos {len(multiple_products)} productos con {product}")
+                    # Continuar con el flujo normal de múltiples productos
+                else:
+                    # Solicitar producto
+                    response.message(f"🦐 Detecté {len(sizes_list)} tallas: {', '.join(sizes_list)}\n\n¿Qué producto necesitas?\n\nEjemplo: 'HLSO' o 'HOSO' o 'COOKED'")
+                    return PlainTextResponse(str(response), media_type="application/xml")
+            else:
+                # No especificó glaseo, pedirlo
+                response.message(f"🦐 Detecté {len(sizes_list)} tallas: {', '.join(sizes_list)}\n\n❄️ ¿Qué glaseo necesitas?\n• 0% (sin glaseo)\n• 10%\n• 20%\n• 30%")
+                return PlainTextResponse(str(response), media_type="application/xml")
+        
+        # Si no hay múltiples tallas, intentar detección normal
+        multiple_products = openai_service.detect_multiple_products(Body)
 
         if multiple_products and len(multiple_products) > 1:
             logger.info(f"📋 Detectados {len(multiple_products)} productos en el mensaje")
