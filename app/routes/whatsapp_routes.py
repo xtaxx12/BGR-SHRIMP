@@ -538,8 +538,8 @@ async def whatsapp_webhook(request: Request,
                     logger.info(f"🚢 Flete especificado para cotización mixta: ${flete_value:.2f}")
 
                     # Asignar productos automáticamente:
-                    # - HOSO para Inteiro
-                    # - COOKED para Colas
+                    # - HOSO para Inteiro (camarón entero con cabeza)
+                    # - HLSO para Colas (camarón sin cabeza, crudo)
                     all_products = []
                     if sizes_inteiro:
                         for size in sizes_inteiro:
@@ -547,8 +547,8 @@ async def whatsapp_webhook(request: Request,
                         logger.info(f"✅ Asignado HOSO para Inteiro: {sizes_inteiro}")
                     if sizes_colas:
                         for size in sizes_colas:
-                            all_products.append({'product': 'COOKED', 'size': size})
-                        logger.info(f"✅ Asignado COOKED para Colas: {sizes_colas}")
+                            all_products.append({'product': 'HLSO', 'size': size})
+                        logger.info(f"✅ Asignado HLSO para Colas: {sizes_colas}")
                     
                     logger.info(f"📋 Total productos: {len(all_products)}")
                     
