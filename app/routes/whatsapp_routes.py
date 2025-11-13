@@ -819,11 +819,74 @@ async def whatsapp_webhook(request: Request,
                         
                         return PlainTextResponse(str(response), media_type="application/xml")
                 
-                # Si hay producto, construir lista de productos
+                # Si hay producto, construir lista de productos y procesarlos
                 if product:
                     multiple_products = [{'product': product, 'size': size} for size in sizes_list]
                     logger.info(f"📋 Construidos {len(multiple_products)} productos con {product}")
-                    # Continuar con el flujo normal de múltiples productos
+                    
+                    # PROCESAR MÚLTIPLES PRODUCTOS INMEDIATAMENTE
+                    destination = ai_analysis.get('destination') if ai_analysis else None
+                    
+                    # Calcular precios para todos los productos
+                    products_info = []
+                    failed_products = []
+
+                    for product_data in multiple_products:
+                        try:
+                            query = {
+                                'product': product_data['product'],
+                                'size': product_data['size'],
+                                'glaseo_factor': glaseo_factor,
+                                'glaseo_percentage': glaseo_percentage,
+                                'flete_solicitado': True,
+                                'destination': destination,
+                                'custom_calculation': True
+                            }
+
+                            price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(query,))
+
+                            if price_info:
+                                products_info.append(price_info)
+                            else:
+                                failed_products.append(f"{product_data['product']} {product_data['size']}")
+                        except Exception as e:
+                            logger.error(f"❌ Error calculando precio para {product_data['product']} {product_data['size']}: {str(e)}")
+                            failed_products.append(f"{product_data['product']} {product_data['size']}")
+
+                    if products_info:
+                        # Solicitar flete
+                        products_list = "\n".join([f"   {i+1}. {p['producto']} {p['talla']}" for i, p in enumerate(products_info)])
+                        
+                        flete_message = f"""✅ **Productos confirmados: {len(products_info)} tallas**
+
+{products_list}
+
+🌍 **Destino:** {destination}
+❄️ **Glaseo:** {glaseo_percentage}%
+
+🚢 **Para calcular el precio CFR necesito el valor del flete a {destination}:**
+
+💡 **Ejemplos:**
+• "flete 0.20"
+• "0.25 de flete"
+• "con flete de 0.22"
+
+¿Cuál es el valor del flete por kilo? 💰"""
+                        
+                        response.message(flete_message)
+                        
+                        # Guardar estado para esperar respuesta de flete
+                        session_manager.set_session_state(user_id, 'waiting_for_multi_flete', {
+                            'products': multiple_products,
+                            'glaseo_factor': glaseo_factor,
+                            'glaseo_percentage': glaseo_percentage,
+                            'destination': destination
+                        })
+                        
+                        return PlainTextResponse(str(response), media_type="application/xml")
+                    else:
+                        response.message("❌ No se pudieron calcular precios para ningún producto.")
+                        return PlainTextResponse(str(response), media_type="application/xml")
                 else:
                     # Solicitar producto
                     response.message(f"🦐 Detecté {len(sizes_list)} tallas: {', '.join(sizes_list)}\n\n¿Qué producto necesitas?\n\nEjemplo: 'HLSO' o 'HOSO' o 'COOKED'")
