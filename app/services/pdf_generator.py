@@ -333,7 +333,11 @@ class PDFGenerator:
                     "talla": "TALLA",
                     "precio_fob": "PRECIO FOB USD/KG",
                     "precio_cfr": "PRECIO CFR USD/KG",
-                    "contacto": "Contacto: BGR Export | amerino@bgrexport.com | +593 98-805-7425"
+                    "contacto": "Contacto: BGR Export | amerino@bgrexport.com | +593 98-805-7425",
+                    "notas": "NOTAS IMPORTANTES:",
+                    "nota1": "• Precios sujetos a disponibilidad y confirmación.",
+                    "nota2": "• Validez de la cotización: 7 días.",
+                    "nota3": "• Condiciones de pago: Según acuerdo comercial."
                 },
                 "en": {
                     "titulo": "CONSOLIDATED QUOTATION",
@@ -344,7 +348,11 @@ class PDFGenerator:
                     "talla": "SIZE",
                     "precio_fob": "FOB PRICE USD/KG",
                     "precio_cfr": "CFR PRICE USD/KG",
-                    "contacto": "Contact: BGR Export | amerino@bgrexport.com | +593 98-805-7425"
+                    "contacto": "Contact: BGR Export | amerino@bgrexport.com | +593 98-805-7425",
+                    "notas": "IMPORTANT NOTES:",
+                    "nota1": "• Prices subject to availability and confirmation.",
+                    "nota2": "• Quote validity: 7 days.",
+                    "nota3": "• Payment terms: According to commercial agreement."
                 }
             }
 
