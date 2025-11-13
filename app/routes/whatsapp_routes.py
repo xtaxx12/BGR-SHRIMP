@@ -772,27 +772,27 @@ async def whatsapp_webhook(request: Request,
                     
                     if has_inteiro or has_colas:
                         # Necesita aclaración de productos
-                        # Separar tallas por contexto
-                        sizes_inteiro = []
-                        sizes_colas = []
+                        # USAR análisis de OpenAI si está disponible (más confiable)
+                        sizes_inteiro = ai_analysis.get('sizes_inteiro', []) if ai_analysis else []
+                        sizes_colas = ai_analysis.get('sizes_colas', []) if ai_analysis else []
                         
-                        # Buscar tallas cerca de "Inteiro" - buscar hasta encontrar "Colas" o fin
-                        inteiro_match = re.search(r'(?:inteiro|entero)[^a-z]*(.*?)(?:colas?|tails?|$)', message_upper, re.IGNORECASE | re.DOTALL)
-                        if inteiro_match:
-                            inteiro_text = inteiro_match.group(1)
-                            sizes_inteiro = re.findall(r'(\d+)/(\d+)', inteiro_text)
-                            sizes_inteiro = [f"{s[0]}/{s[1]}" for s in sizes_inteiro]
-                            logger.info(f"🔍 Texto Inteiro: {inteiro_text[:100]}")
+                        # Si OpenAI no detectó las tallas, intentar con regex
+                        if not sizes_inteiro and not sizes_colas:
+                            # Buscar tallas cerca de "Inteiro" - buscar hasta encontrar "Colas" o fin
+                            inteiro_match = re.search(r'(?:inteiro|entero)[^a-z]*(.*?)(?:colas?|tails?|$)', message_upper, re.IGNORECASE | re.DOTALL)
+                            if inteiro_match:
+                                inteiro_text = inteiro_match.group(1)
+                                sizes_inteiro = re.findall(r'(\d+)/(\d+)', inteiro_text)
+                                sizes_inteiro = [f"{s[0]}/{s[1]}" for s in sizes_inteiro]
+                            
+                            # Buscar tallas cerca de "Colas" - buscar desde "Colas" hasta el fin
+                            colas_match = re.search(r'(?:colas?|tails?)[^a-z]*(.*?)$', message_upper, re.IGNORECASE | re.DOTALL)
+                            if colas_match:
+                                colas_text = colas_match.group(1)
+                                sizes_colas = re.findall(r'(\d+)/(\d+)', colas_text)
+                                sizes_colas = [f"{s[0]}/{s[1]}" for s in sizes_colas]
                         
-                        # Buscar tallas cerca de "Colas" - buscar desde "Colas" hasta el fin
-                        colas_match = re.search(r'(?:colas?|tails?)[^a-z]*(.*?)$', message_upper, re.IGNORECASE | re.DOTALL)
-                        if colas_match:
-                            colas_text = colas_match.group(1)
-                            sizes_colas = re.findall(r'(\d+)/(\d+)', colas_text)
-                            sizes_colas = [f"{s[0]}/{s[1]}" for s in sizes_colas]
-                            logger.info(f"🔍 Texto Colas: {colas_text[:100]}")
-                        
-                        # Si no se pudieron separar, usar todas las tallas
+                        # Si aún no se pudieron separar, dividir las tallas por la mitad
                         if not sizes_inteiro and not sizes_colas:
                             sizes_inteiro = sizes_list[:len(sizes_list)//2] if len(sizes_list) > 1 else []
                             sizes_colas = sizes_list[len(sizes_list)//2:] if len(sizes_list) > 1 else sizes_list
