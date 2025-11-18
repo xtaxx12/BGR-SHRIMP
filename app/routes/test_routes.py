@@ -174,3 +174,34 @@ async def test_pdf_send(
     except Exception as e:
         logger.error(f"Error en test de PDF: {str(e)}")
         return {"status": "error", "message": str(e)}
+
+
+@test_router.get("/sentry-test")
+async def test_sentry():
+    """
+    Endpoint para probar que Sentry está capturando errores
+    """
+    import sentry_sdk
+    
+    # Capturar un mensaje de prueba
+    sentry_sdk.capture_message("🧪 Test de Sentry desde BGR-SHRIMP", level="info")
+    
+    logger.info("✅ Mensaje de prueba enviado a Sentry")
+    
+    return {
+        "status": "success",
+        "message": "Mensaje de prueba enviado a Sentry",
+        "sentry_configured": bool(settings.SENTRY_DSN),
+        "environment": settings.ENVIRONMENT
+    }
+
+
+@test_router.get("/sentry-error")
+async def test_sentry_error():
+    """
+    Endpoint para generar un error de prueba y verificar que Sentry lo capture
+    """
+    logger.warning("⚠️ Generando error de prueba para Sentry...")
+    
+    # Generar un error intencional
+    raise ValueError("🧪 Error de prueba para verificar Sentry - Este error es intencional")
