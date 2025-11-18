@@ -464,8 +464,8 @@ class PreDeploymentChecker:
         
         # Verificar health check endpoint
         try:
-            from app.routes import router
-            # El health check debería estar en las rutas
+            from app.main import app
+            # El health check debería estar en la aplicación
             details = "Sistema de monitoreo básico disponible"
         except:
             details = "Sistema de monitoreo limitado"
