@@ -40,8 +40,8 @@ class TestGlaseoFactor:
     @pytest.fixture
     def pricing_service(self):
         """Fixture que proporciona una instancia de PricingService"""
-        with patch('app.services.pricing.ExcelService'), \
-             patch('app.services.pricing.GoogleSheetsService'), \
+        with patch('app.services.pricing.get_google_sheets_service'), \
+             patch('app.services.pricing.ExcelService'), \
              patch('app.services.pricing.ExcelLocalCalculatorService'):
             return PricingService()
 
@@ -77,8 +77,8 @@ class TestCalculateFinalPrice:
 
     @pytest.fixture
     def pricing_service(self):
-        with patch('app.services.pricing.ExcelService'), \
-             patch('app.services.pricing.GoogleSheetsService'), \
+        with patch('app.services.pricing.get_google_sheets_service'), \
+             patch('app.services.pricing.ExcelService'), \
              patch('app.services.pricing.ExcelLocalCalculatorService'):
             return PricingService()
 
@@ -143,7 +143,7 @@ class TestGetShrimpPrice:
     @pytest.fixture
     def pricing_service(self):
         with patch('app.services.pricing.ExcelService') as mock_excel, \
-             patch('app.services.pricing.GoogleSheetsService') as mock_sheets, \
+             patch('app.services.pricing.get_google_sheets_service') as mock_sheets, \
              patch('app.services.pricing.ExcelLocalCalculatorService') as mock_calc:
 
             service = PricingService()
@@ -274,7 +274,7 @@ class TestCalculateDynamicPrices:
     @pytest.fixture
     def pricing_service(self):
         with patch('app.services.pricing.ExcelService') as mock_excel, \
-             patch('app.services.pricing.GoogleSheetsService') as mock_sheets, \
+             patch('app.services.pricing.get_google_sheets_service') as mock_sheets, \
              patch('app.services.pricing.ExcelLocalCalculatorService') as mock_calc:
 
             service = PricingService()
@@ -497,7 +497,7 @@ class TestServiceMethods:
     @pytest.fixture
     def pricing_service(self):
         with patch('app.services.pricing.ExcelService') as mock_excel, \
-             patch('app.services.pricing.GoogleSheetsService'), \
+             patch('app.services.pricing.get_google_sheets_service'), \
              patch('app.services.pricing.ExcelLocalCalculatorService'):
 
             service = PricingService()
@@ -545,7 +545,7 @@ class TestPricingIntegrationScenarios:
     @pytest.fixture
     def pricing_service(self):
         with patch('app.services.pricing.ExcelService') as mock_excel, \
-             patch('app.services.pricing.GoogleSheetsService') as mock_sheets, \
+             patch('app.services.pricing.get_google_sheets_service') as mock_sheets, \
              patch('app.services.pricing.ExcelLocalCalculatorService') as mock_calc:
 
             service = PricingService()
@@ -648,3 +648,4 @@ class TestPricingIntegrationScenarios:
         assert result['precio_final_kg'] == 7.14
         assert result['incluye_flete'] is False
         assert result['flete'] == 0
+
