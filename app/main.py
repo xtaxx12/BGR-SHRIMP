@@ -21,6 +21,7 @@ from app.exceptions import (
     validation_exception_handler,
 )
 from app.logging_config import setup_logging
+from app.monitoring import init_sentry, get_metrics, api_request_duration
 from app.routes.whatsapp_routes import whatsapp_router
 from app.routes.admin_routes import admin_router
 from app.routes.test_routes import test_router
@@ -29,6 +30,9 @@ from app.routes.pdf_routes import pdf_router
 # Configurar logging mejorado
 setup_logging()
 logger = logging.getLogger(__name__)
+
+# Inicializar Sentry
+init_sentry()
 
 # Contexto de ciclo de vida de la aplicación
 @asynccontextmanager
@@ -102,6 +106,14 @@ async def log_requests(request: Request, call_next):
         response = await call_next(request)
         process_time = time.time() - start_time
 
+        # Registrar métrica de duración
+        if settings.ENABLE_METRICS:
+            api_request_duration.labels(
+                method=request.method,
+                endpoint=request.url.path,
+                status=response.status_code
+            ).observe(process_time)
+
         # Log de respuesta exitosa
         logger.info(
             "Request completed",
@@ -120,6 +132,15 @@ async def log_requests(request: Request, call_next):
 
     except Exception as e:
         process_time = time.time() - start_time
+        
+        # Registrar métrica de error
+        if settings.ENABLE_METRICS:
+            api_request_duration.labels(
+                method=request.method,
+                endpoint=request.url.path,
+                status=500
+            ).observe(process_time)
+        
         logger.error(
             "Request failed",
             extra={
@@ -173,18 +194,62 @@ async def health_check():
 
     return health_status
 
-@app.get("/metrics", tags=["system"])
-async def metrics():
-    """Endpoint básico de métricas"""
-    if not settings.DEBUG:
-        raise HTTPException(status_code=404)
-
-    # TODO: Implementar métricas reales con Prometheus o similar
-    return {
-        "uptime_seconds": time.time(),
-        "environment": settings.ENVIRONMENT,
-        "debug_mode": settings.DEBUG
+@app.get("/health/detailed", tags=["system"])
+async def detailed_health_check():
+    """Health check detallado con verificación de componentes"""
+    from app.services.google_sheets import get_google_sheets_service
+    
+    checks = {
+        "status": "healthy",
+        "timestamp": time.time(),
+        "checks": {}
     }
+    
+    # Check Twilio
+    checks["checks"]["twilio"] = {
+        "status": "ok" if settings.TWILIO_ACCOUNT_SID else "not_configured",
+        "configured": bool(settings.TWILIO_ACCOUNT_SID)
+    }
+    
+    # Check Google Sheets
+    try:
+        gs_service = get_google_sheets_service()
+        has_data = gs_service.prices_data is not None and len(gs_service.prices_data) > 0
+        checks["checks"]["google_sheets"] = {
+            "status": "ok" if has_data else "no_data",
+            "configured": bool(settings.GOOGLE_SHEETS_ID),
+            "data_loaded": has_data
+        }
+    except Exception as e:
+        checks["checks"]["google_sheets"] = {
+            "status": "error",
+            "error": str(e)
+        }
+        checks["status"] = "degraded"
+    
+    # Check OpenAI
+    checks["checks"]["openai"] = {
+        "status": "ok" if settings.OPENAI_API_KEY else "not_configured",
+        "configured": bool(settings.OPENAI_API_KEY)
+    }
+    
+    # Check Sentry
+    checks["checks"]["sentry"] = {
+        "status": "ok" if settings.SENTRY_DSN else "not_configured",
+        "configured": bool(settings.SENTRY_DSN)
+    }
+    
+    return checks
+
+
+@app.get("/metrics", tags=["system"])
+async def metrics_endpoint():
+    """Endpoint de métricas Prometheus"""
+    if not settings.ENABLE_METRICS:
+        raise HTTPException(status_code=404, detail="Metrics disabled")
+    
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(get_metrics(), media_type="text/plain")
 
 if __name__ == "__main__":
     # Configuración para desarrollo local

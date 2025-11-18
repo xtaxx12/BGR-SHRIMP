@@ -10,3 +10,5 @@ gspread==6.1.2
 google-auth==2.35.0
 reportlab==4.4.4
 pillow==11.3.0
+sentry-sdk[fastapi]==2.18.0
+prometheus-client==0.21.0
