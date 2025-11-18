@@ -36,6 +36,13 @@ class Settings:
     ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
     CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
 
+    # Configuración de Sentry
+    SENTRY_DSN = os.getenv("SENTRY_DSN")
+    SENTRY_TRACES_SAMPLE_RATE = float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1"))
+    
+    # Configuración de métricas
+    ENABLE_METRICS = os.getenv("ENABLE_METRICS", "true").lower() == "true"
+
     # Rate limiting
     RATE_LIMIT_MAX_REQUESTS = int(os.getenv("RATE_LIMIT_MAX_REQUESTS", "30"))
     RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
