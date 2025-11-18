@@ -5,7 +5,7 @@ import sys
 sys.path.append('.')
 
 # Importar la función helper
-from app.routes import glaseo_percentage_to_factor
+from app.utils.language_utils import glaseo_percentage_to_factor
 
 def test_flexible_glaseo():
     """
