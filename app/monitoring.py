@@ -8,7 +8,8 @@ from typing import Callable
 
 import sentry_sdk
 from prometheus_client import Counter, Histogram, generate_latest
-from sentry_sdk.integrations.fastapi import FastAPIIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
+from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 from app.config import settings
@@ -35,7 +36,8 @@ def init_sentry():
             dsn=settings.SENTRY_DSN,
             environment=settings.ENVIRONMENT,
             integrations=[
-                FastAPIIntegration(),
+                StarletteIntegration(transaction_style="endpoint"),
+                FastApiIntegration(transaction_style="endpoint"),
                 sentry_logging,
             ],
             traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
