@@ -275,9 +275,11 @@ PRODUCTOS DISPONIBLES:
 RECONOCIMIENTO DE TÉRMINOS:
 - "Cocedero", "Cocido", "Cooked" → COOKED, PRE-COCIDO, o COCIDO SIN TRATAR
 - "Inteiro", "Entero", "Whole" → HOSO o HLSO
-- "Colas", "Tails", "Cola" → P&D IQF, COOKED (colas peladas)
+- "Colas", "Tails", "Cola" (sin cocedero) → HLSO (camarón sin cabeza, con cáscara)
+- "Colas Cocedero", "Colas Cocidas" → COOKED (colas peladas cocidas)
 - "Lagostino", "Vannamei", "Camarón" → Todos son válidos
 - "CFR", "CIF", "FOB" → Términos de flete (detectar destino)
+- "Precio CFR de cola X/X con Y de flete" → HLSO con flete (cálculo: FOB + Flete)
 
 TALLAS: U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60, 60/70, 61/70, 70/80, 71/90
 
@@ -560,7 +562,8 @@ COMBINACIONES VÁLIDAS:
 - "Colas Cocedero" / "Colas Cocidas" → COOKED (colas peladas cocidas)
 - Solo "Cocedero" sin especificar → Solicitar tipo: COOKED, PRE-COCIDO, COCIDO SIN TRATAR
 - "Inteiro" solo (sin cocedero) → HOSO (camarón entero crudo)
-- "Colas" solo (sin cocedero) → P&D IQF (colas peladas crudas)
+- "Colas" / "Cola" solo (sin cocedero) → HLSO (camarón sin cabeza, con cáscara)
+- "Precio CFR de cola 20/30" → HLSO 20/30 con flete (NO es COOKED ni P&D IQF)
 
 OTROS TÉRMINOS:
 - "Lagostino", "Vannamei", "Camarón", "Shrimp" → Todos válidos
@@ -585,16 +588,18 @@ EXTRAE (valores exactos o null):
 
 REGLAS IMPORTANTES:
 1. Si menciona tallas (ej: 20/30, 21/25) → intent: "proforma" (incluso si empieza con saludo)
-2. Si menciona CFR/CIF sin glaseo → flete_solicitado: true, glaseo_factor: null (cálculo CFR simple)
+2. Si menciona CFR/CIF sin glaseo → flete_solicitado: true, glaseo_factor: null (cálculo CFR simple: FOB + Flete)
 3. Si menciona CFR/CIF con glaseo (ej: "CFR con 15%") → flete_solicitado: true, glaseo_factor: 0.85
 4. Si menciona "Cocedero" + "Inteiro" → multiple_presentations: true, needs_product_type: true, clarification_needed
 5. Si menciona "Cocedero" + "Colas" → product: "COOKED" (colas cocidas)
 6. Si menciona solo "Cocedero" → product: null, needs_product_type: true
-7. Si detecta múltiples tallas → multiple_sizes: true, listar todas en array
-8. Si detecta "Inteiro" y "Colas" en el mismo mensaje → separar tallas: sizes_inteiro y sizes_colas
-9. NO asumir valores por defecto - extraer solo lo que el usuario dice explícitamente
-10. CFR sin glaseo = Precio FOB + Flete (simple)
-11. CFR con glaseo = Precio FOB + Glaseo + Flete (completo)
+7. Si menciona "Cola" o "Colas" SIN "Cocedero" → product: "HLSO" (camarón sin cabeza, con cáscara)
+8. Si detecta múltiples tallas → multiple_sizes: true, listar todas en array
+9. Si detecta "Inteiro" y "Colas" en el mismo mensaje → separar tallas: sizes_inteiro y sizes_colas
+10. NO asumir valores por defecto - extraer solo lo que el usuario dice explícitamente
+11. CFR sin glaseo = Precio FOB + Flete (simple, sin aplicar factor de glaseo)
+12. CFR con glaseo = Precio FOB + Glaseo + Flete (completo)
+13. "Precio CFR de cola 20/30 con 0.25 de flete" → product: "HLSO", size: "20/30", flete_custom: 0.25, glaseo_factor: null
 
 EJEMPLOS:
 Input: "HLSO 16/20 con 20% glaseo"
@@ -608,6 +613,9 @@ Output: {intent: "proforma", product: "HLSO", size: "16/20", destination: "Houst
 
 Input: "Precio CFR Houston HLSO 16/20 con 15% glaseo"
 Output: {intent: "proforma", product: "HLSO", size: "16/20", destination: "Houston", flete_solicitado: true, glaseo_factor: 0.85, glaseo_percentage: 15, confidence: 0.95}
+
+Input: "Precio cfr de cola 20/30 con 0.25 de flete"
+Output: {intent: "proforma", product: "HLSO", size: "20/30", flete_custom: 0.25, flete_solicitado: true, glaseo_factor: null, glaseo_percentage: 0, confidence: 0.95}
 
 Input: "Necesito precios CFR Lisboa Inteiro 0% 20/30, 30/40"
 Output: {intent: "proforma", product: null, needs_product_type: true, sizes: ["20/30", "30/40"], destination: "Lisboa", flete_solicitado: true, glaseo_factor: null, glaseo_percentage: 0, confidence: 0.9}
@@ -1370,18 +1378,23 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
                     needs_clarification = True
             else:
                 # No menciona cocedero, usar lógica normal
+                # IMPORTANTE: "cola" sin "cocedero" = HLSO (camarón sin cabeza, con cáscara)
+                # Solo "cola cocedero" = COOKED (colas cocidas)
                 product_patterns = {
                     'HLSO': [
                         'sin cabeza', 'hlso', 'head less', 'headless', 'descabezado',
-                        'sin cabezas', 'tipo sin cabeza'
+                        'sin cabezas', 'tipo sin cabeza',
+                        # AGREGADO: "cola" sin "cocedero" = HLSO (camarón sin cabeza)
+                        'cola', 'colas', 'tail', 'tails'
                     ],
                     'HOSO': [
                         'con cabeza', 'hoso', 'head on', 'entero', 'completo',
-                        'con cabezas', 'tipo con cabeza', 'inteiro', 'whole'
+                        'con cabezas', 'tipo con cabeza', 'inteiro', 'whole' , 'entero'
                     ],
                     'P&D IQF': [
                         'p&d iqf', 'pd iqf', 'p&d', 'pelado', 'peeled', 'deveined',
-                        'limpio', 'procesado', 'pd', 'p d', 'pelado y desvenado'
+                        'limpio', 'procesado', 'pd', 'p d', 'pelado y desvenado',
+                        
                     ],
                     'P&D BLOQUE': [
                         'p&d bloque', 'pd bloque', 'bloque', 'block', 'p&d block',
@@ -1397,7 +1410,8 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
                         'pud eeuu', 'pud-eeuu', 'eeuu', 'usa', 'estados unidos'
                     ],
                     'COOKED': [
-                        'cooked', 'cocinado', 'preparado', 'colas', 'tails', 'tail'
+                        # REMOVIDO: 'colas', 'tails', 'tail' (ahora solo se detecta con "cocedero")
+                        'cooked', 'cocinado', 'preparado'
                     ],
                     'PRE-COCIDO': [
                         'pre-cocido', 'pre cocido', 'precocido', 'pre-cooked', 'pre cooked'
@@ -1408,6 +1422,7 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
                 }
 
                 # Buscar coincidencias de productos (orden específico para evitar conflictos)
+                # IMPORTANTE: P&D IQF debe ir ANTES que COOKED para detectar "cola" correctamente
                 specific_order = ['COCIDO SIN TRATAR', 'PRE-COCIDO', 'P&D IQF', 'P&D BLOQUE', 'PuD-EUROPA', 'PuD-EEUU', 'EZ PEEL', 'HLSO', 'HOSO', 'COOKED']
 
                 for prod_name in specific_order:
