@@ -42,6 +42,9 @@ class Settings:
     
     # Configuración de métricas
     ENABLE_METRICS = os.getenv("ENABLE_METRICS", "true").lower() == "true"
+    
+    # Configuración de documentación API
+    ENABLE_DOCS = os.getenv("ENABLE_DOCS", "true").lower() == "true"
 
     # Rate limiting
     RATE_LIMIT_MAX_REQUESTS = int(os.getenv("RATE_LIMIT_MAX_REQUESTS", "30"))
