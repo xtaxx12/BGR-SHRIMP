@@ -26,6 +26,11 @@ from app.routes.whatsapp_routes import whatsapp_router
 from app.routes.admin_routes import admin_router
 from app.routes.test_routes import test_router
 from app.routes.pdf_routes import pdf_router
+from app.models import (
+    HealthStatus,
+    DetailedHealthStatus,
+    RootResponse
+)
 
 # Configurar logging mejorado
 setup_logging()
@@ -57,13 +62,82 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down BGR Export WhatsApp Bot")
 
 app = FastAPI(
-    title="BGR Export WhatsApp Bot",
-    description="Bot de WhatsApp para consulta de precios de camarón",
+    title="BGR Export WhatsApp Bot API",
+    description="""
+    ## 🦐 Sistema de Cotización de Camarón vía WhatsApp
+    
+    API REST para gestionar cotizaciones de productos de camarón premium de BGR Export.
+    
+    ### Características principales:
+    
+    * **WhatsApp Integration**: Recibe y procesa mensajes de WhatsApp vía Twilio
+    * **Pricing Engine**: Cálculo dinámico de precios FOB y CFR con glaseo
+    * **PDF Generation**: Generación automática de proformas en español e inglés
+    * **AI-Powered**: Análisis inteligente de mensajes con OpenAI GPT
+    * **Session Management**: Gestión de sesiones de usuario con contexto
+    * **Multi-Product**: Soporte para cotizaciones consolidadas
+    
+    ### Productos disponibles:
+    
+    * HLSO (Head Less Shell On) - Sin cabeza, con cáscara
+    * HOSO (Head On Shell On) - Camarón entero con cabeza
+    * P&D IQF - Pelado y desvenado individual
+    * P&D BLOQUE - Pelado y desvenado en bloque
+    * COOKED - Cocido listo para consumo
+    * EZ PEEL - Fácil pelado
+    * PuD-EUROPA - Calidad premium para Europa
+    * PuD-EEUU - Calidad para Estados Unidos
+    
+    ### Tallas disponibles:
+    
+    U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60, 60/70, 61/70, 70/80, 71/90
+    
+    ### Autenticación:
+    
+    * Endpoints de administración requieren token Bearer
+    * Webhooks de WhatsApp validados con firma Twilio
+    
+    ### Rate Limiting:
+    
+    * WhatsApp webhook: 10 requests/minuto por número
+    * Admin endpoints: Sin límite (requiere autenticación)
+    """,
     version="2.0.0",
     lifespan=lifespan,
-    docs_url="/docs" if settings.DEBUG else None,  # Desactivar docs en producción
+    docs_url="/docs" if settings.DEBUG else None,
     redoc_url="/redoc" if settings.DEBUG else None,
-    openapi_url="/openapi.json" if settings.DEBUG else None
+    openapi_url="/openapi.json" if settings.DEBUG else None,
+    contact={
+        "name": "BGR Export",
+        "url": "https://bgrexport.com",
+        "email": "info@bgrexport.com"
+    },
+    license_info={
+        "name": "Proprietary",
+        "url": "https://bgrexport.com/license"
+    },
+    openapi_tags=[
+        {
+            "name": "whatsapp",
+            "description": "Endpoints para integración con WhatsApp vía Twilio. Recibe mensajes, procesa audio y genera cotizaciones."
+        },
+        {
+            "name": "admin",
+            "description": "Endpoints administrativos para gestión del sistema. Requieren autenticación con token Bearer."
+        },
+        {
+            "name": "pdf",
+            "description": "Endpoints para descarga de PDFs generados. Acceso público a documentos de cotización."
+        },
+        {
+            "name": "test",
+            "description": "Endpoints de prueba para desarrollo y testing. Solo disponibles en modo DEBUG."
+        },
+        {
+            "name": "system",
+            "description": "Endpoints de sistema para health checks, métricas y estado general de la aplicación."
+        }
+    ]
 )
 
 # Configurar middlewares
@@ -163,17 +237,79 @@ app.include_router(test_router, prefix="/webhook", tags=["test"])
 app.include_router(pdf_router, prefix="/webhook", tags=["pdf"])
 
 # Endpoints de sistema
-@app.get("/", tags=["system"])
+@app.get(
+    "/",
+    tags=["system"],
+    summary="Root endpoint",
+    description="Información básica de la API",
+    response_description="Información del servicio",
+    response_model=RootResponse
+)
 async def root():
-    return {
+    """
+    ## Root Endpoint
+    
+    Retorna información básica sobre el servicio.
+    
+    ### Respuesta:
+    
+    ```json
+    {
         "message": "BGR Export WhatsApp Bot",
         "version": "2.0.0",
         "description": "Sistema de consulta de precios de camarón vía WhatsApp"
     }
+    ```
+    """
+    return {
+        "message": "BGR Export WhatsApp Bot",
+        "version": "2.0.0",
+        "description": "Sistema de consulta de precios de camarón vía WhatsApp",
+        "docs": "/docs" if settings.DEBUG else "Disabled in production",
+        "health": "/health"
+    }
 
-@app.get("/health", tags=["system"])
+@app.get(
+    "/health",
+    tags=["system"],
+    summary="Health check básico",
+    description="Verifica el estado general del servicio y sus componentes",
+    response_description="Estado de salud del servicio",
+    response_model=HealthStatus
+)
 async def health_check():
-    """Endpoint para verificar salud del servicio"""
+    """
+    ## Health Check Básico
+    
+    Verifica el estado general del servicio y la configuración de componentes críticos.
+    
+    ### Componentes verificados:
+    
+    * **Twilio**: Configuración de integración con WhatsApp
+    * **Google Sheets**: Configuración de fuente de datos de precios
+    * **OpenAI**: Configuración de análisis inteligente de mensajes
+    
+    ### Estados posibles:
+    
+    * `healthy`: Todos los componentes configurados correctamente
+    * `degraded`: Algunos componentes no configurados pero el servicio funciona
+    
+    ### Ejemplo de respuesta:
+    
+    ```json
+    {
+        "status": "healthy",
+        "service": "bgr-whatsapp-bot",
+        "version": "2.0.0",
+        "environment": "production",
+        "components": {
+            "twilio_configured": true,
+            "google_sheets_configured": true,
+            "openai_configured": true
+        }
+    }
+    ```
+    """
     # Verificar componentes críticos
     health_status = {
         "status": "healthy",
@@ -194,9 +330,62 @@ async def health_check():
 
     return health_status
 
-@app.get("/health/detailed", tags=["system"])
+@app.get(
+    "/health/detailed",
+    tags=["system"],
+    summary="Health check detallado",
+    description="Verifica el estado detallado de todos los componentes del sistema",
+    response_description="Estado detallado de cada componente",
+    response_model=DetailedHealthStatus
+)
 async def detailed_health_check():
-    """Health check detallado con verificación de componentes"""
+    """
+    ## Health Check Detallado
+    
+    Realiza verificaciones profundas de todos los componentes del sistema.
+    
+    ### Verificaciones incluidas:
+    
+    * **Twilio**: Configuración y conectividad
+    * **Google Sheets**: Configuración, conectividad y datos cargados
+    * **OpenAI**: Configuración de API key
+    * **Sentry**: Configuración de monitoreo de errores
+    
+    ### Estados por componente:
+    
+    * `ok`: Componente funcionando correctamente
+    * `not_configured`: Componente no configurado
+    * `no_data`: Componente configurado pero sin datos
+    * `error`: Error en el componente
+    
+    ### Ejemplo de respuesta:
+    
+    ```json
+    {
+        "status": "healthy",
+        "timestamp": 1700000000.0,
+        "checks": {
+            "twilio": {
+                "status": "ok",
+                "configured": true
+            },
+            "google_sheets": {
+                "status": "ok",
+                "configured": true,
+                "data_loaded": true
+            },
+            "openai": {
+                "status": "ok",
+                "configured": true
+            },
+            "sentry": {
+                "status": "ok",
+                "configured": true
+            }
+        }
+    }
+    ```
+    """
     from app.services.google_sheets import get_google_sheets_service
     
     checks = {
@@ -242,9 +431,50 @@ async def detailed_health_check():
     return checks
 
 
-@app.get("/metrics", tags=["system"])
+@app.get(
+    "/metrics",
+    tags=["system"],
+    summary="Métricas Prometheus",
+    description="Expone métricas del sistema en formato Prometheus",
+    response_description="Métricas en formato texto plano compatible con Prometheus"
+)
 async def metrics_endpoint():
-    """Endpoint de métricas Prometheus"""
+    """
+    ## Métricas Prometheus
+    
+    Expone métricas del sistema en formato compatible con Prometheus.
+    
+    ### Métricas disponibles:
+    
+    * **api_request_duration_seconds**: Duración de requests HTTP
+    * **api_request_total**: Total de requests por endpoint
+    * **api_request_errors_total**: Total de errores por endpoint
+    
+    ### Configuración:
+    
+    Solo disponible si `ENABLE_METRICS=true` en variables de entorno.
+    
+    ### Ejemplo de uso con Prometheus:
+    
+    ```yaml
+    scrape_configs:
+      - job_name: 'bgr-whatsapp-bot'
+        static_configs:
+          - targets: ['api.bgrexport.com:80']
+        metrics_path: '/metrics'
+    ```
+    
+    ### Ejemplo de respuesta:
+    
+    ```
+    # HELP api_request_duration_seconds Request duration in seconds
+    # TYPE api_request_duration_seconds histogram
+    api_request_duration_seconds_bucket{endpoint="/webhook/whatsapp",method="POST",status="200",le="0.1"} 45.0
+    api_request_duration_seconds_bucket{endpoint="/webhook/whatsapp",method="POST",status="200",le="0.5"} 98.0
+    api_request_duration_seconds_count{endpoint="/webhook/whatsapp",method="POST",status="200"} 100.0
+    api_request_duration_seconds_sum{endpoint="/webhook/whatsapp",method="POST",status="200"} 12.5
+    ```
+    """
     if not settings.ENABLE_METRICS:
         raise HTTPException(status_code=404, detail="Metrics disabled")
     
