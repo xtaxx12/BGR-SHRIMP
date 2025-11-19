@@ -23,6 +23,7 @@ def test_cfr_cola_detection():
     
     # Caso 1: "Precio cfr de cola 20/30 con 0.25 de flete"
     # Debe detectar: HLSO 20/30 con flete 0.25 (NO COOKED ni P&D IQF)
+    # Nota: La talla 20/30 no existe para HLSO, el sistema mostrará error con tallas disponibles
     print("📝 Caso 1: Precio CFR de cola 20/30 con 0.25 de flete")
     print("-" * 80)
     
@@ -41,6 +42,7 @@ def test_cfr_cola_detection():
     # Verificar resultado
     if result1.get('product') == 'HLSO':
         print("✅ CORRECTO: Detectó HLSO (camarón sin cabeza, con cáscara)")
+        print("ℹ️  NOTA: La talla 20/30 no existe para HLSO, el sistema mostrará error")
     elif result1.get('product') == 'COOKED':
         print("❌ ERROR: Detectó COOKED (debería ser HLSO)")
     elif result1.get('product') == 'P&D IQF':

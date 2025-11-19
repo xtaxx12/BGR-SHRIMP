@@ -79,7 +79,19 @@ class PricingService:
                 price_data = self.excel_service.get_price_data(size, product)
                 if not price_data:
                     logger.warning(f"No se encontró precio para {product} {size}")
-                    return None
+                    # Obtener tallas disponibles para mostrar al usuario
+                    available_sizes = self.excel_service.get_available_sizes(product)
+                    error_msg = f"La talla {size} no está disponible para {product}."
+                    if available_sizes:
+                        error_msg += f" Tallas disponibles: {', '.join(available_sizes)}"
+                    # Retornar dict con error para que el sistema pueda manejarlo
+                    return {
+                        'error': True,
+                        'error_message': error_msg,
+                        'product': product,
+                        'size': size,
+                        'available_sizes': available_sizes
+                    }
                 precio_base_kg = price_data.get('precio_kg', 0)
                 logger.info(f"📊 Usando precio base del Excel: ${precio_base_kg}/kg")
 

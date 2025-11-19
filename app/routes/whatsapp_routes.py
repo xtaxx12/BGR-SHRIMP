@@ -2164,6 +2164,13 @@ Responde con el número o escribe:
                 price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(user_input,))
 
                 if price_info:
+                    # Verificar si es un error
+                    if price_info.get('error'):
+                        error_message = price_info.get('error_message', 'Error desconocido')
+                        response.message(f"❌ {error_message}")
+                        session_manager.clear_session(user_id)
+                        return PlainTextResponse(str(response), media_type="application/xml")
+                    
                     formatted_response = format_price_response(price_info)
 
                     # Agregar instrucción para confirmar
@@ -2239,6 +2246,13 @@ Responde con el número o escribe:
             price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(user_input,))
 
             if price_info:
+                # Verificar si es un error
+                if price_info.get('error'):
+                    error_message = price_info.get('error_message', 'Error desconocido')
+                    response.message(f"❌ {error_message}")
+                    session_manager.clear_session(user_id)
+                    return PlainTextResponse(str(response), media_type="application/xml")
+                
                 formatted_response = format_price_response(price_info)
 
                 # Agregar instrucción para confirmar

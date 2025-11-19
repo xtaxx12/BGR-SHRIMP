@@ -1449,7 +1449,7 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
                         size = f"{match.group(1)}/{match.group(2)}"
                     break
 
-            # Lógica inteligente: Si no se detectó producto pero hay talla específica de HOSO, asumir HOSO
+            # Si no se detectó producto pero hay talla específica, inferir por talla
             if not product and size:
                 # Tallas que solo existen en HOSO según la tabla de precios
                 hoso_exclusive_sizes = ['20/30', '30/40', '40/50', '50/60', '60/70', '70/80']
