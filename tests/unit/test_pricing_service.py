@@ -265,7 +265,12 @@ class TestGetShrimpPrice:
 
         result = pricing_service.get_shrimp_price(user_input)
 
-        assert result is None
+        # Ahora retorna un dict con error en lugar de None
+        assert result is not None
+        assert result.get('error') is True
+        assert 'no está disponible' in result.get('error_message', '').lower()
+        assert result.get('product') == 'HLSO'
+        assert result.get('size') == '99/99'
 
 
 class TestCalculateDynamicPrices:
