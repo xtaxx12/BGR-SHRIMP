@@ -1384,6 +1384,13 @@ U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60
                 price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(ai_query,))
 
                 if price_info:
+                    # IMPORTANTE: Verificar si es un error ANTES de generar el PDF
+                    if price_info.get('error'):
+                        error_message = price_info.get('error_message', 'Error desconocido')
+                        response.message(f"❌ {error_message}")
+                        session_manager.clear_session(user_id)
+                        return PlainTextResponse(str(response), media_type="application/xml")
+                    
                     logger.debug(f"✅ Datos de proforma validados para: {ai_query}")
 
                     # Detectar idioma automáticamente y generar PDF
