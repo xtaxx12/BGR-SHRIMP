@@ -749,7 +749,8 @@ async def whatsapp_webhook(request: Request,
         logger.info(f"🔍 Intent: {ai_analysis.get('intent')}, Confidence: {ai_analysis.get('confidence')}, Product: {ai_analysis.get('product')}, Size: {ai_analysis.get('size')}")
 
         # Detectar si el mensaje tiene indicadores de cotización (tallas, términos específicos)
-        has_size = bool(re.search(r'\b\d+/\d+\b', Body.lower()))
+        # Soporta formatos: 16/20, 16-20, 21/25, 21-25, etc.
+        has_size = bool(re.search(r'\b\d+[/-]\d+\b', Body.lower()))
         quote_keywords = ['proforma', 'cotizacion', 'cotizar', 'precio', 'necesito', 'contenedor', 'cfr', 'cif', 'cocedero', 'lagostino', 'inteiro', 'colas']
         has_quote_keywords = any(keyword in Body.lower() for keyword in quote_keywords)
         is_complex_quote = has_size or has_quote_keywords
@@ -923,7 +924,8 @@ async def whatsapp_webhook(request: Request,
 
         # DETECTAR MÚLTIPLES TALLAS PRIMERO (simplificado)
         # Si hay 2 o más tallas en el mensaje, generar cotización consolidada
-        all_sizes_in_message = re.findall(r'(\d+)/(\d+)', Body)
+        # Soporta formatos: 16/20, 16-20, 21/25, 21-25, etc.
+        all_sizes_in_message = re.findall(r'(\d+)[/-](\d+)', Body)
         
         if len(all_sizes_in_message) >= 2:
             logger.info(f"📋 Detectadas {len(all_sizes_in_message)} tallas en el mensaje → Cotización consolidada")
@@ -969,6 +971,14 @@ async def whatsapp_webhook(request: Request,
                 # Detectar producto y destino del mensaje
                 destination = ai_analysis.get('destination') if ai_analysis else None
                 product = ai_analysis.get('product') if ai_analysis else None
+                
+                # Extraer información adicional del análisis de OpenAI
+                processing_type = ai_analysis.get('processing_type') if ai_analysis else None
+                net_weight = ai_analysis.get('net_weight_percentage') if ai_analysis else None
+                cantidad = ai_analysis.get('cantidad') if ai_analysis else None
+                sizes_by_product = ai_analysis.get('sizes_by_product') if ai_analysis else None
+                
+                logger.info(f"📦 Info adicional detectada - Processing: {processing_type}, NET: {net_weight}%, Cantidad: {cantidad}")
                 
                 # PRIMERO: Verificar si menciona Inteiro/Colas (tiene prioridad sobre producto detectado)
                 message_upper = Body.upper()
@@ -1243,29 +1253,53 @@ async def whatsapp_webhook(request: Request,
                 return PlainTextResponse(str(response), media_type="application/xml")
             else:
                 # No especificó glaseo, pedirlo
+                # Extraer información adicional del análisis de OpenAI
+                processing_type = ai_analysis.get('processing_type') if ai_analysis else None
+                net_weight = ai_analysis.get('net_weight_percentage') if ai_analysis else None
+                cantidad = ai_analysis.get('cantidad') if ai_analysis else None
+                sizes_by_product = ai_analysis.get('sizes_by_product') if ai_analysis else None
+                
                 session_manager.set_session_state(user_id, 'waiting_for_multi_glaseo', {
                     'products': multiple_products,
-                    'message': Body
+                    'message': Body,
+                    'processing_type': processing_type,
+                    'net_weight': net_weight,
+                    'cantidad': cantidad
                 })
 
-                # Mostrar lista de productos detectados
-                products_list = "\n".join([f"   {i+1}. {p['product']} {p['size']}"
-                                          for i, p in enumerate(multiple_products)])
+                # Mostrar lista de productos detectados AGRUPADOS por tipo si está disponible
+                if sizes_by_product:
+                    products_list = ""
+                    for prod_type, prod_sizes in sizes_by_product.items():
+                        products_list += f"\n🦐 **{prod_type}:** {', '.join(prod_sizes)}"
+                else:
+                    products_list = "\n".join([f"   {i+1}. {p['product']} {p['size']}"
+                                              for i, p in enumerate(multiple_products)])
 
                 # Detectar destino si está en el mensaje
                 destination = ai_analysis.get('destination') if ai_analysis else None
-                destination_text = f"\n🌍 Destino: {destination}" if destination else ""
+                destination_text = f"\n🌍 **Destino:** {destination}" if destination else ""
+                
+                # Mostrar información adicional detectada
+                additional_info = ""
+                if processing_type:
+                    additional_info += f"\n📦 **Procesamiento:** {processing_type}"
+                if net_weight:
+                    additional_info += f"\n⚖️ **Peso Neto:** {net_weight}%"
+                if cantidad:
+                    additional_info += f"\n📊 **Cantidad:** {cantidad}"
 
-                multi_message = f"""📋 **Detecté {len(multiple_products)} productos para cotizar:**
+                multi_message = f"""✅ **Detecté {len(multiple_products)} productos para cotizar:**
 
-{products_list}{destination_text}
+{products_list}{destination_text}{additional_info}
 
 ❄️ **¿Qué glaseo necesitas para todos los productos?**
+• **0%** (sin glaseo)
 • **10%** glaseo (factor 0.90)
 • **20%** glaseo (factor 0.80)
 • **30%** glaseo (factor 0.70)
 
-💡 Responde con el número: 10, 20 o 30"""
+💡 Responde con el número: 0, 10, 20 o 30"""
 
                 response.message(multi_message)
                 return PlainTextResponse(str(response), media_type="application/xml")

@@ -569,11 +569,21 @@ OTROS TÉRMINOS:
 - "Lagostino", "Vannamei", "Camarón", "Shrimp" → Todos válidos
 - "CFR [ciudad]", "CIF [ciudad]" → Detectar destino y marcar flete_solicitado: true
 - "Contenedor" → Solicitud de cotización grande
+- "BRINE", "Salmuera" → Tipo de procesamiento (extraer como processing_type)
+- "NET", "Neto" → Peso neto (extraer porcentaje si está presente, ej: "100% NET")
+- Cantidades con formato: "20k/caja", "10kg/caja", "5000kg", "10000lb"
+
+FORMATOS DE TALLAS A RECONOCER:
+- Con guión: "16-20", "21-25", "26-30" → Normalizar a "16/20", "21/25", "26/30"
+- Con barra: "16/20", "21/25" → Mantener formato
+- Separadas por espacios: "16 20" → Normalizar a "16/20"
 
 EXTRAE (valores exactos o null):
 - Intent: pricing|proforma|product_info|greeting|help|other
 - Product: nombre exacto del producto (o null si necesita especificar entre COOKED/PRE-COCIDO/COCIDO SIN TRATAR)
 - Size: talla exacta (o array de tallas si menciona múltiples)
+- Sizes: array con TODAS las tallas detectadas (normalizar formato a X/X)
+- Sizes_by_product: objeto agrupando tallas por producto {"HLSO": ["16/20", "21/25"], "HOSO": ["20/30"]}
 - Glaseo: porcentaje (0, 10, 20, 30) → convertir a factor decimal
   * 0% = null (sin glaseo, CFR simple)
   * 10% = 0.90
@@ -581,41 +591,52 @@ EXTRAE (valores exactos o null):
   * 30% = 0.70
 - Destination: ciudad/país si menciona "CFR [lugar]", "CIF [lugar]", "flete a [lugar]", "envío a [lugar]"
 - Flete: valor numérico si menciona "flete 0.30", "freight $0.25", etc.
-- Cantidad: número + unidad (ej: "5000 kg", "10000 lb")
+- Cantidad: número + unidad (ej: "5000 kg", "10000 lb", "20k/caja")
+- Processing_type: "BRINE", "SALMUERA", u otro tipo de procesamiento mencionado
+- Net_weight_percentage: porcentaje de peso neto si menciona (ej: "100% NET" → 100)
 - Cliente: nombre si menciona "cliente [nombre]", "para [nombre]"
 - Language: "es" (español) o "en" (inglés)
 - Multiple_sizes: true si detecta múltiples tallas en el mensaje
+- Multiple_products: true si detecta múltiples productos diferentes
 
 REGLAS IMPORTANTES:
 1. Si menciona tallas (ej: 20/30, 21/25) → intent: "proforma" (incluso si empieza con saludo)
-2. Si menciona CFR/CIF sin glaseo → flete_solicitado: true, glaseo_factor: null (cálculo CFR simple: FOB + Flete)
-3. Si menciona CFR/CIF con glaseo (ej: "CFR con 15%") → flete_solicitado: true, glaseo_factor: 0.85
-4. Si menciona "Cocedero" + "Inteiro" → multiple_presentations: true, needs_product_type: true, clarification_needed
-5. Si menciona "Cocedero" + "Colas" → product: "COOKED" (colas cocidas)
-6. Si menciona solo "Cocedero" → product: null, needs_product_type: true
-7. Si menciona "Cola" o "Colas" SIN "Cocedero" → product: "HLSO" (camarón sin cabeza, con cáscara)
-8. Si detecta múltiples tallas → multiple_sizes: true, listar todas en array
-9. Si detecta "Inteiro" y "Colas" en el mismo mensaje → separar tallas: sizes_inteiro y sizes_colas
-10. NO asumir valores por defecto - extraer solo lo que el usuario dice explícitamente
-11. CFR sin glaseo = Precio FOB + Flete (simple, sin aplicar factor de glaseo)
-12. CFR con glaseo = Precio FOB + Glaseo + Flete (completo)
-13. "Precio CFR de cola 20/30 con 0.25 de flete" → product: "HLSO", size: "20/30", flete_custom: 0.25, glaseo_factor: null
+2. NORMALIZAR TODAS LAS TALLAS: "16-20" → "16/20", "21-25" → "21/25"
+3. EXTRAER TODAS LAS TALLAS sin excepción, incluso si hay 10+ tallas
+4. Si menciona CFR/CIF sin glaseo → flete_solicitado: true, glaseo_factor: null (cálculo CFR simple: FOB + Flete)
+5. Si menciona CFR/CIF con glaseo (ej: "CFR con 15%") → flete_solicitado: true, glaseo_factor: 0.85
+6. Si menciona "Cocedero" + "Inteiro" → multiple_presentations: true, needs_product_type: true, clarification_needed
+7. Si menciona "Cocedero" + "Colas" → product: "COOKED" (colas cocidas)
+8. Si menciona solo "Cocedero" → product: null, needs_product_type: true
+9. Si menciona "Cola" o "Colas" SIN "Cocedero" → product: "HLSO" (camarón sin cabeza, con cáscara)
+10. Si detecta múltiples tallas → multiple_sizes: true, listar TODAS en array
+11. Si detecta "Inteiro" y "Colas" en el mismo mensaje → separar tallas: sizes_inteiro y sizes_colas
+12. NO asumir valores por defecto - extraer solo lo que el usuario dice explícitamente
+13. CFR sin glaseo = Precio FOB + Flete (simple, sin aplicar factor de glaseo)
+14. CFR con glaseo = Precio FOB + Glaseo + Flete (completo)
+15. "Precio CFR de cola 20/30 con 0.25 de flete" → product: "HLSO", size: "20/30", flete_custom: 0.25, glaseo_factor: null
+16. Extraer "BRINE" como processing_type si está presente
+17. Extraer "100% NET" como net_weight_percentage: 100
+18. Extraer cantidades como "20k/caja" → cantidad: "20000 kg/caja"
 
 EJEMPLOS:
 Input: "HLSO 16/20 con 20% glaseo"
-Output: {intent: "proforma", product: "HLSO", size: "16/20", glaseo_factor: 0.80, destination: null, confidence: 0.9}
+Output: {intent: "proforma", product: "HLSO", size: "16/20", sizes: ["16/20"], glaseo_factor: 0.80, destination: null, confidence: 0.9}
+
+Input: "Hola Erick, como estas? podras ofertar otros tamaños de camaron? HLSO 16-20/ 21-25/26-30/31-35/36-40/41-50/51-60 HOSO 20-30/30-40/40-50 BRINE 100% NET 20k/caja"
+Output: {intent: "proforma", product: null, multiple_products: true, multiple_sizes: true, sizes: ["16/20", "21/25", "26/30", "31/35", "36/40", "41/50", "51/60", "20/30", "30/40", "40/50"], sizes_by_product: {"HLSO": ["16/20", "21/25", "26/30", "31/35", "36/40", "41/50", "51/60"], "HOSO": ["20/30", "30/40", "40/50"]}, processing_type: "BRINE", net_weight_percentage: 100, cantidad: "20000 kg/caja", glaseo_factor: null, glaseo_percentage: null, confidence: 0.95}
 
 Input: "Buenas Tardes. Necesito precios Lagostino Cocedero CFR Lisboa: Inteiro 0% 20/30, 30/40, 40/50. Colas 21/25, 31/35, 36/40, 41/50"
-Output: {intent: "proforma", product: null, needs_product_type: true, product_category: "cocido", sizes_inteiro: ["20/30", "30/40", "40/50"], sizes_colas: ["21/25", "31/35", "36/40", "41/50"], destination: "Lisboa", flete_solicitado: true, glaseo_factor: null, glaseo_percentage: 0, multiple_sizes: true, multiple_presentations: true, clarification_needed: "Cliente solicita 'Inteiro Cocedero' y 'Colas Cocedero'. Confirmar productos específicos.", confidence: 0.95}
+Output: {intent: "proforma", product: null, needs_product_type: true, product_category: "cocido", sizes_inteiro: ["20/30", "30/40", "40/50"], sizes_colas: ["21/25", "31/35", "36/40", "41/50"], sizes: ["20/30", "30/40", "40/50", "21/25", "31/35", "36/40", "41/50"], destination: "Lisboa", flete_solicitado: true, glaseo_factor: null, glaseo_percentage: 0, multiple_sizes: true, multiple_presentations: true, clarification_needed: "Cliente solicita 'Inteiro Cocedero' y 'Colas Cocedero'. Confirmar productos específicos.", confidence: 0.95}
 
 Input: "Precio CFR Houston HLSO 16/20"
-Output: {intent: "proforma", product: "HLSO", size: "16/20", destination: "Houston", flete_solicitado: true, glaseo_factor: null, confidence: 0.9}
+Output: {intent: "proforma", product: "HLSO", size: "16/20", sizes: ["16/20"], destination: "Houston", flete_solicitado: true, glaseo_factor: null, confidence: 0.9}
 
 Input: "Precio CFR Houston HLSO 16/20 con 15% glaseo"
-Output: {intent: "proforma", product: "HLSO", size: "16/20", destination: "Houston", flete_solicitado: true, glaseo_factor: 0.85, glaseo_percentage: 15, confidence: 0.95}
+Output: {intent: "proforma", product: "HLSO", size: "16/20", sizes: ["16/20"], destination: "Houston", flete_solicitado: true, glaseo_factor: 0.85, glaseo_percentage: 15, confidence: 0.95}
 
 Input: "Precio cfr de cola 20/30 con 0.25 de flete"
-Output: {intent: "proforma", product: "HLSO", size: "20/30", flete_custom: 0.25, flete_solicitado: true, glaseo_factor: null, glaseo_percentage: 0, confidence: 0.95}
+Output: {intent: "proforma", product: "HLSO", size: "20/30", sizes: ["20/30"], flete_custom: 0.25, flete_solicitado: true, glaseo_factor: null, glaseo_percentage: 0, confidence: 0.95}
 
 Input: "Necesito precios CFR Lisboa Inteiro 0% 20/30, 30/40"
 Output: {intent: "proforma", product: null, needs_product_type: true, sizes: ["20/30", "30/40"], destination: "Lisboa", flete_solicitado: true, glaseo_factor: null, glaseo_percentage: 0, confidence: 0.9}
@@ -632,9 +653,11 @@ Responde SOLO en JSON:
   "product": null | "...",
   "size": null | "...",
   "sizes": null | [...],
+  "sizes_by_product": null | {...},
   "sizes_inteiro": null | [...],
   "sizes_colas": null | [...],
   "multiple_sizes": false,
+  "multiple_products": false,
   "multiple_presentations": false,
   "needs_product_type": false,
   "product_category": null | "cocido",
@@ -648,6 +671,8 @@ Responde SOLO en JSON:
   "is_ddp": false,
   "usar_libras": false,
   "cantidad": null | "...",
+  "processing_type": null | "...",
+  "net_weight_percentage": null | number,
   "cliente_nombre": null | "...",
   "wants_proforma": false,
   "language": "es",
@@ -1235,7 +1260,8 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
         message_lower = message.lower().strip()
 
         # PRIMERO: Detectar si hay tallas (fuerte indicador de cotización)
-        has_size = bool(re.search(r'\b\d+/\d+\b', message_lower))
+        # Soporta formatos: 16/20, 16-20, 21/25, 21-25, etc.
+        has_size = bool(re.search(r'\b\d+[/-]\d+\b', message_lower))
         
         # SEGUNDO: Detectar términos de cotización/precio
         proforma_keywords = [
@@ -1698,20 +1724,55 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
 
             language = "en" if english_count > spanish_count else "es"
 
-            # Detectar cantidad
+            # Detectar tipo de procesamiento (BRINE, etc.)
+            processing_type = None
+            processing_patterns = {
+                'BRINE': ['brine', 'salmuera', 'salmoura'],
+                'IQF': ['iqf', 'individual', 'individually'],
+                'BLOCK': ['bloque', 'block', 'bloques']
+            }
+            
+            for proc_type, patterns in processing_patterns.items():
+                if any(pattern in message_lower for pattern in patterns):
+                    processing_type = proc_type
+                    break
+            
+            # Detectar porcentaje de peso neto (NET)
+            net_weight_percentage = None
+            net_patterns = [
+                r'(\d+)\s*%\s*net',  # "100% NET"
+                r'net\s*(\d+)\s*%',  # "NET 100%"
+                r'(\d+)\s*%\s*neto',  # "100% neto"
+                r'neto\s*(\d+)\s*%',  # "neto 100%"
+            ]
+            
+            for pattern in net_patterns:
+                match = re.search(pattern, message_lower)
+                if match:
+                    net_weight_percentage = int(match.group(1))
+                    break
+            
+            # Detectar cantidad con formatos variados
             quantity = None
             quantity_patterns = [
                 r'(\d+(?:,\d{3})*)\s*(?:libras?|lb|lbs)',
                 r'(\d+(?:,\d{3})*)\s*(?:kilos?|kg|kgs)',
                 r'(\d+(?:,\d{3})*)\s*(?:toneladas?|tons?)',
                 r'(\d+(?:\.\d+)?)\s*(?:mil|thousand)',
-                r'(\d+(?:,\d{3})*)\s*(?:pounds?)'
+                r'(\d+(?:,\d{3})*)\s*(?:pounds?)',
+                r'(\d+)k/caja',  # "20k/caja"
+                r'(\d+)kg/caja',  # "20kg/caja"
             ]
 
             for pattern in quantity_patterns:
                 match = re.search(pattern, message_lower)
                 if match:
-                    quantity = match.group(1)
+                    quantity_value = match.group(1)
+                    # Si es formato "20k/caja", convertir a kg
+                    if 'k/caja' in message_lower or 'kg/caja' in message_lower:
+                        quantity = f"{int(quantity_value) * 1000} kg/caja"
+                    else:
+                        quantity = quantity_value
                     break
 
             # Determinar confianza basada en información extraída
@@ -1733,6 +1794,8 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
                 "is_ddp": menciona_ddp,  # Flag para indicar que es precio DDP (ya incluye flete)
                 "usar_libras": usar_libras,
                 "cliente_nombre": cliente_nombre,
+                "processing_type": processing_type,  # Tipo de procesamiento (BRINE, IQF, etc.)
+                "net_weight_percentage": net_weight_percentage,  # Porcentaje de peso neto
                 "wants_proforma": True,
                 "language": language,  # Idioma detectado
                 "confidence": min(confidence, 0.95),  # Máximo 0.95
