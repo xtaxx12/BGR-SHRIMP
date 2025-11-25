@@ -1848,9 +1848,10 @@ Responde con el número o escribe:
                 glaseo_factor = None
 
                 glaseo_patterns = [
+                    r'^(\d+)$',  # Solo número (prioridad máxima)
                     r'(\d+)\s*%',
                     r'(\d+)\s*porciento',
-                    r'^(\d+)$'
+                    r'(\d+)\s*por\s*ciento',
                 ]
 
                 message_lower = Body.lower().strip()
@@ -1858,11 +1859,17 @@ Responde con el número o escribe:
                     match = re.search(pattern, message_lower)
                     if match:
                         glaseo_percentage = int(match.group(1))
+                        logger.info(f"✅ Glaseo detectado: {glaseo_percentage}%")
                         break
 
                 # Convertir porcentaje a factor usando función helper
-                if glaseo_percentage:
-                    glaseo_factor = glaseo_percentage_to_factor(glaseo_percentage)
+                if glaseo_percentage is not None:
+                    if glaseo_percentage == 0:
+                        glaseo_factor = None  # Sin glaseo
+                        logger.info("✅ Glaseo 0% → Sin glaseo")
+                    else:
+                        glaseo_factor = glaseo_percentage_to_factor(glaseo_percentage)
+                        logger.info(f"✅ Glaseo {glaseo_percentage}% → Factor {glaseo_factor}")
 
                 if glaseo_factor:
                     logger.info(f"📊 Calculando precios para {len(products)} productos con glaseo {glaseo_percentage}%")
@@ -1893,19 +1900,27 @@ Responde con el número o escribe:
                             failed_products.append(f"{product_data['product']} {product_data['size']}")
 
                     if products_info:
-                        # Guardar como última cotización consolidada y generar PDF automáticamente
-                        user_lang = detect_language(Body, ai_analysis)
+                        # Guardar como última cotización consolidada
                         last = {
                             'consolidated': True,
                             'products_info': products_info,
                             'glaseo_percentage': glaseo_percentage,
                             'failed_products': failed_products
-                            # NO incluir flete por defecto
                         }
                         session_manager.set_last_quote(user_id, last)
+
+                        # Detectar idioma del mensaje original (guardado en sesión)
+                        original_message = session['data'].get('message', Body)
+                        user_lang = detect_language(original_message, {})
                         session_manager.set_user_language(user_id, user_lang)
 
                         logger.info(f"📄 Generando PDF consolidado automáticamente en idioma {user_lang} para usuario {user_id}")
+                        
+                        # Extraer información adicional de la sesión
+                        processing_type = session['data'].get('processing_type')
+                        net_weight = session['data'].get('net_weight')
+                        cantidad = session['data'].get('cantidad')
+                        
                         pdf_path = pdf_generator.generate_consolidated_quote_pdf(
                             products_info,
                             From,
@@ -1920,15 +1935,31 @@ Responde con el número o escribe:
                                 pdf_path,
                                 f"Cotización Consolidada BGR Export - {len(products_info)} productos"
                             )
+                            
+                            # Construir mensaje de confirmación con información adicional
+                            confirmation_msg = f"✅ Cotización consolidada generada - {len(products_info)} productos\n"
+                            confirmation_msg += f"❄️ Glaseo: {glaseo_percentage}%\n"
+                            if processing_type:
+                                confirmation_msg += f"📦 Procesamiento: {processing_type}\n"
+                            if net_weight:
+                                confirmation_msg += f"⚖️ Peso Neto: {net_weight}%\n"
+                            if cantidad:
+                                confirmation_msg += f"📊 Cantidad: {cantidad}\n"
+                            confirmation_msg += f"🌐 Idioma: {'Español 🇪🇸' if user_lang == 'es' else 'English 🇺🇸'}"
+                            
                             if pdf_sent:
-                                response.message(f"✅ Cotización consolidada generada y enviada en {'Español' if user_lang == 'es' else 'English'} - {len(products_info)} productos")
+                                response.message(confirmation_msg)
                             else:
                                 filename = os.path.basename(pdf_path)
                                 base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
                                 download_url = f"{base_url}/webhook/download-pdf/{filename}"
-                                response.message(f"✅ Cotización generada\n📄 Descarga: {download_url}")
+                                response.message(f"{confirmation_msg}\n\n📄 Descarga: {download_url}")
+                            
+                            # Limpiar sesión después de generar exitosamente
+                            session_manager.clear_session(user_id)
                         else:
                             response.message("❌ Error generando PDF consolidado. Intenta nuevamente.")
+                            session_manager.clear_session(user_id)
                     else:
                         response.message("❌ No se pudieron calcular precios para ningún producto. Verifica los productos y tallas.")
                         session_manager.clear_session(user_id)
