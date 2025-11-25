@@ -34,8 +34,8 @@ def parse_multiple_products(message: str) -> list[dict] | None:
     # Detectar si menciona términos de producto cocido
     has_cocido = bool(re.search(r'\b(?:COCIDO|COCEDERO|COOKED|COZIDO)\b', message_upper))
 
-    # Buscar todas las tallas en el mensaje (formato XX/XX)
-    size_matches = re.finditer(r'(\d+)[/](\d+)', message)
+    # Buscar todas las tallas en el mensaje (formato XX/XX o XX-XX)
+    size_matches = re.finditer(r'(\d+)[/-](\d+)', message)
     
     for match in size_matches:
         size = f"{match.group(1)}/{match.group(2)}"
