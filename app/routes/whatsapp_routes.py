@@ -936,32 +936,58 @@ async def whatsapp_webhook(request: Request,
             # Verificar si el usuario ya especificó el glaseo en el mensaje
             glaseo_factor = ai_analysis.get('glaseo_factor') if ai_analysis else None
             glaseo_percentage = ai_analysis.get('glaseo_percentage') if ai_analysis else None
+            net_weight = ai_analysis.get('net_weight_percentage') if ai_analysis else None
 
-            logger.info(f"🔍 Glaseo detectado en análisis: factor={glaseo_factor}, percentage={glaseo_percentage}")
+            logger.info(f"🔍 Glaseo detectado en análisis: factor={glaseo_factor}, percentage={glaseo_percentage}, net_weight={net_weight}%")
+
+            # IMPORTANTE: Si menciona "100% NET" significa 0% glaseo (todo es producto)
+            if net_weight == 100 and glaseo_percentage is None:
+                glaseo_percentage = 0
+                glaseo_factor = None  # Sin glaseo
+                logger.info(f"✅ 100% NET detectado → Glaseo 0% (todo es producto, sin glaseo)")
 
             # Detectar glaseo manualmente si no se detectó
             if glaseo_percentage is None or (glaseo_percentage not in [0, 10, 20, 30] and not glaseo_factor):
                 message_lower = Body.lower()
-                glaseo_patterns = [
-                    r'(?:inteiro|entero|colas?|tails?)\s+(\d+)\s*%',  # "Inteiro 0%"
-                    r'al\s*(\d+)\s*%',
-                    r'(\d+)\s*%\s*glaseo',
-                    r'glaseo\s*(\d+)\s*%',
-                    r'con\s*(\d+)\s*glaseo',
-                    r'(\d+)\s*(?:de\s*)?glaseo',
+                message_upper = Body.upper()
+                
+                # Primero verificar si menciona "100% NET" o "NET 100%"
+                net_patterns = [
+                    r'100\s*%\s*NET',
+                    r'NET\s*100\s*%',
+                    r'100\s*%\s*NETO',
+                    r'NETO\s*100\s*%',
                 ]
-
-                for pattern in glaseo_patterns:
-                    match = re.search(pattern, message_lower)
-                    if match:
-                        glaseo_percentage = int(match.group(1))
-                        if glaseo_percentage == 0:
-                            glaseo_factor = None  # Sin glaseo
-                            logger.info(f"✅ Glaseo 0% detectado manualmente → Sin glaseo")
-                        else:
-                            glaseo_factor = glaseo_percentage_to_factor(glaseo_percentage)
-                            logger.info(f"✅ Glaseo detectado manualmente: {glaseo_percentage}% (factor {glaseo_factor})")
+                
+                for pattern in net_patterns:
+                    if re.search(pattern, message_upper):
+                        glaseo_percentage = 0
+                        glaseo_factor = None  # Sin glaseo
+                        logger.info(f"✅ 100% NET detectado manualmente → Glaseo 0% (todo es producto)")
                         break
+                
+                # Si no se detectó NET, buscar glaseo explícito
+                if glaseo_percentage is None:
+                    glaseo_patterns = [
+                        r'(?:inteiro|entero|colas?|tails?)\s+(\d+)\s*%',  # "Inteiro 0%"
+                        r'al\s*(\d+)\s*%',
+                        r'(\d+)\s*%\s*glaseo',
+                        r'glaseo\s*(\d+)\s*%',
+                        r'con\s*(\d+)\s*glaseo',
+                        r'(\d+)\s*(?:de\s*)?glaseo',
+                    ]
+
+                    for pattern in glaseo_patterns:
+                        match = re.search(pattern, message_lower)
+                        if match:
+                            glaseo_percentage = int(match.group(1))
+                            if glaseo_percentage == 0:
+                                glaseo_factor = None  # Sin glaseo
+                                logger.info(f"✅ Glaseo 0% detectado manualmente → Sin glaseo")
+                            else:
+                                glaseo_factor = glaseo_percentage_to_factor(glaseo_percentage)
+                                logger.info(f"✅ Glaseo detectado manualmente: {glaseo_percentage}% (factor {glaseo_factor})")
+                            break
 
             # Verificar si el glaseo fue especificado (incluyendo 0%)
             if glaseo_percentage is not None:
@@ -1055,17 +1081,68 @@ async def whatsapp_webhook(request: Request,
                         
                         return PlainTextResponse(str(response), media_type="application/xml")
                 
-                # Si hay producto, construir lista de productos y solicitar flete directamente
+                # Si hay producto, construir lista de productos
                 if product:
                     multiple_products = [{'product': product, 'size': size} for size in sizes_list]
                     logger.info(f"📋 Construidos {len(multiple_products)} productos con {product}")
                     
-                    # SOLICITAR FLETE DIRECTAMENTE (sin calcular precios aún)
-                    destination = ai_analysis.get('destination') if ai_analysis else None
-                    
-                    products_list = "\n".join([f"   {i+1}. {product} {size}" for i, size in enumerate(sizes_list, 1)])
-                    
-                    flete_message = f"""✅ **Productos confirmados: {len(multiple_products)} tallas**
+                    # IMPORTANTE: Si glaseo = 0% (100% NET), solicitar flete para calcular CFR
+                    # CFR = FOB + Flete (sin aplicar factor de glaseo)
+                    if glaseo_percentage == 0:
+                        logger.info(f"🚢 Glaseo 0% detectado → Solicitando flete para cálculo CFR")
+                        
+                        destination = ai_analysis.get('destination') if ai_analysis else "destino"
+                        processing_type = ai_analysis.get('processing_type') if ai_analysis else None
+                        net_weight = ai_analysis.get('net_weight_percentage') if ai_analysis else None
+                        cantidad = ai_analysis.get('cantidad') if ai_analysis else None
+                        
+                        products_list = "\n".join([f"   {i+1}. {product} {size}" for i, size in enumerate(sizes_list, 1)])
+                        
+                        # Construir mensaje con información adicional
+                        additional_info = ""
+                        if processing_type:
+                            additional_info += f"\n📦 **Procesamiento:** {processing_type}"
+                        if net_weight:
+                            additional_info += f"\n⚖️ **Peso Neto:** {net_weight}% (sin glaseo)"
+                        if cantidad:
+                            additional_info += f"\n📊 **Cantidad:** {cantidad}"
+                        
+                        flete_message = f"""✅ **Productos confirmados: {len(multiple_products)} tallas**
+
+{products_list}{additional_info}
+
+❄️ **Glaseo:** 0% (100% producto neto)
+
+🚢 **Para calcular el precio CFR necesito el valor del flete a {destination}:**
+
+💡 **Ejemplos:**
+• "flete 0.20"
+• "0.25 de flete"
+• "con flete de 0.22"
+
+¿Cuál es el valor del flete por kilo? 💰"""
+                        
+                        response.message(flete_message)
+                        
+                        # Guardar estado para esperar respuesta de flete
+                        session_manager.set_session_state(user_id, 'waiting_for_multi_flete', {
+                            'products': multiple_products,
+                            'glaseo_factor': None,  # Sin glaseo
+                            'glaseo_percentage': 0,
+                            'destination': destination,
+                            'processing_type': processing_type,
+                            'net_weight': net_weight,
+                            'cantidad': cantidad
+                        })
+                        
+                        return PlainTextResponse(str(response), media_type="application/xml")
+                    else:
+                        # Si glaseo > 0%, solicitar flete también
+                        destination = ai_analysis.get('destination') if ai_analysis else "destino"
+                        
+                        products_list = "\n".join([f"   {i+1}. {product} {size}" for i, size in enumerate(sizes_list, 1)])
+                        
+                        flete_message = f"""✅ **Productos confirmados: {len(multiple_products)} tallas**
 
 {products_list}
 
@@ -1080,18 +1157,18 @@ async def whatsapp_webhook(request: Request,
 • "con flete de 0.22"
 
 ¿Cuál es el valor del flete por kilo? 💰"""
-                    
-                    response.message(flete_message)
-                    
-                    # Guardar estado para esperar respuesta de flete
-                    session_manager.set_session_state(user_id, 'waiting_for_multi_flete', {
-                        'products': multiple_products,
-                        'glaseo_factor': glaseo_factor,
-                        'glaseo_percentage': glaseo_percentage,
-                        'destination': destination
-                    })
-                    
-                    return PlainTextResponse(str(response), media_type="application/xml")
+                        
+                        response.message(flete_message)
+                        
+                        # Guardar estado para esperar respuesta de flete
+                        session_manager.set_session_state(user_id, 'waiting_for_multi_flete', {
+                            'products': multiple_products,
+                            'glaseo_factor': glaseo_factor,
+                            'glaseo_percentage': glaseo_percentage,
+                            'destination': destination
+                        })
+                        
+                        return PlainTextResponse(str(response), media_type="application/xml")
                 else:
                     # Solicitar producto
                     response.message(f"🦐 Detecté {len(sizes_list)} tallas: {', '.join(sizes_list)}\n\n¿Qué producto necesitas?\n\nEjemplo: 'HLSO' o 'HOSO' o 'COOKED'")

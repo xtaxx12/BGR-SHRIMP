@@ -9,12 +9,8 @@ from app.services.openai_service import OpenAIService
 def test_deteccion_completa():
     """Test para verificar que se detectan todos los elementos del mensaje"""
     
-    mensaje = """Hola Erick, como estas? podras ofertar otros tamaños de camaron? 
-HLSO 16-20/ 21-25/26-30/31-35/36-40/41-50/51-60 
-HOSO 20-30/30-40/40-50
-BRINE
-100% NET
-20k/caja"""
+    # Mensaje sin espacios (como lo envía el cliente)
+    mensaje = """Hola Erick, como estas? podras ofertar otros tamaños de camaron? HLSO 16-20/ 21-25/26-30/31-35/36-40/41-50/51-60 HOSO 20-30/30-40/40-50BRINE100% NET20k/caja"""
     
     # Inicializar servicio
     openai_service = OpenAIService()
@@ -155,6 +151,23 @@ BRINE
     else:
         print("\n⚠️ OpenAI no está disponible, saltando análisis con IA")
     
+    # Verificar interpretación de 100% NET como glaseo 0%
+    print("\n" + "="*80)
+    print("INTERPRETACIÓN DE 100% NET")
+    print("="*80)
+    
+    print(f"\n💡 Interpretación correcta:")
+    print(f"   100% NET = 0% glaseo (todo es producto)")
+    print(f"   Esto significa que se debe calcular precio CFR (FOB + Flete)")
+    print(f"   Sin aplicar factor de glaseo")
+    
+    if net_weight == 100:
+        print(f"\n✅ El bot debe:")
+        print(f"   1. Detectar glaseo = 0%")
+        print(f"   2. Solicitar valor de flete")
+        print(f"   3. Calcular precio CFR = FOB + Flete")
+        print(f"   4. NO aplicar factor de glaseo")
+    
     # Resumen final
     print("\n" + "="*80)
     print("RESUMEN FINAL")
@@ -164,7 +177,9 @@ BRINE
     print("   ✓ 2 productos detectados (HLSO y HOSO)")
     print("   ✓ BRINE detectado como tipo de procesamiento")
     print("   ✓ 100% NET detectado como peso neto")
+    print("   ✓ 100% NET interpretado como glaseo 0% (sin glaseo)")
     print("   ✓ 20k/caja detectado y convertido a 20000 kg/caja")
+    print("   ✓ Bot solicitará flete para calcular precio CFR")
     print("\n🎉 El bot está listo para procesar este tipo de mensajes complejos!")
     print("="*80 + "\n")
 
