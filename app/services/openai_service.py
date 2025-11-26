@@ -1252,6 +1252,83 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
 
         return products_found
 
+    def _detect_products_and_sizes(self, message: str) -> dict:
+        """
+        Detecta productos y agrupa tallas por producto
+        
+        Returns:
+            dict con 'sizes_by_product' y 'multiple_products'
+        """
+        message_upper = message.upper()
+        
+        # Detectar productos mencionados
+        products_found = []
+        if 'HLSO' in message_upper:
+            products_found.append('HLSO')
+        if 'HOSO' in message_upper:
+            products_found.append('HOSO')
+        if 'P&D IQF' in message_upper or 'PD IQF' in message_upper:
+            products_found.append('P&D IQF')
+        if 'COOKED' in message_upper:
+            products_found.append('COOKED')
+        
+        # Si no hay productos, retornar vacío
+        if not products_found:
+            return {'sizes_by_product': None, 'multiple_products': False}
+        
+        # Extraer todas las tallas del mensaje
+        all_sizes = re.findall(r'(\d+)[/-](\d+)', message)
+        all_sizes_normalized = [f"{s[0]}/{s[1]}" for s in all_sizes]
+        
+        if not all_sizes_normalized:
+            return {'sizes_by_product': None, 'multiple_products': False}
+        
+        # Si solo hay un producto, asignar todas las tallas a ese producto
+        if len(products_found) == 1:
+            return {
+                'sizes_by_product': {products_found[0]: all_sizes_normalized},
+                'multiple_products': False
+            }
+        
+        # Si hay múltiples productos, intentar agrupar tallas por producto
+        sizes_by_product = {}
+        
+        # Buscar tallas cerca de cada producto
+        for product in products_found:
+            # Buscar el índice donde aparece el producto
+            product_index = message_upper.find(product)
+            if product_index == -1:
+                continue
+            
+            # Buscar el siguiente producto (o fin del mensaje)
+            next_product_index = len(message)
+            for other_product in products_found:
+                if other_product != product:
+                    other_index = message_upper.find(other_product, product_index + len(product))
+                    if other_index != -1 and other_index < next_product_index:
+                        next_product_index = other_index
+            
+            # Extraer tallas entre este producto y el siguiente
+            product_section = message[product_index:next_product_index]
+            product_sizes = re.findall(r'(\d+)[/-](\d+)', product_section)
+            product_sizes_normalized = [f"{s[0]}/{s[1]}" for s in product_sizes]
+            
+            if product_sizes_normalized:
+                sizes_by_product[product] = product_sizes_normalized
+        
+        # Si no se pudieron agrupar, dividir equitativamente
+        if not sizes_by_product:
+            sizes_per_product = len(all_sizes_normalized) // len(products_found)
+            for i, product in enumerate(products_found):
+                start_idx = i * sizes_per_product
+                end_idx = start_idx + sizes_per_product if i < len(products_found) - 1 else len(all_sizes_normalized)
+                sizes_by_product[product] = all_sizes_normalized[start_idx:end_idx]
+        
+        return {
+            'sizes_by_product': sizes_by_product,
+            'multiple_products': len(products_found) > 1
+        }
+    
     def _basic_intent_analysis(self, message: str) -> dict:
         """
         Análisis básico de intenciones sin IA como fallback
@@ -1775,17 +1852,25 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
                         quantity = quantity_value
                     break
 
+            # Detectar múltiples productos y agrupar tallas
+            products_detection = self._detect_products_and_sizes(message)
+            sizes_by_product = products_detection.get('sizes_by_product')
+            multiple_products = products_detection.get('multiple_products', False)
+            
             # Determinar confianza basada en información extraída
             confidence = 0.6  # Base
             if size: confidence += 0.2
             if product: confidence += 0.1
             if destination: confidence += 0.1
             if glaseo_factor: confidence += 0.1
+            if sizes_by_product: confidence += 0.1
 
             return {
                 "intent": "proforma",
                 "product": product,
                 "size": size,
+                "sizes_by_product": sizes_by_product,  # Tallas agrupadas por producto
+                "multiple_products": multiple_products,  # Flag de múltiples productos
                 "quantity": quantity,
                 "destination": destination,
                 "glaseo_factor": glaseo_factor,

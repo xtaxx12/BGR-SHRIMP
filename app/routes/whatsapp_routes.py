@@ -997,6 +997,104 @@ async def whatsapp_webhook(request: Request,
                 # Detectar producto y destino del mensaje
                 destination = ai_analysis.get('destination') if ai_analysis else None
                 product = ai_analysis.get('product') if ai_analysis else None
+                sizes_by_product = ai_analysis.get('sizes_by_product') if ai_analysis else None
+                
+                # IMPORTANTE: Si OpenAI detectó múltiples productos con sus tallas, usar esa información
+                if sizes_by_product and len(sizes_by_product) > 1:
+                    logger.info(f"✅ OpenAI detectó múltiples productos: {list(sizes_by_product.keys())}")
+                    
+                    # Construir lista de productos con sus tallas
+                    multiple_products = []
+                    for prod_type, prod_sizes in sizes_by_product.items():
+                        for size in prod_sizes:
+                            multiple_products.append({'product': prod_type, 'size': size})
+                    
+                    logger.info(f"📋 Construidos {len(multiple_products)} productos desde sizes_by_product")
+                    
+                    # Extraer información adicional
+                    processing_type = ai_analysis.get('processing_type') if ai_analysis else None
+                    net_weight = ai_analysis.get('net_weight_percentage') if ai_analysis else None
+                    cantidad = ai_analysis.get('cantidad') if ai_analysis else None
+                    
+                    # Si glaseo = 0%, solicitar flete para CFR
+                    if glaseo_percentage == 0:
+                        logger.info(f"🚢 Glaseo 0% detectado → Solicitando flete para cálculo CFR")
+                        
+                        # Construir mensaje agrupado por producto
+                        products_list = ""
+                        for prod_type, prod_sizes in sizes_by_product.items():
+                            products_list += f"\n🦐 **{prod_type}:** {', '.join(prod_sizes)}"
+                        
+                        # Construir mensaje con información adicional
+                        additional_info = ""
+                        if processing_type:
+                            additional_info += f"\n📦 **Procesamiento:** {processing_type}"
+                        if net_weight:
+                            additional_info += f"\n⚖️ **Peso Neto:** {net_weight}% (sin glaseo)"
+                        if cantidad:
+                            additional_info += f"\n📊 **Cantidad:** {cantidad}"
+                        
+                        flete_message = f"""✅ **Productos confirmados: {len(multiple_products)} tallas**
+{products_list}{additional_info}
+
+❄️ **Glaseo:** 0% (100% producto neto)
+
+🚢 **Para calcular el precio CFR necesito el valor del flete a {destination or 'destino'}:**
+
+💡 **Ejemplos:**
+• "flete 0.20"
+• "0.25 de flete"
+• "con flete de 0.22"
+
+¿Cuál es el valor del flete por kilo? 💰"""
+                        
+                        response.message(flete_message)
+                        
+                        # Guardar estado para esperar respuesta de flete
+                        session_manager.set_session_state(user_id, 'waiting_for_multi_flete', {
+                            'products': multiple_products,
+                            'glaseo_factor': None,  # Sin glaseo
+                            'glaseo_percentage': 0,
+                            'destination': destination,
+                            'processing_type': processing_type,
+                            'net_weight': net_weight,
+                            'cantidad': cantidad
+                        })
+                        
+                        return PlainTextResponse(str(response), media_type="application/xml")
+                    else:
+                        # Si glaseo > 0%, solicitar flete también
+                        # Construir mensaje agrupado por producto
+                        products_list = ""
+                        for prod_type, prod_sizes in sizes_by_product.items():
+                            products_list += f"\n🦐 **{prod_type}:** {', '.join(prod_sizes)}"
+                        
+                        flete_message = f"""✅ **Productos confirmados: {len(multiple_products)} tallas**
+{products_list}
+
+🌍 **Destino:** {destination or 'destino'}
+❄️ **Glaseo:** {glaseo_percentage}%
+
+🚢 **Para calcular el precio CFR necesito el valor del flete a {destination or 'destino'}:**
+
+💡 **Ejemplos:**
+• "flete 0.20"
+• "0.25 de flete"
+• "con flete de 0.22"
+
+¿Cuál es el valor del flete por kilo? 💰"""
+                        
+                        response.message(flete_message)
+                        
+                        # Guardar estado para esperar respuesta de flete
+                        session_manager.set_session_state(user_id, 'waiting_for_multi_flete', {
+                            'products': multiple_products,
+                            'glaseo_factor': glaseo_factor,
+                            'glaseo_percentage': glaseo_percentage,
+                            'destination': destination
+                        })
+                        
+                        return PlainTextResponse(str(response), media_type="application/xml")
                 
                 # Extraer información adicional del análisis de OpenAI
                 processing_type = ai_analysis.get('processing_type') if ai_analysis else None
