@@ -1,0 +1,12 @@
+{
+  "user_id": "synthetic_user_008",
+  "role": "assistant",
+  "original_length": 170,
+  "content": "✅ Sí, tenemos disponible HOSO 40/50 para CFR Lisboa.\n\nPara generar la cotización necesito:\n• Porcentaje de glaseo\n• Valor del flete a Lisboa\n\n¿Me confirmas estos datos? 🦐",
+  "metadata": {
+    "state": "idle",
+    "has_quote": false
+  },
+  "captured_at": "2025-11-26T12:58:33.311201",
+  "status": "pending"
+}

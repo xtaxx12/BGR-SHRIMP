@@ -1,0 +1,12 @@
+{
+  "user_id": "test_assistant_001",
+  "role": "user",
+  "original_length": 58,
+  "content": "Necesito precios para HLSO 16/20 CFR Lisboa con 20% glaseo",
+  "metadata": {
+    "state": "idle",
+    "has_quote": false
+  },
+  "captured_at": "2025-11-26T12:21:27.320799",
+  "status": "pending"
+}

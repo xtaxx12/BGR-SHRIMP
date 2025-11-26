@@ -1,0 +1,12 @@
+{
+  "user_id": "synthetic_user_004",
+  "role": "user",
+  "original_length": 48,
+  "content": "Cotizar un Contenedor de 30/40 con 0.15 de flete",
+  "metadata": {
+    "state": "idle",
+    "has_quote": false
+  },
+  "captured_at": "2025-11-26T12:58:33.162368",
+  "status": "pending"
+}

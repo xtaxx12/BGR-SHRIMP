@@ -1,0 +1,12 @@
+{
+  "user_id": "synthetic_user_006",
+  "role": "assistant",
+  "original_length": 179,
+  "content": "👋 ¡Hola! Claro que sí, puedo cotizar esos tamaños.\n\nPara generar la cotización necesito:\n• Destino (CFR/CIF)\n• Porcentaje de glaseo\n• Valor del flete\n\n¿Me confirmas estos datos? 🦐",
+  "metadata": {
+    "state": "idle",
+    "has_quote": false
+  },
+  "captured_at": "2025-11-26T12:58:33.248536",
+  "status": "pending"
+}

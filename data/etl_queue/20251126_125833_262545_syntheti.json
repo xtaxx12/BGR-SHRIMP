@@ -1,0 +1,12 @@
+{
+  "user_id": "synthetic_user_006",
+  "role": "assistant",
+  "original_length": 242,
+  "content": "✅ **Datos confirmados:**\n\n🦐 **HLSO:** 16/20, 21/25, 26/30, 31/35, 36/40, 41/50, 51/60\n🦐 **HOSO:** 20/30, 30/40, 40/50\n🌍 **Destino:** Lisboa\n❄️ **Glaseo:** 0% (100% NET)\n🚢 **Flete:** $0.20/kg\n\nGenerando cotización consolidada para 10 tallas...",
+  "metadata": {
+    "state": "idle",
+    "has_quote": false
+  },
+  "captured_at": "2025-11-26T12:58:33.262474",
+  "status": "pending"
+}

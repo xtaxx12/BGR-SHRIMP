@@ -28,6 +28,23 @@ logger = logging.getLogger(__name__)
 whatsapp_router = APIRouter()
 
 
+def capture_and_return(user_id: str, response_text: str, response: MessagingResponse) -> PlainTextResponse:
+    """
+    Helper para capturar respuesta del asistente y retornar.
+    
+    Args:
+        user_id: ID del usuario
+        response_text: Texto de la respuesta
+        response: Objeto MessagingResponse de Twilio
+        
+    Returns:
+        PlainTextResponse con XML
+    """
+    # Capturar respuesta del asistente si hay consentimiento
+    session_manager.add_to_conversation(user_id, 'assistant', response_text)
+    return PlainTextResponse(str(response), media_type="application/xml")
+
+
 @whatsapp_router.post("/whatsapp")
 @rate_limit(lambda req, **kwargs: kwargs.get('From', 'unknown'))
 async def whatsapp_webhook(request: Request,
@@ -90,20 +107,93 @@ async def whatsapp_webhook(request: Request,
                     # Confirmar al usuario que se procesó el audio
                     response.message(f"🎤 Audio recibido: \"{transcription}\"")
                 else:
-                    response.message("❌ No pude procesar el audio. Por favor, envía un mensaje de texto.")
-                    return PlainTextResponse(str(response), media_type="application/xml")
+                    error_msg = "❌ No pude procesar el audio. Por favor, envía un mensaje de texto."
+                    response.message(error_msg)
+                    return capture_and_return(user_id, error_msg, response)
             else:
-                response.message("❌ Error descargando el audio. Intenta nuevamente.")
-                return PlainTextResponse(str(response), media_type="application/xml")
+                error_msg = "❌ Error descargando el audio. Intenta nuevamente."
+                response.message(error_msg)
+                return capture_and_return(user_id, error_msg, response)
 
         # Si no hay mensaje de texto (ni transcripción), salir
         if not Body or Body.strip() == "":
-            response.message("👋 ¡Hola! Envíame un mensaje de texto o audio para ayudarte con precios de camarón.")
-            return PlainTextResponse(str(response), media_type="application/xml")
+            greeting_msg = "👋 ¡Hola! Envíame un mensaje de texto o audio para ayudarte con precios de camarón."
+            response.message(greeting_msg)
+            return capture_and_return(user_id, greeting_msg, response)
 
         # Obtener sesión del usuario
         user_id = From.replace("whatsapp:", "")
         session = session_manager.get_session(user_id)
+        
+        # 🆕 CAPTURAR MENSAJE DEL USUARIO PARA ENTRENAMIENTO (si hay consentimiento)
+        # Agregar al historial de conversación (esto activa la captura automática)
+        session_manager.add_to_conversation(user_id, 'user', Body)
+
+        # 🆕 SOLICITAR CONSENTIMIENTO PARA ENTRENAMIENTO (solo la primera vez)
+        # Solo preguntar si NO tiene timestamp de consentimiento (indicador más confiable)
+        if session.get('consent_timestamp') is None:
+            # Verificar si el mensaje es una respuesta al consentimiento
+            message_lower = Body.lower().strip()
+            
+            # Si ya está respondiendo al consentimiento
+            if session.get('state') == 'waiting_for_consent':
+                if message_lower in ['si', 'sí', 'yes', 'acepto', 'accept', '1']:
+                    session_manager.set_training_consent(user_id, True)
+                    # Marcar que ya se pidió consentimiento
+                    session_manager.set_session_state(user_id, 'idle', {'consent_asked': True})
+                    # IMPORTANTE: Actualizar la sesión local para que la verificación funcione
+                    session['consent_timestamp'] = session_manager.sessions[user_id].get('consent_timestamp')
+                    
+                    consent_response = (
+                        "✅ ¡Gracias! Tus mensajes nos ayudarán a mejorar el servicio.\n\n"
+                        "🔒 Toda tu información será anonimizada y protegida.\n\n"
+                        "Ahora, ¿en qué puedo ayudarte? 🦐"
+                    )
+                    response.message(consent_response)
+                    return capture_and_return(user_id, consent_response, response)
+                    
+                elif message_lower in ['no', 'nope', 'rechazar', 'reject', '2']:
+                    session_manager.set_training_consent(user_id, False)
+                    # Marcar que ya se pidió consentimiento
+                    session_manager.set_session_state(user_id, 'idle', {'consent_asked': True})
+                    # IMPORTANTE: Actualizar la sesión local para que la verificación funcione
+                    session['consent_timestamp'] = session_manager.sessions[user_id].get('consent_timestamp')
+                    
+                    reject_response = (
+                        "👍 Entendido. No usaremos tus mensajes para entrenamiento.\n\n"
+                        "Ahora, ¿en qué puedo ayudarte? 🦐"
+                    )
+                    response.message(reject_response)
+                    return capture_and_return(user_id, reject_response, response)
+                else:
+                    clarify_response = (
+                        "🤔 Por favor responde:\n\n"
+                        "• **Sí** o **1** para aceptar\n"
+                        "• **No** o **2** para rechazar"
+                    )
+                    response.message(clarify_response)
+                    return capture_and_return(user_id, clarify_response, response)
+            
+            # Primera interacción - solicitar consentimiento
+            else:
+                session_manager.set_session_state(user_id, 'waiting_for_consent', {})
+                
+                consent_message = (
+                    "👋 ¡Bienvenido a BGR Export!\n\n"
+                    "🤖 Soy tu asistente para cotizaciones de camarón.\n\n"
+                    "📊 **Solicitud de Consentimiento:**\n"
+                    "Para mejorar nuestro servicio, ¿autorizas que usemos tus mensajes de forma anonimizada para entrenar nuestra IA?\n\n"
+                    "🔒 **Garantizamos:**\n"
+                    "• Toda información personal será anonimizada\n"
+                    "• Cumplimos con GDPR y leyes de privacidad\n"
+                    "• Puedes revocar el consentimiento cuando quieras\n\n"
+                    "**Responde:**\n"
+                    "• **Sí** o **1** para aceptar\n"
+                    "• **No** o **2** para rechazar"
+                )
+                
+                response.message(consent_message)
+                return capture_and_return(user_id, consent_message, response)
 
         # VERIFICAR PRIMERO SI EL USUARIO ESTÁ EN UN ESTADO QUE REQUIERE RESPUESTA DIRECTA
         # Esto evita que el análisis de intención interfiera con respuestas esperadas
@@ -322,20 +412,32 @@ async def whatsapp_webhook(request: Request,
                                 f"Cotización Consolidada BGR Export - {len(products_info)} productos"
                             )
                             if pdf_sent:
-                                response.message(f"✅ Cotización consolidada generada con flete ${flete_value:.2f} - {len(products_info)} productos 🚢")
+                                success_msg = f"✅ Cotización consolidada generada con flete ${flete_value:.2f} - {len(products_info)} productos 🚢"
+                                response.message(success_msg)
+                                # 🆕 Capturar respuesta antes de limpiar sesión
+                                session_manager.add_to_conversation(user_id, 'assistant', success_msg)
                             else:
                                 filename = os.path.basename(pdf_path)
                                 base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
                                 download_url = f"{base_url}/webhook/download-pdf/{filename}"
-                                response.message(f"✅ Cotización generada\n📄 Descarga: {download_url}")
+                                download_msg = f"✅ Cotización generada\n📄 Descarga: {download_url}"
+                                response.message(download_msg)
+                                # 🆕 Capturar respuesta antes de limpiar sesión
+                                session_manager.add_to_conversation(user_id, 'assistant', download_msg)
 
                             # Limpiar sesión
                             session_manager.clear_session(user_id)
                         else:
-                            response.message("❌ Error generando PDF consolidado. Intenta nuevamente.")
+                            error_msg = "❌ Error generando PDF consolidado. Intenta nuevamente."
+                            response.message(error_msg)
+                            # 🆕 Capturar respuesta antes de limpiar sesión
+                            session_manager.add_to_conversation(user_id, 'assistant', error_msg)
                             session_manager.clear_session(user_id)
                     else:
-                        response.message("❌ No se pudieron calcular precios para ningún producto.")
+                        error_msg = "❌ No se pudieron calcular precios para ningún producto."
+                        response.message(error_msg)
+                        # 🆕 Capturar respuesta antes de limpiar sesión
+                        session_manager.add_to_conversation(user_id, 'assistant', error_msg)
                         session_manager.clear_session(user_id)
 
                     return PlainTextResponse(str(response), media_type="application/xml")
@@ -360,6 +462,8 @@ async def whatsapp_webhook(request: Request,
 ¿Cuál es el valor del flete por kilo? 💰"""
                     
                     response.message(flete_message)
+                    # 🆕 Capturar respuesta del asistente
+                    session_manager.add_to_conversation(user_id, 'assistant', flete_message)
                     
                     # Guardar estado para esperar respuesta de flete
                     session_manager.set_session_state(user_id, 'waiting_for_multi_flete', {
@@ -472,20 +576,32 @@ async def whatsapp_webhook(request: Request,
                                     f"Cotización Consolidada BGR Export - {len(products_info)} productos"
                                 )
                                 if pdf_sent:
-                                    response.message(f"✅ Cotización consolidada generada con flete ${flete_value:.2f} - {len(products_info)} productos 🚢")
+                                    success_msg = f"✅ Cotización consolidada generada con flete ${flete_value:.2f} - {len(products_info)} productos 🚢"
+                                    response.message(success_msg)
+                                    # 🆕 Capturar respuesta antes de limpiar sesión
+                                    session_manager.add_to_conversation(user_id, 'assistant', success_msg)
                                 else:
                                     filename = os.path.basename(pdf_path)
-                                    base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
+                                    base_url = os.getenv('BASE_URL', 'https://e30f03031f5a.ngrok-free.app')
                                     download_url = f"{base_url}/webhook/download-pdf/{filename}"
-                                    response.message(f"✅ Cotización generada\n📄 Descarga: {download_url}")
+                                    download_msg = f"✅ Cotización generada\n📄 Descarga: {download_url}"
+                                    response.message(download_msg)
+                                    # 🆕 Capturar respuesta antes de limpiar sesión
+                                    session_manager.add_to_conversation(user_id, 'assistant', download_msg)
 
                                 # Limpiar sesión
                                 session_manager.clear_session(user_id)
                             else:
-                                response.message("❌ Error generando PDF consolidado. Intenta nuevamente.")
+                                error_msg = "❌ Error generando PDF consolidado. Intenta nuevamente."
+                                response.message(error_msg)
+                                # 🆕 Capturar respuesta antes de limpiar sesión
+                                session_manager.add_to_conversation(user_id, 'assistant', error_msg)
                                 session_manager.clear_session(user_id)
                         else:
-                            response.message("❌ No se pudieron calcular precios para ningún producto.")
+                            error_msg = "❌ No se pudieron calcular precios para ningún producto."
+                            response.message(error_msg)
+                            # 🆕 Capturar respuesta antes de limpiar sesión
+                            session_manager.add_to_conversation(user_id, 'assistant', error_msg)
                             session_manager.clear_session(user_id)
 
                         return PlainTextResponse(str(response), media_type="application/xml")
@@ -609,20 +725,32 @@ async def whatsapp_webhook(request: Request,
                                 f"Cotización Consolidada BGR Export - {len(products_info)} productos"
                             )
                             if pdf_sent:
-                                response.message(f"✅ Cotización consolidada generada con flete ${flete_value:.2f} - {len(products_info)} productos 🚢")
+                                success_msg = f"✅ Cotización consolidada generada con flete ${flete_value:.2f} - {len(products_info)} productos 🚢"
+                                response.message(success_msg)
+                                # 🆕 Capturar respuesta antes de limpiar sesión
+                                session_manager.add_to_conversation(user_id, 'assistant', success_msg)
                             else:
                                 filename = os.path.basename(pdf_path)
                                 base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
                                 download_url = f"{base_url}/webhook/download-pdf/{filename}"
-                                response.message(f"✅ Cotización generada\n📄 Descarga: {download_url}")
+                                download_msg = f"✅ Cotización generada\n📄 Descarga: {download_url}"
+                                response.message(download_msg)
+                                # 🆕 Capturar respuesta antes de limpiar sesión
+                                session_manager.add_to_conversation(user_id, 'assistant', download_msg)
 
                             # Limpiar sesión
                             session_manager.clear_session(user_id)
                         else:
-                            response.message("❌ Error generando PDF consolidado. Intenta nuevamente.")
+                            error_msg = "❌ Error generando PDF consolidado. Intenta nuevamente."
+                            response.message(error_msg)
+                            # 🆕 Capturar respuesta antes de limpiar sesión
+                            session_manager.add_to_conversation(user_id, 'assistant', error_msg)
                             session_manager.clear_session(user_id)
                     else:
-                        response.message("❌ No se pudieron calcular precios para ningún producto.")
+                        error_msg = "❌ No se pudieron calcular precios para ningún producto."
+                        response.message(error_msg)
+                        # 🆕 Capturar respuesta antes de limpiar sesión
+                        session_manager.add_to_conversation(user_id, 'assistant', error_msg)
                         session_manager.clear_session(user_id)
 
                     return PlainTextResponse(str(response), media_type="application/xml")
@@ -1051,6 +1179,8 @@ async def whatsapp_webhook(request: Request,
 ¿Cuál es el valor del flete por kilo? 💰"""
                         
                         response.message(flete_message)
+                        # 🆕 Capturar respuesta del asistente
+                        session_manager.add_to_conversation(user_id, 'assistant', flete_message)
                         
                         # Guardar estado para esperar respuesta de flete
                         session_manager.set_session_state(user_id, 'waiting_for_multi_flete', {
@@ -1087,6 +1217,8 @@ async def whatsapp_webhook(request: Request,
 ¿Cuál es el valor del flete por kilo? 💰"""
                         
                         response.message(flete_message)
+                        # 🆕 Capturar respuesta del asistente
+                        session_manager.add_to_conversation(user_id, 'assistant', flete_message)
                         
                         # Guardar estado para esperar respuesta de flete
                         session_manager.set_session_state(user_id, 'waiting_for_multi_flete', {
@@ -1169,6 +1301,8 @@ async def whatsapp_webhook(request: Request,
                         flete_message += "¿Cuál es el valor del flete por kilo? 💰"
                         
                         response.message(flete_message)
+                        # 🆕 Capturar respuesta del asistente
+                        session_manager.add_to_conversation(user_id, 'assistant', flete_message)
                         
                         # Guardar estado para esperar el flete
                         session_manager.set_session_state(user_id, 'waiting_for_multi_flete_mixed', {
@@ -1223,6 +1357,8 @@ async def whatsapp_webhook(request: Request,
 ¿Cuál es el valor del flete por kilo? 💰"""
                         
                         response.message(flete_message)
+                        # 🆕 Capturar respuesta del asistente
+                        session_manager.add_to_conversation(user_id, 'assistant', flete_message)
                         
                         # Guardar estado para esperar respuesta de flete
                         session_manager.set_session_state(user_id, 'waiting_for_multi_flete', {
@@ -1259,6 +1395,8 @@ async def whatsapp_webhook(request: Request,
 ¿Cuál es el valor del flete por kilo? 💰"""
                         
                         response.message(flete_message)
+                        # 🆕 Capturar respuesta del asistente
+                        session_manager.add_to_conversation(user_id, 'assistant', flete_message)
                         
                         # Guardar estado para esperar respuesta de flete
                         session_manager.set_session_state(user_id, 'waiting_for_multi_flete', {
@@ -1707,6 +1845,54 @@ U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60
 
         # Comandos globales que funcionan desde cualquier estado
         message_lower = Body.lower().strip()
+
+        # 🆕 COMANDO: Gestionar consentimiento
+        if message_lower in ['consentimiento', 'consent', 'privacidad', 'privacy', 'datos']:
+            current_consent = session_manager.get_training_consent(user_id)
+            
+            consent_status_msg = (
+                "🔒 **Estado de Consentimiento**\n\n"
+                f"Estado actual: {'✅ ACEPTADO' if current_consent else '❌ NO ACEPTADO'}\n\n"
+            )
+            
+            if current_consent:
+                consent_status_msg += (
+                    "Tus mensajes se usan de forma anonimizada para mejorar el servicio.\n\n"
+                    "**Para revocar el consentimiento:**\n"
+                    "Escribe: 'revocar consentimiento' o 'no consent'\n\n"
+                    "🔒 Toda tu información está protegida y anonimizada."
+                )
+            else:
+                consent_status_msg += (
+                    "Tus mensajes NO se usan para entrenamiento.\n\n"
+                    "**Para otorgar consentimiento:**\n"
+                    "Escribe: 'acepto consentimiento' o 'accept consent'\n\n"
+                    "Esto nos ayudará a mejorar el servicio para todos."
+                )
+            
+            response.message(consent_status_msg)
+            return PlainTextResponse(str(response), media_type="application/xml")
+        
+        # 🆕 COMANDO: Revocar consentimiento
+        if message_lower in ['revocar consentimiento', 'no consent', 'revocar', 'no quiero']:
+            session_manager.set_training_consent(user_id, False)
+            response.message(
+                "✅ **Consentimiento revocado**\n\n"
+                "Tus mensajes ya NO se usarán para entrenamiento.\n\n"
+                "Puedes volver a otorgarlo cuando quieras escribiendo 'consentimiento'."
+            )
+            return PlainTextResponse(str(response), media_type="application/xml")
+        
+        # 🆕 COMANDO: Otorgar consentimiento
+        if message_lower in ['acepto consentimiento', 'accept consent', 'acepto', 'si quiero']:
+            session_manager.set_training_consent(user_id, True)
+            response.message(
+                "✅ **Consentimiento otorgado**\n\n"
+                "¡Gracias! Tus mensajes nos ayudarán a mejorar el servicio.\n\n"
+                "🔒 Toda tu información será anonimizada y protegida.\n\n"
+                "Puedes revocarlo cuando quieras escribiendo 'revocar consentimiento'."
+            )
+            return PlainTextResponse(str(response), media_type="application/xml")
 
         # DETECTAR MODIFICACIÓN DE FLETE (debe ir antes de otros comandos)
         if ai_analysis and ai_analysis.get('intent') == 'modify_flete':
@@ -2539,6 +2725,8 @@ Responde con el número o escribe:
             # Usar respuesta inteligente (IA o fallback)
             logger.debug(f"✅ Usando respuesta inteligente: {smart_response}")
             response.message(smart_response)
+            # 🆕 Capturar respuesta del asistente
+            session_manager.add_to_conversation(user_id, 'assistant', smart_response)
             logger.debug("📤 Respuesta configurada en objeto response")
             # Mantener en estado conversacional sin menú numerado
             session_manager.set_session_state(user_id, 'conversational', {})
@@ -2550,6 +2738,8 @@ Responde con el número o escribe:
             menu_msg, options = interactive_service.create_main_menu()
             full_message = f"{welcome_msg}\n\n{menu_msg}"
             response.message(full_message)
+            # 🆕 Capturar respuesta del asistente
+            session_manager.add_to_conversation(user_id, 'assistant', full_message)
             session_manager.set_session_state(user_id, 'main_menu', {'options': options})
 
         response_xml = str(response)

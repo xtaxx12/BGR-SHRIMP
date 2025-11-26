@@ -1,0 +1,12 @@
+{
+  "user_id": "synthetic_user_005",
+  "role": "assistant",
+  "original_length": 394,
+  "content": "✅ **Productos confirmados: 8 tallas**\n\n   1. HOSO 50/60\n   2. HLSO 16/20\n   3. HLSO 26/30\n   4. HLSO 36/40\n   5. HLSO 51/60\n   6. PYD TAIL OFF 61/70\n   7. EZPEEL 16/20\n   8. EZPEEL 26/30\n\n🌍 **Destino:** Houston\n❄️ **Glaseo:** 15%\n\n🚢 **Para calcular el precio CFR necesito el valor del flete a Houston:**\n\n💡 **Ejemplos:**\n• \"flete 0.20\"\n• \"0.25 de flete\"\n\n¿Cuál es el valor del flete por kilo? 💰",
+  "metadata": {
+    "state": "idle",
+    "has_quote": false
+  },
+  "captured_at": "2025-11-26T12:58:33.206932",
+  "status": "pending"
+}

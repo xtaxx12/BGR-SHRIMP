@@ -1,0 +1,12 @@
+{
+  "user_id": "synthetic_user_003",
+  "role": "user",
+  "original_length": 116,
+  "content": "hazme una proforma para el cliente jose andres con el producto 16/20 sin cabeza con 20 de glaseo con flete a houston",
+  "metadata": {
+    "state": "idle",
+    "has_quote": false
+  },
+  "captured_at": "2025-11-26T12:58:33.066804",
+  "status": "pending"
+}

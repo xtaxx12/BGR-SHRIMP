@@ -1,0 +1,12 @@
+{
+  "user_id": "synthetic_user_003",
+  "role": "assistant",
+  "original_length": 286,
+  "content": "✅ **Datos confirmados:**\n\n👤 **Cliente:** Jose Andres\n🦐 **Producto:** HLSO 16/20\n❄️ **Glaseo:** 20%\n🌍 **Destino:** Houston\n\n🚢 **Para calcular el precio CFR necesito el valor del flete a Houston:**\n\n💡 **Ejemplos:**\n• \"flete 0.20\"\n• \"0.25 de flete\"\n\n¿Cuál es el valor del flete por kilo? 💰",
+  "metadata": {
+    "state": "idle",
+    "has_quote": false
+  },
+  "captured_at": "2025-11-26T12:58:33.072813",
+  "status": "pending"
+}

@@ -1,0 +1,12 @@
+{
+  "user_id": "synthetic_user_005",
+  "role": "user",
+  "original_length": 13,
+  "content": "0.22 de flete",
+  "metadata": {
+    "state": "idle",
+    "has_quote": false
+  },
+  "captured_at": "2025-11-26T12:58:33.218478",
+  "status": "pending"
+}

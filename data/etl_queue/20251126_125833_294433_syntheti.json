@@ -1,0 +1,12 @@
+{
+  "user_id": "synthetic_user_007",
+  "role": "assistant",
+  "original_length": 73,
+  "content": "✅ Proforma generada - HLSO 21/25 con 15% glaseo y flete $0.18 a Houston 🚢",
+  "metadata": {
+    "state": "idle",
+    "has_quote": false
+  },
+  "captured_at": "2025-11-26T12:58:33.294391",
+  "status": "pending"
+}

@@ -1,0 +1,12 @@
+{
+  "user_id": "synthetic_user_004",
+  "role": "assistant",
+  "original_length": 74,
+  "content": "✅ Cotización generada - HLSO 30/40 con 20% glaseo y flete $0.15 a Lisboa 🚢",
+  "metadata": {
+    "state": "idle",
+    "has_quote": false
+  },
+  "captured_at": "2025-11-26T12:58:33.182882",
+  "status": "pending"
+}
