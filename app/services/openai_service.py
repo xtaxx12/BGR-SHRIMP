@@ -454,7 +454,7 @@ Respuesta: {
             "data": data if data is not None else {}
         }
 
-    def _make_request(self, messages: list[dict], max_tokens: int = 300, temperature: float = 0.3, use_cache: bool = True) -> str | None:
+    def _make_request(self, messages: list[dict], max_tokens: int = 300, temperature: float = 0.3, use_cache: bool = True, force_base_model: bool = False) -> str | None:
         """
         Hace una petición directa a la API de OpenAI con caché y rate limiting.
 
@@ -463,6 +463,7 @@ Respuesta: {
             max_tokens: Número máximo de tokens en la respuesta
             temperature: Temperatura para generación (0.0-1.0)
             use_cache: Si debe usar el sistema de caché (default: True)
+            force_base_model: Si True, usa gpt-3.5-turbo en lugar del modelo fine-tuned (para análisis JSON)
 
         Returns:
             Respuesta de la API o None si falla
@@ -489,8 +490,11 @@ Respuesta: {
                 "Content-Type": "application/json"
             }
 
+            # 🆕 Usar modelo base si se fuerza (para análisis JSON)
+            model_to_use = "gpt-3.5-turbo" if force_base_model else self.model
+            
             data = {
-                "model": self.model,
+                "model": model_to_use,
                 "messages": messages,
                 "max_tokens": max_tokens,
                 "temperature": temperature
@@ -695,7 +699,8 @@ Responde SOLO en JSON:
                 {"role": "user", "content": f"Mensaje: '{message}'"}
             ]
 
-            result = self._make_request(messages, max_tokens=300, temperature=0.3)
+            # 🆕 Forzar modelo base para análisis JSON (el fine-tuned responde en texto)
+            result = self._make_request(messages, max_tokens=300, temperature=0.3, force_base_model=True)
 
             if result:
                 # Intentar parsear como JSON
@@ -704,8 +709,10 @@ Responde SOLO en JSON:
                     logger.info(f"🤖 Análisis OpenAI: {parsed_result}")
                     return parsed_result
                 except json.JSONDecodeError:
-                    logger.error(f"❌ Error parseando JSON de OpenAI: {result}")
-                    return {"intent": "unknown", "confidence": 0}
+                    logger.warning(f"⚠️ Respuesta no es JSON (modelo fine-tuned?): {result[:100]}...")
+                    # 🆕 Fallback: Si el modelo fine-tuned responde en texto, usar análisis básico
+                    logger.info("🔄 Usando análisis básico como fallback")
+                    return self._basic_intent_analysis(message)
             else:
                 return {"intent": "unknown", "confidence": 0}
 
