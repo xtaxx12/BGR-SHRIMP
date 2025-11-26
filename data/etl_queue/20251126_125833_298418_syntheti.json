@@ -1,0 +1,12 @@
+{
+  "user_id": "synthetic_user_008",
+  "role": "user",
+  "original_length": 45,
+  "content": "Tienes disponible HOSO 40/50 para CFR Lisboa?",
+  "metadata": {
+    "state": "idle",
+    "has_quote": false
+  },
+  "captured_at": "2025-11-26T12:58:33.298327",
+  "status": "pending"
+}

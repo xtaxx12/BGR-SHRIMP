@@ -1,0 +1,12 @@
+{
+  "user_id": "test_assistant_001",
+  "role": "assistant",
+  "original_length": 65,
+  "content": "✅ Cotización consolidada generada con flete $0.20 - 7 productos 🚢",
+  "metadata": {
+    "state": "idle",
+    "has_quote": false
+  },
+  "captured_at": "2025-11-26T12:21:27.327908",
+  "status": "pending"
+}

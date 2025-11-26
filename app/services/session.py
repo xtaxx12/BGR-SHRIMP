@@ -64,6 +64,14 @@ class SessionManager:
             session['conversation_history'] = session['conversation_history'][-20:]
 
         logger.debug(f"Mensaje agregado al historial de {user_id}: {role}")
+        
+        # 🆕 Guardar sesiones después de agregar mensaje
+        self._save_sessions()
+        
+        # 🆕 ETL: Capturar mensaje para entrenamiento si hay consentimiento
+        # Capturar tanto mensajes de usuario como respuestas del asistente
+        if session.get('consent_for_training'):
+            self._capture_for_training(user_id, content, role)
 
     def get_conversation_history(self, user_id: str) -> list:
         """
@@ -118,19 +126,33 @@ class SessionManager:
 
     def clear_session(self, user_id: str):
         """
-        Limpia la sesión del usuario (preserva idioma y última cotización)
+        Limpia la sesión del usuario (preserva idioma, última cotización y consentimiento)
         """
         if user_id in self.sessions:
-            # Preservar idioma y última cotización al limpiar sesión
+            # Preservar datos importantes al limpiar sesión
             language = self.sessions[user_id].get('language', 'es')
             last_quote = self.sessions[user_id].get('last_quote')
+            # 🆕 Preservar consentimiento
+            consent_for_training = self.sessions[user_id].get('consent_for_training')
+            consent_timestamp = self.sessions[user_id].get('consent_timestamp')
+            consent_asked = self.sessions[user_id].get('consent_asked')
+            
             del self.sessions[user_id]
             # Recrear sesión con datos preservados
             self.get_session(user_id)
             self.sessions[user_id]['language'] = language
+            
             if last_quote:
                 self.sessions[user_id]['last_quote'] = last_quote
                 logger.debug(f"Cotización preservada después de limpiar sesión para {user_id}")
+            
+            # 🆕 Restaurar consentimiento
+            if consent_timestamp is not None:
+                self.sessions[user_id]['consent_for_training'] = consent_for_training
+                self.sessions[user_id]['consent_timestamp'] = consent_timestamp
+                self.sessions[user_id]['consent_asked'] = consent_asked
+                logger.debug(f"Consentimiento preservado después de limpiar sesión para {user_id}")
+            
             self._save_sessions()
 
     def _cleanup_expired_sessions(self, current_time: float):
@@ -171,6 +193,88 @@ class SessionManager:
                         logger.info(f"Cargadas {len(self.sessions)} sesiones desde disco")
             except Exception as e:
                 logger.error(f"Error cargando sessions file: {e}")
+
+    # 🆕 MÉTODOS PARA ENTRENAMIENTO Y CONSENTIMIENTO
+    
+    def set_training_consent(self, user_id: str, consent: bool):
+        """
+        Establece el consentimiento del usuario para usar sus mensajes en entrenamiento.
+        
+        Args:
+            user_id: ID del usuario
+            consent: True si acepta, False si no
+        """
+        session = self.get_session(user_id)
+        session['consent_for_training'] = consent
+        session['consent_timestamp'] = time.time()
+        self._save_sessions()
+        logger.info(f"✅ Consentimiento de entrenamiento para {user_id}: {consent}")
+    
+    def get_training_consent(self, user_id: str) -> bool:
+        """
+        Obtiene el consentimiento del usuario para entrenamiento.
+        
+        Args:
+            user_id: ID del usuario
+            
+        Returns:
+            True si ha dado consentimiento
+        """
+        session = self.get_session(user_id)
+        return session.get('consent_for_training', False)
+    
+    def _capture_for_training(self, user_id: str, content: str, role: str):
+        """
+        Captura un mensaje para el pipeline de entrenamiento.
+        
+        Args:
+            user_id: ID del usuario
+            content: Contenido del mensaje
+            role: Rol (user/assistant)
+        """
+        try:
+            # Importar aquí para evitar dependencias circulares
+            from app.services.training_pipeline import get_training_pipeline
+            
+            pipeline = get_training_pipeline()
+            
+            # Capturar con metadatos
+            metadata = {
+                'state': self.sessions[user_id].get('state'),
+                'has_quote': 'last_quote' in self.sessions[user_id],
+            }
+            
+            pipeline.capture_message(user_id, content, role, metadata)
+            
+        except Exception as e:
+            logger.error(f"❌ Error capturando mensaje para entrenamiento: {str(e)}")
+    
+    def export_training_data(self, user_id: str = None) -> dict:
+        """
+        Exporta datos de entrenamiento.
+        
+        Args:
+            user_id: Si se especifica, solo exporta de ese usuario
+            
+        Returns:
+            Estadísticas de exportación
+        """
+        try:
+            from app.services.training_pipeline import get_training_pipeline
+            
+            pipeline = get_training_pipeline()
+            train_count, valid_count = pipeline.export_for_finetune()
+            
+            return {
+                'success': True,
+                'train_examples': train_count,
+                'valid_examples': valid_count,
+                'total': train_count + valid_count
+            }
+        except Exception as e:
+            logger.error(f"❌ Error exportando datos de entrenamiento: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
 
 # Instancia global del manejador de sesiones
 session_manager = SessionManager()

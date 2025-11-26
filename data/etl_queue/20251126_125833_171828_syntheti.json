@@ -1,0 +1,12 @@
+{
+  "user_id": "synthetic_user_004",
+  "role": "assistant",
+  "original_length": 243,
+  "content": "✅ **Producto confirmado:**\n\n🦐 **Talla:** 30/40\n🚢 **Flete:** $0.15/kg\n\nPara generar la cotización necesito:\n• ¿Qué producto? (HLSO, HOSO, COOKED, etc.)\n• ¿Destino? (CFR a qué puerto?)\n• ¿Porcentaje de glaseo?\n\nPor favor especifica estos datos 🦐",
+  "metadata": {
+    "state": "idle",
+    "has_quote": false
+  },
+  "captured_at": "2025-11-26T12:58:33.171753",
+  "status": "pending"
+}

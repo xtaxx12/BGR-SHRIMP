@@ -1,0 +1,12 @@
+{
+  "user_id": "[PHONE]",
+  "role": "assistant",
+  "original_length": 343,
+  "content": "🦐 ¡Hola! Bienvenido a *ShrimpBot* 🤖\n\n✨ Tu asistente virtual especializado en precios de camarón de BGR Export\n\n🌊 Estoy aquí para ayudarte con consultas de precios, productos y más información sobre nuestros camarones de alta calidad.\n\n🦐 ¿En qué podemos ayudarte?\n\n1️⃣ 💰 Consultar Precios\n2️⃣ 📋 Información de Productos\n3️⃣ 📞 Contacto Comercial",
+  "metadata": {
+    "state": "idle",
+    "has_quote": true
+  },
+  "captured_at": "2025-11-26T12:17:42.287886",
+  "status": "pending"
+}

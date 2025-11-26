@@ -1,0 +1,12 @@
+{
+  "user_id": "synthetic_user_008",
+  "role": "user",
+  "original_length": 22,
+  "content": "20% glaseo, flete 0.22",
+  "metadata": {
+    "state": "idle",
+    "has_quote": false
+  },
+  "captured_at": "2025-11-26T12:58:33.321891",
+  "status": "pending"
+}

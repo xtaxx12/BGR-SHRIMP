@@ -1,0 +1,12 @@
+{
+  "user_id": "[PHONE]",
+  "role": "assistant",
+  "original_length": 351,
+  "content": "✅ **Cotización consolidada detectada:**\n\n🦐 **Inteiro (Entero):** 20/30, 30/40, 40/50\n🦐 **Colas:** 21/25, 31/35, 36/40, 41/50\n🌍 **Destino:** Lisboa\n❄️ **Glaseo:** 0%\n\n� **Para ca¿lcular el precio CFR necesito el valor del flete a Lisboa:**\n\n💡 **Ejemplos:**\n• \"flete 0.20\"\n• \"0.25 de flete\"\n• \"con flete de 0.22\"\n\n¿Cuál es el valor del flete por kilo? 💰",
+  "metadata": {
+    "state": "main_menu",
+    "has_quote": true
+  },
+  "captured_at": "2025-11-26T12:22:28.891740",
+  "status": "pending"
+}

@@ -1,0 +1,12 @@
+{
+  "user_id": "synthetic_user_001",
+  "role": "user",
+  "original_length": 207,
+  "content": "Buenas Tardes\nNecesito precios para Contenedor Lagostino Vannamei Color A3 calidad Cocedero CFR Lisboa para lo siguiente talles:\nInteiro 0%\n20/30\n30/40\n40/50\n\nColas Talle Real 1.7 kg.\n21/25\n31/35\n36/40\n41/50",
+  "metadata": {
+    "state": "idle",
+    "has_quote": false
+  },
+  "captured_at": "2025-11-26T12:58:32.825035",
+  "status": "pending"
+}

@@ -236,6 +236,10 @@ app.include_router(admin_router, prefix="/webhook", tags=["admin"])
 app.include_router(test_router, prefix="/webhook", tags=["test"])
 app.include_router(pdf_router, prefix="/webhook", tags=["pdf"])
 
+# 🆕 Rutas de entrenamiento
+from app.routes.training_routes import training_router
+app.include_router(training_router, prefix="/webhook", tags=["training"])
+
 # Endpoints de sistema
 @app.get(
     "/",

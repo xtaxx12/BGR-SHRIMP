@@ -1,0 +1,12 @@
+{
+  "user_id": "synthetic_user_004",
+  "role": "user",
+  "original_length": 30,
+  "content": "HLSO CFR Lisboa con 20% glaseo",
+  "metadata": {
+    "state": "idle",
+    "has_quote": false
+  },
+  "captured_at": "2025-11-26T12:58:33.178014",
+  "status": "pending"
+}

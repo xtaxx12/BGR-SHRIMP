@@ -48,7 +48,11 @@ class OpenAIService:
     def __init__(self):
         """Inicializa el servicio OpenAI con configuración optimizada."""
         self.api_key = os.getenv("OPENAI_API_KEY")
-        self.model = "gpt-3.5-turbo"
+        
+        # 🆕 Modelo fine-tuned (configurable desde .env)
+        # Si OPENAI_FINETUNED_MODEL está configurado, úsalo; si no, usa el modelo base
+        self.model = os.getenv("OPENAI_FINETUNED_MODEL", "gpt-3.5-turbo")
+        
         self.whisper_model = "whisper-1"
         self.base_url = "https://api.openai.com/v1"
 
@@ -60,6 +64,12 @@ class OpenAIService:
         # Métricas de rate limiting
         self._rate_limit_hits = 0
         self._last_request_time = 0
+        
+        # 🆕 Log del modelo en uso
+        if "ft:" in self.model:
+            logger.info(f"🎯 Usando modelo FINE-TUNED: {self.model}")
+        else:
+            logger.info(f"🤖 Usando modelo BASE: {self.model}")
 
 
     def is_available(self) -> bool:

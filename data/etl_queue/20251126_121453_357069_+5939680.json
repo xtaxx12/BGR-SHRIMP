@@ -1,0 +1,12 @@
+{
+  "user_id": "[PHONE]",
+  "role": "assistant",
+  "original_length": 129,
+  "content": "✅ Cotización generada\n📄 Descarga: https://localhost:8000/webhook/download-pdf/cotizacion_BGR_consolidada_[PHONE]_121453_8769.pdf",
+  "metadata": {
+    "state": "waiting_for_multi_flete",
+    "has_quote": true
+  },
+  "captured_at": "2025-11-26T12:14:53.357026",
+  "status": "pending"
+}

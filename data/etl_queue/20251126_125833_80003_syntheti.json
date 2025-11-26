@@ -1,0 +1,12 @@
+{
+  "user_id": "synthetic_user_003",
+  "role": "user",
+  "original_length": 10,
+  "content": "flete 0.25",
+  "metadata": {
+    "state": "idle",
+    "has_quote": false
+  },
+  "captured_at": "2025-11-26T12:58:33.079915",
+  "status": "pending"
+}
