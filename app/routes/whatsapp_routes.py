@@ -388,7 +388,9 @@ async def whatsapp_webhook(request: Request,
                 glaseo_percentage = session['data'].get('glaseo_percentage')
                 is_ddp = session['data'].get('is_ddp', False)
 
-                if products and glaseo_factor:
+                # IMPORTANTE: glaseo_percentage puede ser 0 (sin glaseo), lo cual es válido
+                # En ese caso glaseo_factor será None
+                if products and glaseo_percentage is not None:
                     # Intentar extraer el valor del flete del mensaje
                     flete_value = None
 
