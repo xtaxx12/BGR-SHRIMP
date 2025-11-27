@@ -1385,15 +1385,27 @@ async def whatsapp_webhook(request: Request,
                             sizes_inteiro = sizes_list[:len(sizes_list)//2] if len(sizes_list) > 1 else []
                             sizes_colas = sizes_list[len(sizes_list)//2:] if len(sizes_list) > 1 else sizes_list
                         
+                        # 🆕 IMPORTANTE: Verificar que todas las tallas del mensaje estén incluidas
+                        # Si hay tallas que no están en ninguna lista, agregarlas a ambas para validación
+                        all_detected_sizes = set(sizes_inteiro + sizes_colas)
+                        missing_sizes = [s for s in sizes_list if s not in all_detected_sizes]
+                        if missing_sizes:
+                            logger.warning(f"⚠️ Tallas no asignadas a Inteiro/Colas: {missing_sizes}")
+                            # Agregar a colas por defecto (más común)
+                            sizes_colas.extend(missing_sizes)
+                        
                         logger.info(f"📏 Tallas Inteiro: {sizes_inteiro}")
                         logger.info(f"📏 Tallas Colas: {sizes_colas}")
+                        logger.info(f"📏 Todas las tallas detectadas en mensaje: {sizes_list}")
                         
                         # 🆕 VALIDACIÓN TEMPRANA: Construir lista de productos y validar
                         mixed_products = []
                         for size in sizes_inteiro:
                             mixed_products.append({'product': 'HOSO', 'size': size})
+                            logger.info(f"   Agregado para validación: HOSO {size}")
                         for size in sizes_colas:
                             mixed_products.append({'product': 'HLSO', 'size': size})
+                            logger.info(f"   Agregado para validación: HLSO {size}")
                         
                         es_valido, productos_no_disponibles = validate_products_early(
                             mixed_products, pricing_service, response, user_id
