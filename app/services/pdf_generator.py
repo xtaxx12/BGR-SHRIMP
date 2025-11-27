@@ -211,11 +211,24 @@ class PDFGenerator:
             logger.info("🔍 PDF Generator - Todos los precios:")
             logger.info(f"   - precio_kg: ${price_info.get('precio_kg', 0):.2f}")
             logger.info(f"   - precio_fob_kg: ${price_info.get('precio_fob_kg', 0):.2f}")
-            logger.info(f"   - precio_glaseo_kg: ${price_info.get('precio_glaseo_kg', 0):.2f}")
-            logger.info(f"   - precio_fob_con_glaseo_kg: ${price_info.get('precio_fob_con_glaseo_kg', 0):.2f}")
+            
+            # Manejar precio_glaseo_kg que puede ser None
+            precio_glaseo = price_info.get('precio_glaseo_kg')
+            if precio_glaseo is not None:
+                logger.info(f"   - precio_glaseo_kg: ${precio_glaseo:.2f}")
+            else:
+                logger.info(f"   - precio_glaseo_kg: N/A (sin glaseo)")
+            
+            # Manejar precio_fob_con_glaseo_kg que puede ser None
+            precio_fob_glaseo = price_info.get('precio_fob_con_glaseo_kg')
+            if precio_fob_glaseo is not None:
+                logger.info(f"   - precio_fob_con_glaseo_kg: ${precio_fob_glaseo:.2f}")
+            else:
+                logger.info(f"   - precio_fob_con_glaseo_kg: N/A (sin glaseo)")
+            
             logger.info(f"   - precio_final_kg: ${price_info.get('precio_final_kg', 0):.2f}")
             logger.info(f"   - flete: ${price_info.get('flete', 0):.2f}")
-            logger.info(f"   - factor_glaseo: {price_info.get('factor_glaseo', 0)}")
+            logger.info(f"   - factor_glaseo: {price_info.get('factor_glaseo', 'N/A')}")
 
             # Tabla del precio con diseño destacado
             precio_data = [[t["precio_header"]], [f'${precio_final:.2f}']]
