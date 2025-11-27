@@ -81,8 +81,11 @@ async def get_pending_reviews(
         Lista paginada de items con status='needs_review'
     """
     try:
-        review = get_review_service()
-        items, total = review.get_pending_reviews(
+        # 🆕 Usar el nuevo sistema de captura con base de datos
+        from app.services.training_capture_db import get_capture_service
+        
+        capture = get_capture_service()
+        items, total = capture.get_pending_reviews(
             limit=limit,
             offset=offset,
             sort_by=sort_by,
@@ -94,7 +97,7 @@ async def get_pending_reviews(
             "total": total,
             "limit": limit,
             "offset": offset,
-            "items": [item.to_dict() for item in items]
+            "items": items
         }
     except Exception as e:
         logger.error(f"❌ Error listando items pendientes: {str(e)}")
@@ -409,4 +412,63 @@ async def get_review_summary():
         }
     except Exception as e:
         logger.error(f"❌ Error obteniendo resumen: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@review_router.get("/debug/filesystem")
+async def debug_filesystem():
+    """
+    Endpoint de debug para verificar el estado del filesystem.
+    
+    Returns:
+        Información sobre directorios y archivos
+    """
+    try:
+        from pathlib import Path
+        import os
+        
+        data_dir = Path("data")
+        
+        info = {
+            "data_dir_exists": data_dir.exists(),
+            "data_dir_path": str(data_dir.absolute()),
+            "subdirectories": {},
+            "total_files": 0,
+        }
+        
+        # Verificar subdirectorios
+        subdirs = ["etl_queue", "processed", "rejected", "approved"]
+        for subdir in subdirs:
+            subdir_path = data_dir / subdir
+            if subdir_path.exists():
+                files = list(subdir_path.glob("*.json"))
+                info["subdirectories"][subdir] = {
+                    "exists": True,
+                    "path": str(subdir_path.absolute()),
+                    "file_count": len(files),
+                    "files": [f.name for f in files[:10]]  # Primeros 10
+                }
+                info["total_files"] += len(files)
+            else:
+                info["subdirectories"][subdir] = {
+                    "exists": False,
+                    "path": str(subdir_path.absolute())
+                }
+        
+        # Verificar permisos de escritura
+        try:
+            test_file = data_dir / "test_write.txt"
+            test_file.write_text("test")
+            test_file.unlink()
+            info["writable"] = True
+        except Exception as e:
+            info["writable"] = False
+            info["write_error"] = str(e)
+        
+        return {
+            "success": True,
+            "filesystem_info": info
+        }
+    except Exception as e:
+        logger.error(f"❌ Error en debug filesystem: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

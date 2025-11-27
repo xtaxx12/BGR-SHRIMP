@@ -233,10 +233,10 @@ class SessionManager:
             role: Rol (user/assistant)
         """
         try:
-            # Importar aquí para evitar dependencias circulares
-            from app.services.training_pipeline import get_training_pipeline
+            # 🆕 Usar el nuevo sistema de captura con base de datos
+            from app.services.training_capture_db import get_capture_service
             
-            pipeline = get_training_pipeline()
+            capture = get_capture_service()
             
             # Capturar con metadatos
             metadata = {
@@ -244,7 +244,7 @@ class SessionManager:
                 'has_quote': 'last_quote' in self.sessions[user_id],
             }
             
-            pipeline.capture_message(user_id, content, role, metadata)
+            capture.capture_message(user_id, content, role, metadata)
             
         except Exception as e:
             logger.error(f"❌ Error capturando mensaje para entrenamiento: {str(e)}")
