@@ -182,9 +182,10 @@ class PricingService:
                 glaseo_factor = None  # No aplicar glaseo
                 glaseo_especificado = False  # Marcar como no especificado para cálculo simple
             elif flete_solicitado and not glaseo_especificado:
-                logger.info("📊 CFR sin glaseo especificado → Cálculo simple: FOB + Flete")
-                # Usar glaseo por defecto solo para cálculos internos, pero no aplicarlo al CFR
-                glaseo_factor = 0.80  # Valor por defecto para cálculos internos
+                logger.info("📊 CFR sin glaseo especificado → Cálculo simple: FOB + Flete (sin glaseo)")
+                # NO aplicar glaseo por defecto - el usuario debe especificarlo
+                glaseo_factor = None  # Sin glaseo
+                glaseo_especificado = False  # Marcar como no especificado para cálculo simple
             elif not flete_solicitado and not glaseo_especificado:
                 # No solicita flete ni glaseo → Requiere al menos uno
                 logger.warning("❌ Se requiere glaseo o flete para generar cotización")

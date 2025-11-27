@@ -96,12 +96,10 @@ class ExcelLocalCalculatorService:
         """
         try:
             # Usar factores personalizados o por defecto
-            # Si glaseo_factor es None y glaseo_especificado es False → usar por defecto para cálculos internos
+            # Si glaseo_factor es None y glaseo_especificado es False → NO aplicar glaseo (CFR simple)
             # Si glaseo_factor es None y glaseo_especificado es True → no aplicar glaseo (0%)
-            if glaseo_factor is None and not glaseo_especificado:
-                glaseo = self.factor_glaseo  # Usar por defecto
-            elif glaseo_factor is None and glaseo_especificado:
-                glaseo = 1.0  # 0% glaseo = factor 1.0 (sin reducción)
+            if glaseo_factor is None:
+                glaseo = None  # No aplicar glaseo
             else:
                 glaseo = glaseo_factor
                 
@@ -136,11 +134,15 @@ class ExcelLocalCalculatorService:
                 precio_neto_kg = precio_neto_preciso
                 logger.info(f"🎯 Confirmado precio neto preciso: {precio_neto_kg}")
 
-            # 2. Precio con glaseo = Precio neto × Factor glaseo
-            precio_glaseo_kg = precio_neto_kg * glaseo
-
-            # 3. Precio FOB con glaseo = Precio glaseo + Costo fijo (según tu Excel: 11.75 + 0.29 = 12.04)
-            precio_fob_con_glaseo_kg = precio_glaseo_kg + self.costo_fijo
+            # 2. Precio con glaseo = Precio neto × Factor glaseo (solo si se especificó glaseo)
+            if glaseo is not None:
+                precio_glaseo_kg = precio_neto_kg * glaseo
+                # 3. Precio FOB con glaseo = Precio glaseo + Costo fijo (según tu Excel: 11.75 + 0.29 = 12.04)
+                precio_fob_con_glaseo_kg = precio_glaseo_kg + self.costo_fijo
+            else:
+                # Sin glaseo: no calcular estos valores
+                precio_glaseo_kg = None
+                precio_fob_con_glaseo_kg = None
 
             # 4. Precio final CFR - LÓGICA CORREGIDA
             if glaseo_especificado:
@@ -156,8 +158,8 @@ class ExcelLocalCalculatorService:
             lb_conversion = 2.20462262185
             precio_fob_lb = precio_fob_kg / lb_conversion
             precio_neto_lb = precio_neto_kg / lb_conversion
-            precio_glaseo_lb = precio_glaseo_kg / lb_conversion
-            precio_fob_con_glaseo_lb = precio_fob_con_glaseo_kg / lb_conversion
+            precio_glaseo_lb = precio_glaseo_kg / lb_conversion if precio_glaseo_kg is not None else None
+            precio_fob_con_glaseo_lb = precio_fob_con_glaseo_kg / lb_conversion if precio_fob_con_glaseo_kg is not None else None
             precio_final_lb = precio_final_kg / lb_conversion
 
             # Almacenar valores con máxima precisión interna
@@ -179,10 +181,10 @@ class ExcelLocalCalculatorService:
                 'precio_fob_lb': round(precio_fob_lb, 2),
                 'precio_neto_kg': round(precio_neto_kg, 2),  # Este es el "precio fob - costo fijo"
                 'precio_neto_lb': round(precio_neto_lb, 2),
-                'precio_glaseo_kg': round(precio_glaseo_kg, 2),  # Solo glaseo (11.75)
-                'precio_glaseo_lb': round(precio_glaseo_lb, 2),
-                'precio_fob_con_glaseo_kg': round(precio_fob_con_glaseo_kg, 2),  # Glaseo + costo fijo (12.04)
-                'precio_fob_con_glaseo_lb': round(precio_fob_con_glaseo_lb, 2),
+                'precio_glaseo_kg': round(precio_glaseo_kg, 2) if precio_glaseo_kg is not None else None,  # Solo glaseo (11.75)
+                'precio_glaseo_lb': round(precio_glaseo_lb, 2) if precio_glaseo_lb is not None else None,
+                'precio_fob_con_glaseo_kg': round(precio_fob_con_glaseo_kg, 2) if precio_fob_con_glaseo_kg is not None else None,  # Glaseo + costo fijo (12.04)
+                'precio_fob_con_glaseo_lb': round(precio_fob_con_glaseo_lb, 2) if precio_fob_con_glaseo_lb is not None else None,
                 'precio_final_kg': round(precio_final_kg, 2),  # FOB con glaseo + flete
                 'precio_final_lb': round(precio_final_lb, 2),
 
@@ -195,8 +197,11 @@ class ExcelLocalCalculatorService:
             logger.info("✅ Cálculo completado:")
             logger.info(f"   🚢 FOB: ${result['precio_fob_kg']}/kg (preciso: {precio_fob_kg})")
             logger.info(f"   📊 Neto: ${result['precio_neto_kg']}/kg (preciso: {precio_neto_kg})")
-            logger.info(f"   ❄️ Glaseo: ${result['precio_glaseo_kg']}/kg (preciso: {precio_glaseo_kg})")
-            logger.info(f"   💰 FOB con glaseo: ${result['precio_fob_con_glaseo_kg']}/kg (preciso: {precio_fob_con_glaseo_kg})")
+            if precio_glaseo_kg is not None:
+                logger.info(f"   ❄️ Glaseo: ${result['precio_glaseo_kg']}/kg (preciso: {precio_glaseo_kg})")
+                logger.info(f"   💰 FOB con glaseo: ${result['precio_fob_con_glaseo_kg']}/kg (preciso: {precio_fob_con_glaseo_kg})")
+            else:
+                logger.info(f"   ❄️ Sin glaseo especificado")
             logger.info(f"   ✈️ Final CFR: ${result['precio_final_kg']}/kg (preciso: {precio_final_kg})")
 
             return result
