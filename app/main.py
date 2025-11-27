@@ -244,6 +244,10 @@ app.include_router(training_router, prefix="/webhook", tags=["training"])
 from app.routes.rag_routes import rag_router
 app.include_router(rag_router, prefix="/webhook", tags=["rag"])
 
+# 🆕 Rutas de Revisión Humana de datos de entrenamiento
+from app.routes.review_routes import review_router
+app.include_router(review_router, prefix="/webhook", tags=["review"])
+
 # Endpoints de sistema
 @app.get(
     "/",
