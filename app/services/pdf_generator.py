@@ -143,15 +143,15 @@ class PDFGenerator:
             cliente = price_info.get('cliente_nombre', 'Cliente')
             # Usar solo el país para el destino en el PDF (ya calculado arriba)
             destino = destino_pais if destino_pais else 'N/A'
-            glaseo_factor = price_info.get('factor_glaseo') or price_info.get('glaseo_factor')
+            glaseo_factor = price_info.get('factor_glaseo') if price_info.get('factor_glaseo') is not None else price_info.get('glaseo_factor')
             glaseo_percentage = price_info.get('glaseo_percentage')  # Porcentaje original
             fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
 
             # Calcular porcentaje de glaseo para mostrar en el PDF
-            # IMPORTANTE: glaseo_percentage puede ser 0 (sin glaseo)
+            # IMPORTANTE: glaseo_percentage puede ser 0 (sin glaseo) o None (no especificado)
             if glaseo_percentage is not None:
                 glaseo_display = f"{glaseo_percentage}%"
-            elif glaseo_factor:
+            elif glaseo_factor is not None:
                 # Calcular porcentaje desde el factor: factor 0.80 = 20% glaseo
                 glaseo_percent_calc = int((1 - glaseo_factor) * 100)
                 glaseo_display = f"{glaseo_percent_calc}%"
