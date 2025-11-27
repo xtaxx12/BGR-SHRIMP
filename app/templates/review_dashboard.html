@@ -290,6 +290,7 @@
             <button onclick="filterMessages('rejected')">Rechazados</button>
             <button onclick="filterMessages('all')">Todos</button>
             <button class="refresh-btn" onclick="exportTrainingData()" style="background: #27ae60;">📦 Exportar</button>
+            <button class="refresh-btn" onclick="uploadToOpenAI()" style="background: #3498db;">☁️ Subir a OpenAI</button>
             <button class="refresh-btn" onclick="loadMessages()">🔄 Actualizar</button>
         </div>
         
@@ -499,9 +500,81 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert(`✅ Exportados ${data.num_pairs} pares de entrenamiento\n\nArchivo: ${data.output_path}\n\nAhora puedes subir este archivo a OpenAI para fine-tuning.`);
+                    alert(`✅ Exportados ${data.num_pairs} pares de entrenamiento\n\nArchivo: ${data.output_path}\n\nAhora puedes subir este archivo a OpenAI con el botón "☁️ Subir a OpenAI".`);
                 } else {
                     alert('⚠️ ' + data.message);
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            }
+        }
+        
+        async function uploadToOpenAI() {
+            if (!confirm('¿Subir archivo de entrenamiento a OpenAI?\n\nEsto subirá el archivo train.jsonl a tu cuenta de OpenAI para fine-tuning.')) return;
+            
+            try {
+                // Mostrar loading
+                const originalText = event.target.textContent;
+                event.target.textContent = '⏳ Subiendo...';
+                event.target.disabled = true;
+                
+                const response = await fetch('/webhook/review/upload-to-openai', {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                // Restaurar botón
+                event.target.textContent = originalText;
+                event.target.disabled = false;
+                
+                if (data.success) {
+                    const message = `✅ Archivo subido exitosamente a OpenAI\n\n` +
+                                  `📋 File ID: ${data.file_id}\n` +
+                                  `📊 Ejemplos: ${data.num_examples}\n` +
+                                  `📈 Status: ${data.status}\n\n` +
+                                  `🚀 Próximo paso:\n` +
+                                  `Crear un job de fine-tuning con este comando:\n\n` +
+                                  `openai api fine_tuning.jobs.create -t ${data.file_id} -m gpt-3.5-turbo\n\n` +
+                                  `O usa el botón "Crear Fine-tuning Job" (próximamente)`;
+                    
+                    alert(message);
+                    
+                    // Preguntar si quiere crear el job ahora
+                    if (confirm('¿Quieres crear el job de fine-tuning ahora?')) {
+                        createFinetuningJob(data.file_id);
+                    }
+                } else {
+                    alert('⚠️ ' + data.message + '\n\n' + (data.can_upload === false ? 'Necesitas al menos 10 ejemplos aprobados para fine-tuning efectivo.' : ''));
+                }
+            } catch (error) {
+                event.target.textContent = originalText;
+                event.target.disabled = false;
+                alert('❌ Error: ' + error.message);
+            }
+        }
+        
+        async function createFinetuningJob(fileId) {
+            try {
+                const response = await fetch(`/webhook/review/create-finetuning-job?file_id=${fileId}`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const message = `✅ Job de fine-tuning creado exitosamente\n\n` +
+                                  `📋 Job ID: ${data.job_id}\n` +
+                                  `📈 Status: ${data.status}\n` +
+                                  `🤖 Modelo: ${data.model}\n\n` +
+                                  `⏱️ El entrenamiento tomará entre 10-30 minutos.\n\n` +
+                                  `Puedes monitorear el progreso en:\n` +
+                                  `https://platform.openai.com/finetune\n\n` +
+                                  `Cuando termine, actualiza tu .env con el nuevo modelo ID.`;
+                    
+                    alert(message);
+                } else {
+                    alert('❌ Error: ' + data.message);
                 }
             } catch (error) {
                 alert('❌ Error: ' + error.message);

@@ -553,6 +553,143 @@ async def export_training_data():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@review_router.post("/upload-to-openai")
+async def upload_to_openai():
+    """
+    Sube el archivo de entrenamiento a OpenAI para fine-tuning.
+    
+    Returns:
+        Información sobre la subida y el file ID
+    """
+    try:
+        import os
+        import openai
+        from pathlib import Path
+        
+        # Verificar API key
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise HTTPException(
+                status_code=400,
+                detail="OPENAI_API_KEY no configurada en variables de entorno"
+            )
+        
+        # Verificar que existe el archivo
+        file_path = Path("data/finetune/train.jsonl")
+        if not file_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail="No hay archivo de entrenamiento. Primero exporta los datos."
+            )
+        
+        # Contar ejemplos
+        with open(file_path, 'r', encoding='utf-8') as f:
+            num_examples = len(f.readlines())
+        
+        if num_examples < 10:
+            return {
+                "success": False,
+                "message": f"Solo tienes {num_examples} ejemplos. OpenAI recomienda al menos 10 para fine-tuning efectivo.",
+                "num_examples": num_examples,
+                "can_upload": False
+            }
+        
+        # Configurar OpenAI
+        openai.api_key = api_key
+        
+        # Subir archivo
+        logger.info(f"📤 Subiendo archivo a OpenAI: {file_path}")
+        
+        with open(file_path, 'rb') as f:
+            response = openai.files.create(
+                file=f,
+                purpose='fine-tune'
+            )
+        
+        file_id = response.id
+        file_status = response.status
+        
+        logger.info(f"✅ Archivo subido exitosamente: {file_id}")
+        
+        return {
+            "success": True,
+            "message": f"Archivo subido exitosamente a OpenAI",
+            "file_id": file_id,
+            "status": file_status,
+            "num_examples": num_examples,
+            "next_steps": f"Ahora puedes crear un fine-tuning job con: openai api fine_tuning.jobs.create -t {file_id} -m gpt-3.5-turbo"
+        }
+        
+    except openai.OpenAIError as e:
+        logger.error(f"❌ Error de OpenAI: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error de OpenAI: {str(e)}")
+    except Exception as e:
+        logger.error(f"❌ Error subiendo a OpenAI: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@review_router.post("/create-finetuning-job")
+async def create_finetuning_job(file_id: str = None):
+    """
+    Crea un job de fine-tuning en OpenAI.
+    
+    Args:
+        file_id: ID del archivo subido a OpenAI
+        
+    Returns:
+        Información sobre el job creado
+    """
+    try:
+        import os
+        import openai
+        
+        # Verificar API key
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise HTTPException(
+                status_code=400,
+                detail="OPENAI_API_KEY no configurada"
+            )
+        
+        if not file_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Se requiere file_id. Primero sube el archivo a OpenAI."
+            )
+        
+        # Configurar OpenAI
+        openai.api_key = api_key
+        
+        # Crear job de fine-tuning
+        logger.info(f"🚀 Creando job de fine-tuning con archivo {file_id}")
+        
+        job = openai.fine_tuning.jobs.create(
+            training_file=file_id,
+            model="gpt-3.5-turbo"
+        )
+        
+        job_id = job.id
+        job_status = job.status
+        
+        logger.info(f"✅ Job de fine-tuning creado: {job_id}")
+        
+        return {
+            "success": True,
+            "message": "Job de fine-tuning creado exitosamente",
+            "job_id": job_id,
+            "status": job_status,
+            "model": "gpt-3.5-turbo",
+            "next_steps": "El entrenamiento tomará entre 10-30 minutos. Puedes monitorear el progreso en el dashboard de OpenAI."
+        }
+        
+    except openai.OpenAIError as e:
+        logger.error(f"❌ Error de OpenAI: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error de OpenAI: {str(e)}")
+    except Exception as e:
+        logger.error(f"❌ Error creando job: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @review_router.get("/debug/filesystem")
 async def debug_filesystem():
     """
