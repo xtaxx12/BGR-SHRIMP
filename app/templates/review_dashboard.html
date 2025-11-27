@@ -303,12 +303,12 @@
         
         async function loadMessages() {
             try {
-                const response = await fetch('/webhook/review/pending?limit=100');
+                const response = await fetch('/webhook/review/messages?status=all&limit=200');
                 const data = await response.json();
                 
                 if (data.success) {
                     allMessages = data.items;
-                    displayMessages(allMessages);
+                    displayMessages(filterMessagesByStatus(currentFilter));
                     updateStats();
                 }
             } catch (error) {
@@ -321,6 +321,13 @@
                     </div>
                 `;
             }
+        }
+        
+        function filterMessagesByStatus(status) {
+            if (status === 'all') {
+                return allMessages;
+            }
+            return allMessages.filter(msg => msg.status === status);
         }
         
         function displayMessages(messages) {
@@ -376,16 +383,13 @@
             currentFilter = status;
             
             // Actualizar botones activos
-            document.querySelectorAll('.filters button').forEach(btn => {
+            document.querySelectorAll('.filters button:not(.refresh-btn)').forEach(btn => {
                 btn.classList.remove('active');
             });
             event.target.classList.add('active');
             
             // Filtrar mensajes
-            const filtered = status === 'all' 
-                ? allMessages 
-                : allMessages.filter(msg => msg.status === status);
-            
+            const filtered = filterMessagesByStatus(status);
             displayMessages(filtered);
         }
         
