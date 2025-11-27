@@ -519,6 +519,40 @@ async def get_review_summary():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@review_router.post("/export")
+async def export_training_data():
+    """
+    Exporta mensajes aprobados a formato JSONL para fine-tuning.
+    
+    Returns:
+        Información sobre la exportación
+    """
+    try:
+        from app.services.training_capture_db import get_capture_service
+        
+        capture = get_capture_service()
+        output_path = "data/finetune/train.jsonl"
+        
+        num_pairs = capture.export_for_finetune(output_path)
+        
+        if num_pairs == 0:
+            return {
+                "success": False,
+                "message": "No hay mensajes aprobados para exportar",
+                "num_pairs": 0
+            }
+        
+        return {
+            "success": True,
+            "message": f"Exportados {num_pairs} pares de entrenamiento",
+            "num_pairs": num_pairs,
+            "output_path": output_path
+        }
+    except Exception as e:
+        logger.error(f"❌ Error exportando datos: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @review_router.get("/debug/filesystem")
 async def debug_filesystem():
     """

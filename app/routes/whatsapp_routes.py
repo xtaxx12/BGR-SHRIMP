@@ -45,6 +45,36 @@ def capture_and_return(user_id: str, response_text: str, response: MessagingResp
     return PlainTextResponse(str(response), media_type="application/xml")
 
 
+def validate_products_availability(failed_products: list, response: MessagingResponse, user_id: str) -> bool:
+    """
+    Valida que no haya productos no disponibles en una cotización consolidada.
+    
+    Args:
+        failed_products: Lista de productos que no se pudieron cotizar
+        response: Objeto MessagingResponse de Twilio
+        user_id: ID del usuario
+        
+    Returns:
+        True si hay productos no disponibles (debe rechazarse la cotización)
+    """
+    if failed_products:
+        error_msg = "❌ **No se puede generar la cotización**\n\n"
+        error_msg += "⚠️ Las siguientes combinaciones de producto-talla **no están disponibles**:\n\n"
+        for fp in failed_products:
+            error_msg += f"   • {fp}\n"
+        error_msg += "\n💡 **Por favor:**\n"
+        error_msg += "• Verifica que las tallas existan para cada producto\n"
+        error_msg += "• Solicita solo productos y tallas disponibles\n"
+        error_msg += "• Puedes pedir el menú de productos disponibles\n\n"
+        error_msg += "¿En qué más puedo ayudarte? 🦐"
+        
+        response.message(error_msg)
+        session_manager.add_to_conversation(user_id, 'assistant', error_msg)
+        session_manager.clear_session(user_id)
+        return True
+    return False
+
+
 @whatsapp_router.post("/whatsapp")
 @rate_limit(lambda req, **kwargs: kwargs.get('From', 'unknown'))
 async def whatsapp_webhook(request: Request,
@@ -383,6 +413,9 @@ async def whatsapp_webhook(request: Request,
                             logger.error(f"❌ Error calculando precio para {product_data['product']} {product_data['size']}: {str(e)}")
                             failed_products.append(f"{product_data['product']} {product_data['size']}")
 
+                    # 🆕 VALIDACIÓN: Si hay productos que fallaron, rechazar la cotización
+                    if validate_products_availability(failed_products, response, user_id):
+                        return PlainTextResponse(str(response), media_type="application/xml")
                     if products_info:
                         # Detectar idioma y generar PDF consolidado automáticamente
                         user_lang = session_manager.get_user_language(user_id) or 'es'
@@ -547,6 +580,9 @@ async def whatsapp_webhook(request: Request,
                                 logger.error(f"❌ Error calculando precio para {product_data['product']} {product_data['size']}: {str(e)}")
                                 failed_products.append(f"{product_data['product']} {product_data['size']}")
 
+                    # 🆕 VALIDACIÓN: Si hay productos que fallaron, rechazar la cotización
+                    if validate_products_availability(failed_products, response, user_id):
+                        return PlainTextResponse(str(response), media_type="application/xml")
                         if products_info:
                             # Detectar idioma y generar PDF consolidado automáticamente
                             user_lang = session_manager.get_user_language(user_id) or 'es'
@@ -696,6 +732,9 @@ async def whatsapp_webhook(request: Request,
                             logger.error(f"❌ Error calculando precio para {product_data['product']} {product_data['size']}: {str(e)}")
                             failed_products.append(f"{product_data['product']} {product_data['size']}")
 
+                    # 🆕 VALIDACIÓN: Si hay productos que fallaron, rechazar la cotización
+                    if validate_products_availability(failed_products, response, user_id):
+                        return PlainTextResponse(str(response), media_type="application/xml")
                     if products_info:
                         # Detectar idioma y generar PDF consolidado automáticamente
                         user_lang = session_manager.get_user_language(user_id) or 'es'
@@ -1525,33 +1564,31 @@ async def whatsapp_webhook(request: Request,
                         logger.error(f"❌ Error calculando precio para {product_data['product']} {product_data['size']}: {str(e)}")
                         failed_products.append(f"{product_data['product']} {product_data['size']}")
 
+                # 🆕 VALIDACIÓN: Si hay productos que fallaron, rechazar la cotización
+                if validate_products_availability(failed_products, response, user_id):
+                    return PlainTextResponse(str(response), media_type="application/xml")
+                
                 if products_info:
                     # Guardar para selección de idioma
                     session_manager.set_session_state(user_id, 'waiting_for_multi_language', {
                         'products_info': products_info,
                         'glaseo_percentage': glaseo_percentage,
-                        'failed_products': failed_products
+                        'failed_products': []  # Ya validamos que no hay fallos
                     })
                     # Guardar como última cotización consolidada para permitir modificación de flete
                     session_manager.set_last_quote(user_id, {
                         'consolidated': True,
                         'products_info': products_info,
                         'glaseo_percentage': glaseo_percentage,
-                        'failed_products': failed_products
+                        'failed_products': []
                     })
 
                     # Mostrar resumen y pedir idioma
                     success_count = len(products_info)
                     total_count = len(multiple_products)
 
-                    summary = f"✅ **Precios calculados para {success_count}/{total_count} productos**\n"
+                    summary = f"✅ **Precios calculados para {success_count} productos**\n"
                     summary += f"❄️ Glaseo: {glaseo_percentage}%\n\n"
-
-                    if failed_products:
-                        summary += "⚠️ No se encontraron precios para:\n"
-                        for fp in failed_products:
-                            summary += f"   • {fp}\n"
-                        summary += "\n"
 
                     summary += "🌐 **Selecciona el idioma para la cotización consolidada:**\n\n"
                     summary += "1️⃣ Español 🇪🇸\n"
@@ -2262,6 +2299,9 @@ Responde con el número o escribe:
                             logger.error(f"❌ Error calculando precio para {product_data['product']} {product_data['size']}: {str(e)}")
                             failed_products.append(f"{product_data['product']} {product_data['size']}")
 
+                    # 🆕 VALIDACIÓN: Si hay productos que fallaron, rechazar la cotización
+                    if validate_products_availability(failed_products, response, user_id):
+                        return PlainTextResponse(str(response), media_type="application/xml")
                     if products_info:
                         # Guardar como última cotización consolidada
                         last = {
