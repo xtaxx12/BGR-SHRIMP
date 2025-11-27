@@ -289,6 +289,7 @@
             <button onclick="filterMessages('approved')">Aprobados</button>
             <button onclick="filterMessages('rejected')">Rechazados</button>
             <button onclick="filterMessages('all')">Todos</button>
+            <button class="refresh-btn" onclick="exportTrainingData()" style="background: #27ae60;">📦 Exportar</button>
             <button class="refresh-btn" onclick="loadMessages()">🔄 Actualizar</button>
         </div>
         
@@ -485,6 +486,26 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+        
+        async function exportTrainingData() {
+            if (!confirm('¿Exportar mensajes aprobados a formato JSONL para fine-tuning?')) return;
+            
+            try {
+                const response = await fetch('/webhook/review/export', {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`✅ Exportados ${data.num_pairs} pares de entrenamiento\n\nArchivo: ${data.output_path}\n\nAhora puedes subir este archivo a OpenAI para fine-tuning.`);
+                } else {
+                    alert('⚠️ ' + data.message);
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            }
         }
         
         // Cargar mensajes al inicio
