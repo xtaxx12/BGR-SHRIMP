@@ -1,4 +1,4 @@
-📄 IMPLEMENTACIÓN DE ENTRENAMIENTO CON MENSAJES DE USUARIOS — GUÍA TÉCNICA COMPLETA
+ 📄 IMPLEMENTACIÓN DE ENTRENAMIENTO CON MENSAJES DE USUARIOS — GUÍA TÉCNICA COMPLETA
 
 Este documento describe cómo integrar en el sistema actual la capacidad de capturar mensajes de usuarios, anonimizar, filtrar, auto-etiquetar, exportar para fine-tuning o RAG, y hacer QA antes de incluir datos en el modelo.
 

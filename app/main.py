@@ -240,6 +240,10 @@ app.include_router(pdf_router, prefix="/webhook", tags=["pdf"])
 from app.routes.training_routes import training_router
 app.include_router(training_router, prefix="/webhook", tags=["training"])
 
+# 🆕 Rutas de RAG (Retrieval-Augmented Generation)
+from app.routes.rag_routes import rag_router
+app.include_router(rag_router, prefix="/webhook", tags=["rag"])
+
 # Endpoints de sistema
 @app.get(
     "/",

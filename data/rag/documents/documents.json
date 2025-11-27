@@ -1,0 +1,132 @@
+{
+  "cfd02f52a9f15db1": {
+    "id": "cfd02f52a9f15db1",
+    "content": "Pregunta: ¿Qué productos de camarón ofrece BGR Export?\nRespuesta: BGR Export ofrece una amplia variedad de productos de camarón premium:\n- HOSO (Head On Shell On): Camarón entero con cabeza y cáscara\n- HLSO (Head Less Shell On): Sin cabeza, con cáscara - ideal para colas\n- P&D IQF (Peeled & Deveined): Pelado y desvenado congelado individualmente\n- P&D BLOQUE: Pelado y desvenado congelado en bloque\n- EZ PEEL: Fácil pelado, con corte en el lomo\n- PuD-EUROPA: Calidad premium específica para mercado europeo\n- PuD-EEUU: Especificaciones para mercado estadounidense\n- COOKED: Cocido listo para consumo\n- PRE-COCIDO: Pre-cocido para procesamiento posterior",
+    "metadata": {
+      "type": "faq",
+      "question": "¿Qué productos de camarón ofrece BGR Export?",
+      "category": "productos"
+    },
+    "created_at": "2025-11-27T09:05:09.977145"
+  },
+  "08c20c2df9d68951": {
+    "id": "08c20c2df9d68951",
+    "content": "Pregunta: ¿Qué tallas de camarón están disponibles?\nRespuesta: Las tallas disponibles son (camarones por libra):\n- U15: Under 15 (menos de 15 camarones por libra) - Jumbo\n- 16/20: 16 a 20 camarones por libra - Extra Large\n- 21/25: 21 a 25 camarones por libra - Large\n- 26/30: 26 a 30 camarones por libra - Medium Large\n- 31/35: 31 a 35 camarones por libra - Medium\n- 36/40: 36 a 40 camarones por libra\n- 40/50, 41/50: 40 a 50 camarones por libra\n- 50/60, 51/60: 50 a 60 camarones por libra\n- 60/70, 61/70: 60 a 70 camarones por libra\n- 70/80: 70 a 80 camarones por libra\n- 71/90: 71 a 90 camarones por libra - Pequeño",
+    "metadata": {
+      "type": "faq",
+      "question": "¿Qué tallas de camarón están disponibles?",
+      "category": "productos"
+    },
+    "created_at": "2025-11-27T09:05:09.977173"
+  },
+  "cb9a722774db155e": {
+    "id": "cb9a722774db155e",
+    "content": "Pregunta: ¿Qué es el glaseo y cómo afecta el precio?\nRespuesta: El glaseo es una capa de agua congelada que se aplica al camarón para protegerlo durante el almacenamiento y transporte.\n\nPorcentajes comunes:\n- 10% glaseo: Mínimo, producto más \"seco\"\n- 20% glaseo: Estándar, balance entre protección y peso neto\n- 30% glaseo: Mayor protección, común para exportación\n\nEl glaseo afecta el precio porque se paga por peso bruto pero el producto neto es menor. Por ejemplo, con 20% de glaseo, 1 kg bruto contiene 800g de camarón neto.\n\nLa fórmula de conversión es: Precio Neto = Precio FOB × (1 - Glaseo%)",
+    "metadata": {
+      "type": "faq",
+      "question": "¿Qué es el glaseo y cómo afecta el precio?",
+      "category": "precios"
+    },
+    "created_at": "2025-11-27T09:05:09.977185"
+  },
+  "4b8fec5034a07a8e": {
+    "id": "4b8fec5034a07a8e",
+    "content": "Pregunta: ¿Cuál es la diferencia entre precio FOB y CFR?\nRespuesta: FOB (Free On Board) y CFR (Cost and Freight) son términos de comercio internacional (Incoterms):\n\nFOB (Puerto de origen):\n- El vendedor entrega la mercancía en el puerto de embarque\n- El comprador paga el flete marítimo\n- Precio base sin incluir transporte internacional\n\nCFR (Puerto de destino):\n- El vendedor paga el flete hasta el puerto de destino\n- Precio = FOB + Flete marítimo\n- Más conveniente para el comprador\n\nEjemplo: Si FOB = $5.00/kg y Flete = $0.35/kg, entonces CFR = $5.35/kg",
+    "metadata": {
+      "type": "faq",
+      "question": "¿Cuál es la diferencia entre precio FOB y CFR?",
+      "category": "precios"
+    },
+    "created_at": "2025-11-27T09:05:09.977194"
+  },
+  "a506cb553f66f5ce": {
+    "id": "a506cb553f66f5ce",
+    "content": "Pregunta: ¿Cómo puedo solicitar una cotización?\nRespuesta: Para solicitar una cotización necesitas proporcionar:\n\n1. Producto: HLSO, HOSO, P&D, etc.\n2. Talla: 16/20, 21/25, etc.\n3. Glaseo: 10%, 20%, 30%\n4. Cantidad: En kilogramos o libras\n5. Destino: Puerto o ciudad de destino (para calcular CFR)\n\nPuedes simplemente escribir tu solicitud de forma natural, por ejemplo:\n- \"Necesito precio para HLSO 16/20 con 20% glaseo\"\n- \"Cotización de 1000 kg de P&D 21/25 CFR Miami\"\n- \"Precios para varias tallas de camarón cocido\"\n\nEl sistema analizará tu mensaje y te guiará si falta información.",
+    "metadata": {
+      "type": "faq",
+      "question": "¿Cómo puedo solicitar una cotización?",
+      "category": "proceso"
+    },
+    "created_at": "2025-11-27T09:05:09.977202"
+  },
+  "c8f06a9b0bfa7710": {
+    "id": "c8f06a9b0bfa7710",
+    "content": "Pregunta: ¿Qué significa 100% NET en los precios?\nRespuesta: 100% NET significa que el precio es por peso neto de camarón, sin incluir el glaseo.\n\nCuando ves un precio \"100% NET\":\n- Es el precio real del producto de camarón\n- No incluye el peso del glaseo (capa de hielo protectora)\n- Es útil para comparar precios entre diferentes proveedores\n\nConversión: Si el precio es $5.00/kg al 100% NET y quieres aplicar 20% de glaseo:\nPrecio con glaseo = $5.00 × 0.80 = $4.00/kg (precio por kg bruto)\n\nEste ajuste es importante porque el comprador paga por peso bruto pero recibe menos producto neto.",
+    "metadata": {
+      "type": "faq",
+      "question": "¿Qué significa 100% NET en los precios?",
+      "category": "precios"
+    },
+    "created_at": "2025-11-27T09:05:09.977209"
+  },
+  "767b2f00adec5f47": {
+    "id": "767b2f00adec5f47",
+    "content": "Pregunta: ¿Cuáles son los métodos de pago aceptados?\nRespuesta: BGR Export acepta los siguientes métodos de pago:\n\n1. Transferencia bancaria internacional (Wire Transfer)\n   - Método más común para exportaciones\n   - Se requiere información bancaria completa\n\n2. Carta de crédito (Letter of Credit - L/C)\n   - Para pedidos grandes\n   - Mayor seguridad para ambas partes\n\n3. Pago anticipado (Advance Payment)\n   - Puede aplicarse a nuevos clientes\n   - Generalmente parcial (30-50% adelanto)\n\nLos términos específicos se negocian según el volumen y la relación comercial.",
+    "metadata": {
+      "type": "faq",
+      "question": "¿Cuáles son los métodos de pago aceptados?",
+      "category": "proceso"
+    },
+    "created_at": "2025-11-27T09:05:09.977216"
+  },
+  "eaaa956087c5b53f": {
+    "id": "eaaa956087c5b53f",
+    "content": "Pregunta: ¿Cuál es el tiempo de entrega típico?\nRespuesta: Los tiempos de entrega varían según el destino:\n\nProducción: 1-2 semanas después de confirmar pedido\n\nTránsito marítimo aproximado:\n- Estados Unidos (costa este): 10-14 días\n- Estados Unidos (costa oeste): 18-21 días\n- Europa (España, Portugal): 18-25 días\n- Asia: 25-35 días\n\nEl tiempo total desde pedido hasta entrega es aproximadamente 3-5 semanas dependiendo del destino.\n\nPara pedidos urgentes, se puede considerar transporte aéreo con costo adicional.",
+    "metadata": {
+      "type": "faq",
+      "question": "¿Cuál es el tiempo de entrega típico?",
+      "category": "logistica"
+    },
+    "created_at": "2025-11-27T09:05:09.977224"
+  },
+  "574eb38e6a78483e": {
+    "id": "574eb38e6a78483e",
+    "content": "Pregunta: ¿Qué certificaciones tiene BGR Export?\nRespuesta: BGR Export cuenta con las siguientes certificaciones y estándares:\n\n- HACCP: Sistema de análisis de peligros y puntos críticos de control\n- BRC: British Retail Consortium - Estándar global de seguridad alimentaria\n- BAP: Best Aquaculture Practices - Prácticas responsables de acuacultura\n- FDA Registered: Registrado con la FDA de Estados Unidos\n\nTodas las instalaciones cumplen con estándares internacionales de calidad y trazabilidad del producto desde el cultivo hasta el embarque.",
+    "metadata": {
+      "type": "faq",
+      "question": "¿Qué certificaciones tiene BGR Export?",
+      "category": "empresa"
+    },
+    "created_at": "2025-11-27T09:05:09.977232"
+  },
+  "2a61b11c9d5a2cca": {
+    "id": "2a61b11c9d5a2cca",
+    "content": "Pregunta: ¿Cuál es el pedido mínimo?\nRespuesta: El pedido mínimo depende del tipo de envío:\n\nContenedor completo (FCL):\n- 20' container: ~18-20 toneladas métricas\n- 40' container: ~25-28 toneladas métricas\n- Mejor precio por kilogramo\n\nCarga consolidada (LCL):\n- Mínimo: 1-2 toneladas métricas\n- Precio ligeramente mayor por kg\n- Ideal para pruebas de mercado\n\nPara muestras comerciales, contáctenos directamente para coordinar envíos especiales.",
+    "metadata": {
+      "type": "faq",
+      "question": "¿Cuál es el pedido mínimo?",
+      "category": "logistica"
+    },
+    "created_at": "2025-11-27T09:05:09.977242"
+  },
+  "a823c95856df7426": {
+    "id": "a823c95856df7426",
+    "content": "BGR Export es una empresa ecuatoriana líder en exportación de camarón premium (Litopenaeus vannamei).\nUbicada en Puerto Jeli, Santa Rosa, Ecuador, BGR Export se especializa en productos de camarón de alta calidad\npara mercados internacionales incluyendo Estados Unidos, Europa y Asia.\nLa empresa mantiene los más altos estándares de calidad con certificaciones HACCP, BRC y BAP.\nContacto comercial: amerino@bgrexport.com, WhatsApp: +593 98-805-7425",
+    "metadata": {
+      "type": "general",
+      "topic": "empresa",
+      "source": "info_general"
+    },
+    "created_at": "2025-11-27T09:05:10.601050"
+  },
+  "a596849f4e208b96": {
+    "id": "a596849f4e208b96",
+    "content": "Horarios de atención de BGR Export:\n- Lunes a Viernes: 8:00 AM - 6:00 PM (GMT-5, hora de Ecuador)\n- Sábados: 9:00 AM - 1:00 PM\n- Domingos y feriados: Cerrado (emergencias vía WhatsApp)\n\nPara consultas urgentes fuera de horario, el equipo comercial puede responder vía WhatsApp.",
+    "metadata": {
+      "type": "general",
+      "topic": "horarios",
+      "source": "info_general"
+    },
+    "created_at": "2025-11-27T09:05:10.601069"
+  },
+  "758065d0e61e28b9": {
+    "id": "758065d0e61e28b9",
+    "content": "El camarón ecuatoriano (Litopenaeus vannamei) es reconocido mundialmente por su calidad superior.\nEcuador es uno de los principales exportadores de camarón del mundo, con aguas cálidas ideales para el cultivo.\nLas características del camarón ecuatoriano incluyen:\n- Sabor dulce y textura firme\n- Alto contenido proteico\n- Cultivo sostenible y responsable\n- Trazabilidad completa desde la granja hasta el embarque",
+    "metadata": {
+      "type": "product",
+      "topic": "calidad",
+      "source": "info_producto"
+    },
+    "created_at": "2025-11-27T09:05:10.601077"
+  }
+}
