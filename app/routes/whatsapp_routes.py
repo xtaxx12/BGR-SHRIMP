@@ -264,7 +264,7 @@ async def whatsapp_webhook(request: Request,
                     # Intentar calcular el precio con el glaseo
                     price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(ai_query,))
 
-                    if price_info:
+                    if price_info and not price_info.get('error'):
                         logger.debug(f"✅ Datos de proforma validados con glaseo {glaseo_percentage}%")
 
                         # Detectar idioma automáticamente y generar PDF
@@ -405,7 +405,7 @@ async def whatsapp_webhook(request: Request,
 
                             price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(query,))
 
-                            if price_info:
+                            if price_info and not price_info.get('error'):
                                 products_info.append(price_info)
                             else:
                                 failed_products.append(f"{product_data['product']} {product_data['size']}")
@@ -572,7 +572,7 @@ async def whatsapp_webhook(request: Request,
 
                                 price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(query,))
 
-                                if price_info:
+                                if price_info and not price_info.get('error'):
                                     products_info.append(price_info)
                                 else:
                                     failed_products.append(f"{product_data['product']} {product_data['size']}")
@@ -724,7 +724,7 @@ async def whatsapp_webhook(request: Request,
 
                             price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(query,))
 
-                            if price_info:
+                            if price_info and not price_info.get('error'):
                                 products_info.append(price_info)
                             else:
                                 failed_products.append(f"{product_data['product']} {product_data['size']}")
@@ -848,7 +848,7 @@ async def whatsapp_webhook(request: Request,
                         price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(ai_query,))
                         logger.info(f"🔍 price_info resultado: {price_info is not None}")
 
-                        if price_info:
+                        if price_info and not price_info.get('error'):
                             logger.debug(f"✅ Datos de proforma validados con flete ${flete_value:.2f}")
 
                             # Detectar idioma (usar el guardado en sesión o detectar del mensaje)
@@ -1556,7 +1556,7 @@ async def whatsapp_webhook(request: Request,
 
                         price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(query,))
 
-                        if price_info:
+                        if price_info and not price_info.get('error'):
                             products_info.append(price_info)
                         else:
                             failed_products.append(f"{product_data['product']} {product_data['size']}")
@@ -1769,7 +1769,7 @@ U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60
                 # Verificar que se puede generar la cotización
                 price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(ai_query,))
 
-                if price_info:
+                if price_info and not price_info.get('error'):
                     # IMPORTANTE: Verificar si es un error ANTES de generar el PDF
                     if price_info.get('error'):
                         error_message = price_info.get('error_message', 'Error desconocido')
@@ -2291,7 +2291,7 @@ Responde con el número o escribe:
 
                             price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(query,))
 
-                            if price_info:
+                            if price_info and not price_info.get('error'):
                                 products_info.append(price_info)
                             else:
                                 failed_products.append(f"{product_data['product']} {product_data['size']}")
@@ -2464,7 +2464,7 @@ Responde con el número o escribe:
                 ai_query = session['data'].get('ai_query')
 
                 # Verificar que price_info tenga glaseo antes de generar PDF
-                if price_info:
+                if price_info and not price_info.get('error'):
                     glaseo_factor = price_info.get('factor_glaseo') or price_info.get('glaseo_factor')
                     glaseo_percentage = price_info.get('glaseo_percentage')
                     
@@ -2638,7 +2638,7 @@ Responde con el número o escribe:
 
                 price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(user_input,))
 
-                if price_info:
+                if price_info and not price_info.get('error'):
                     # Verificar si es un error
                     if price_info.get('error'):
                         error_message = price_info.get('error_message', 'Error desconocido')
@@ -2720,7 +2720,7 @@ Responde con el número o escribe:
             # Obtener precio del camarón
             price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(user_input,))
 
-            if price_info:
+            if price_info and not price_info.get('error'):
                 # Verificar si es un error
                 if price_info.get('error'):
                     error_message = price_info.get('error_message', 'Error desconocido')
