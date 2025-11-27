@@ -205,16 +205,17 @@ class OpenAIService:
 
     # ==================== MÉTODOS PRINCIPALES ====================
 
-    def chat_with_context(self, user_message: str, conversation_history: list[dict] = None, session_data: dict = None) -> dict:
+    def chat_with_context(self, user_message: str, conversation_history: list[dict] = None, session_data: dict = None, use_rag: bool = True) -> dict:
         """
         Conversación natural con GPT manteniendo contexto completo
         MANEJA CUALQUIER TIPO DE SOLICITUD DEL USUARIO
-        
+
         Args:
             user_message: Mensaje actual del usuario
             conversation_history: Historial de mensajes previos
             session_data: Datos de la sesión actual (productos detectados, precios, etc.)
-        
+            use_rag: Si usar el sistema RAG para enriquecer contexto
+
         Returns:
             Dict con respuesta y acciones a realizar
         """
@@ -227,6 +228,15 @@ class OpenAIService:
             messages = [
                 {"role": "system", "content": self._get_conversation_system_prompt()}
             ]
+
+            # 🆕 RAG: Agregar contexto relevante recuperado
+            if use_rag:
+                rag_context = self._get_rag_context(user_message)
+                if rag_context:
+                    messages.append({
+                        "role": "system",
+                        "content": f"INFORMACIÓN RELEVANTE DE LA BASE DE CONOCIMIENTOS:\n{rag_context}\n\nUsa esta información para responder al usuario si es relevante."
+                    })
 
             # Agregar contexto de sesión si existe
             if session_data:
@@ -360,6 +370,42 @@ Respuesta: {
         "product_category": "cocido"
     }
 }"""
+
+    def _get_rag_context(self, query: str, max_tokens: int = 1500) -> str:
+        """
+        Recupera contexto relevante del sistema RAG.
+
+        Args:
+            query: Consulta del usuario
+            max_tokens: Límite aproximado de tokens para el contexto
+
+        Returns:
+            Contexto formateado o string vacío si no hay resultados
+        """
+        try:
+            from app.services.rag_service import get_rag_service
+
+            rag = get_rag_service()
+
+            # Verificar si hay documentos indexados
+            if not rag.documents:
+                return ""
+
+            # Recuperar contexto relevante
+            context = rag.retrieve_context(
+                query=query,
+                top_k=3,
+                max_tokens=max_tokens
+            )
+
+            if context:
+                logger.debug(f"🔍 RAG: Contexto recuperado ({len(context)} chars)")
+
+            return context
+
+        except Exception as e:
+            logger.warning(f"⚠️ Error recuperando contexto RAG: {str(e)}")
+            return ""
 
     def _build_context_message(self, session_data: dict) -> str:
         """

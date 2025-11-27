@@ -202,27 +202,30 @@ class TrainingPipeline:
                 # Validar con QA si está disponible
                 qa_passed = True
                 qa_errors = []
-                
+
                 if qa_service and record.get('analysis'):
                     analysis = record['analysis']
-                    
+
                     # Validar producto
                     if analysis.get('product'):
-                        if not qa_service.validate_product(analysis['product']):
+                        is_valid, error = qa_service.validate_product(analysis['product'])
+                        if not is_valid:
                             qa_passed = False
-                            qa_errors.append(f"Producto inválido: {analysis['product']}")
-                    
+                            qa_errors.append(error or f"Producto inválido: {analysis['product']}")
+
                     # Validar talla
                     if analysis.get('size'):
-                        if not qa_service.validate_size(analysis['size']):
+                        is_valid, error = qa_service.validate_size(analysis['size'])
+                        if not is_valid:
                             qa_passed = False
-                            qa_errors.append(f"Talla inválida: {analysis['size']}")
-                    
+                            qa_errors.append(error or f"Talla inválida: {analysis['size']}")
+
                     # Validar glaseo
                     if analysis.get('glaseo_percentage') is not None:
-                        if not qa_service.validate_glaseo(analysis['glaseo_percentage']):
+                        is_valid, error = qa_service.validate_glaseo(analysis['glaseo_percentage'])
+                        if not is_valid:
                             qa_passed = False
-                            qa_errors.append(f"Glaseo inválido: {analysis['glaseo_percentage']}")
+                            qa_errors.append(error or f"Glaseo inválido: {analysis['glaseo_percentage']}")
                 
                 record['qa_passed'] = qa_passed
                 record['qa_errors'] = qa_errors
