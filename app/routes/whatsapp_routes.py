@@ -75,6 +75,52 @@ def validate_products_availability(failed_products: list, response: MessagingRes
     return False
 
 
+def validate_products_early(products_list: list, pricing_service, response: MessagingResponse, user_id: str) -> tuple:
+    """
+    Valida productos ANTES de pedir información adicional (flete, glaseo, etc).
+    
+    Args:
+        products_list: Lista de dicts con 'product' y 'size'
+        pricing_service: Servicio de precios
+        response: Objeto MessagingResponse de Twilio
+        user_id: ID del usuario
+        
+    Returns:
+        Tupla (es_valido: bool, productos_no_disponibles: list)
+    """
+    productos_no_disponibles = []
+    
+    for product_data in products_list:
+        product = product_data.get('product')
+        size = product_data.get('size')
+        
+        # Verificar si el producto-talla existe
+        # Hacemos una consulta simple sin glaseo ni flete
+        query = {
+            'product': product,
+            'size': size,
+            'glaseo_factor': None,
+            'glaseo_percentage': 0,
+            'custom_calculation': True
+        }
+        
+        try:
+            price_info = pricing_service.get_shrimp_price(query)
+            
+            # Si retorna error o None, el producto no está disponible
+            if not price_info or price_info.get('error'):
+                productos_no_disponibles.append(f"{product} {size}")
+        except Exception as e:
+            logger.error(f"Error validando {product} {size}: {str(e)}")
+            productos_no_disponibles.append(f"{product} {size}")
+    
+    # Si hay productos no disponibles, mostrar error
+    if productos_no_disponibles:
+        return False, productos_no_disponibles
+    
+    return True, []
+
+
 @whatsapp_router.post("/whatsapp")
 @rate_limit(lambda req, **kwargs: kwargs.get('From', 'unknown'))
 async def whatsapp_webhook(request: Request,
@@ -1180,6 +1226,27 @@ async def whatsapp_webhook(request: Request,
                     
                     logger.info(f"📋 Construidos {len(multiple_products)} productos desde sizes_by_product")
                     
+                    # 🆕 VALIDACIÓN TEMPRANA: Verificar que todos los productos existan ANTES de pedir flete
+                    es_valido, productos_no_disponibles = validate_products_early(
+                        multiple_products, pricing_service, response, user_id
+                    )
+                    
+                    if not es_valido:
+                        error_msg = "❌ **No se puede generar la cotización**\n\n"
+                        error_msg += "⚠️ Las siguientes combinaciones de producto-talla **no están disponibles**:\n\n"
+                        for fp in productos_no_disponibles:
+                            error_msg += f"   • {fp}\n"
+                        error_msg += "\n💡 **Por favor:**\n"
+                        error_msg += "• Verifica que las tallas existan para cada producto\n"
+                        error_msg += "• Solicita solo productos y tallas disponibles\n"
+                        error_msg += "• Puedes pedir el menú de productos disponibles\n\n"
+                        error_msg += "¿En qué más puedo ayudarte? 🦐"
+                        
+                        response.message(error_msg)
+                        session_manager.add_to_conversation(user_id, 'assistant', error_msg)
+                        session_manager.clear_session(user_id)
+                        return PlainTextResponse(str(response), media_type="application/xml")
+                    
                     # Extraer información adicional
                     processing_type = ai_analysis.get('processing_type') if ai_analysis else None
                     net_weight = ai_analysis.get('net_weight_percentage') if ai_analysis else None
@@ -1321,6 +1388,33 @@ async def whatsapp_webhook(request: Request,
                         logger.info(f"📏 Tallas Inteiro: {sizes_inteiro}")
                         logger.info(f"📏 Tallas Colas: {sizes_colas}")
                         
+                        # 🆕 VALIDACIÓN TEMPRANA: Construir lista de productos y validar
+                        mixed_products = []
+                        for size in sizes_inteiro:
+                            mixed_products.append({'product': 'HOSO', 'size': size})
+                        for size in sizes_colas:
+                            mixed_products.append({'product': 'HLSO', 'size': size})
+                        
+                        es_valido, productos_no_disponibles = validate_products_early(
+                            mixed_products, pricing_service, response, user_id
+                        )
+                        
+                        if not es_valido:
+                            error_msg = "❌ **No se puede generar la cotización**\n\n"
+                            error_msg += "⚠️ Las siguientes combinaciones de producto-talla **no están disponibles**:\n\n"
+                            for fp in productos_no_disponibles:
+                                error_msg += f"   • {fp}\n"
+                            error_msg += "\n💡 **Por favor:**\n"
+                            error_msg += "• Verifica que las tallas existan para cada producto\n"
+                            error_msg += "• Solicita solo productos y tallas disponibles\n"
+                            error_msg += "• Puedes pedir el menú de productos disponibles\n\n"
+                            error_msg += "¿En qué más puedo ayudarte? 🦐"
+                            
+                            response.message(error_msg)
+                            session_manager.add_to_conversation(user_id, 'assistant', error_msg)
+                            session_manager.clear_session(user_id)
+                            return PlainTextResponse(str(response), media_type="application/xml")
+                        
                         # Solicitar precio de flete directamente
                         flete_message = "✅ **Cotización consolidada detectada:**\n\n"
                         if sizes_inteiro:
@@ -1358,6 +1452,27 @@ async def whatsapp_webhook(request: Request,
                 if product:
                     multiple_products = [{'product': product, 'size': size} for size in sizes_list]
                     logger.info(f"📋 Construidos {len(multiple_products)} productos con {product}")
+                    
+                    # 🆕 VALIDACIÓN TEMPRANA: Verificar que todos los productos existan
+                    es_valido, productos_no_disponibles = validate_products_early(
+                        multiple_products, pricing_service, response, user_id
+                    )
+                    
+                    if not es_valido:
+                        error_msg = "❌ **No se puede generar la cotización**\n\n"
+                        error_msg += "⚠️ Las siguientes combinaciones de producto-talla **no están disponibles**:\n\n"
+                        for fp in productos_no_disponibles:
+                            error_msg += f"   • {fp}\n"
+                        error_msg += "\n💡 **Por favor:**\n"
+                        error_msg += "• Verifica que las tallas existan para cada producto\n"
+                        error_msg += "• Solicita solo productos y tallas disponibles\n"
+                        error_msg += "• Puedes pedir el menú de productos disponibles\n\n"
+                        error_msg += "¿En qué más puedo ayudarte? 🦐"
+                        
+                        response.message(error_msg)
+                        session_manager.add_to_conversation(user_id, 'assistant', error_msg)
+                        session_manager.clear_session(user_id)
+                        return PlainTextResponse(str(response), media_type="application/xml")
                     
                     # IMPORTANTE: Si glaseo = 0% (100% NET), solicitar flete para calcular CFR
                     # CFR = FOB + Flete (sin aplicar factor de glaseo)
