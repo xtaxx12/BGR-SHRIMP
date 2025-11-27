@@ -15,7 +15,9 @@ Endpoints:
 """
 import logging
 from typing import List, Optional
+from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from app.services.human_review import get_review_service
@@ -23,6 +25,31 @@ from app.services.human_review import get_review_service
 logger = logging.getLogger(__name__)
 
 review_router = APIRouter(prefix="/review", tags=["review"])
+
+
+# ==================== DASHBOARD WEB ====================
+
+@review_router.get("/dashboard", response_class=HTMLResponse)
+async def review_dashboard():
+    """
+    Dashboard web para revisión de mensajes.
+    
+    Returns:
+        Página HTML con interfaz de revisión
+    """
+    try:
+        template_path = Path("app/templates/review_dashboard.html")
+        
+        if not template_path.exists():
+            raise HTTPException(status_code=404, detail="Template no encontrado")
+        
+        with open(template_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        
+        return HTMLResponse(content=html_content)
+    except Exception as e:
+        logger.error(f"❌ Error cargando dashboard: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ==================== MODELOS ====================
@@ -169,9 +196,12 @@ async def approve_item(item_id: str, request: ApproveRequest):
         Confirmación de aprobación
     """
     try:
-        review = get_review_service()
-        success, message = review.approve_item(
-            item_id=item_id,
+        # 🆕 Usar el nuevo sistema de captura con base de datos
+        from app.services.training_capture_db import get_capture_service
+        
+        capture = get_capture_service()
+        success, message = capture.approve_message(
+            message_id=int(item_id),
             reviewer=request.reviewer,
             notes=request.notes
         )
@@ -205,9 +235,12 @@ async def reject_item(item_id: str, request: RejectRequest):
         Confirmación de rechazo
     """
     try:
-        review = get_review_service()
-        success, message = review.reject_item(
-            item_id=item_id,
+        # 🆕 Usar el nuevo sistema de captura con base de datos
+        from app.services.training_capture_db import get_capture_service
+        
+        capture = get_capture_service()
+        success, message = capture.reject_message(
+            message_id=int(item_id),
             reviewer=request.reviewer,
             reason=request.reason
         )

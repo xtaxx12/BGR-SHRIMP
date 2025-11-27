@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BGR Shrimp - Revisión de Mensajes</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f7fa;
+            color: #2c3e50;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .stat-card h3 {
+            font-size: 14px;
+            color: #7f8c8d;
+            margin-bottom: 10px;
+        }
+        
+        .stat-card .number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #3498db;
+        }
+        
+        .filters {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .filters button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .filters button.active {
+            background: #3498db;
+            color: white;
+        }
+        
+        .filters button:not(.active) {
+            background: #ecf0f1;
+            color: #7f8c8d;
+        }
+        
+        .filters button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        
+        .message-list {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .message-item {
+            padding: 20px;
+            border-bottom: 1px solid #ecf0f1;
+            transition: background 0.2s;
+        }
+        
+        .message-item:hover {
+            background: #f8f9fa;
+        }
+        
+        .message-item:last-child {
+            border-bottom: none;
+        }
+        
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .message-meta {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .badge.user {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .badge.assistant {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+        
+        .badge.needs-review {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+        
+        .badge.approved {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+        
+        .badge.rejected {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+        
+        .message-content {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .message-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .btn-approve {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .btn-approve:hover {
+            background: #229954;
+        }
+        
+        .btn-reject {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .btn-reject:hover {
+            background: #c0392b;
+        }
+        
+        .btn-edit {
+            background: #3498db;
+            color: white;
+        }
+        
+        .btn-edit:hover {
+            background: #2980b9;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+        
+        .empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: #7f8c8d;
+        }
+        
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        
+        .timestamp {
+            font-size: 12px;
+            color: #95a5a6;
+        }
+        
+        .confidence {
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+        
+        .refresh-btn {
+            background: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-left: auto;
+        }
+        
+        .refresh-btn:hover {
+            background: #2980b9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🦐 BGR Shrimp - Revisión de Mensajes</h1>
+            <p>Sistema de revisión humana para datos de entrenamiento</p>
+        </header>
+        
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <h3>Pendientes</h3>
+                <div class="number" id="stat-pending">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Aprobados</h3>
+                <div class="number" id="stat-approved">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Rechazados</h3>
+                <div class="number" id="stat-rejected">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total</h3>
+                <div class="number" id="stat-total">-</div>
+            </div>
+        </div>
+        
+        <div class="filters">
+            <button class="active" onclick="filterMessages('needs_review')">Pendientes</button>
+            <button onclick="filterMessages('approved')">Aprobados</button>
+            <button onclick="filterMessages('rejected')">Rechazados</button>
+            <button onclick="filterMessages('all')">Todos</button>
+            <button class="refresh-btn" onclick="loadMessages()">🔄 Actualizar</button>
+        </div>
+        
+        <div class="message-list" id="messageList">
+            <div class="loading">Cargando mensajes...</div>
+        </div>
+    </div>
+    
+    <script>
+        let currentFilter = 'needs_review';
+        let allMessages = [];
+        
+        async function loadMessages() {
+            try {
+                const response = await fetch('/webhook/review/pending?limit=100');
+                const data = await response.json();
+                
+                if (data.success) {
+                    allMessages = data.items;
+                    displayMessages(allMessages);
+                    updateStats();
+                }
+            } catch (error) {
+                console.error('Error cargando mensajes:', error);
+                document.getElementById('messageList').innerHTML = `
+                    <div class="empty">
+                        <div class="empty-icon">❌</div>
+                        <h3>Error cargando mensajes</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function displayMessages(messages) {
+            const container = document.getElementById('messageList');
+            
+            if (messages.length === 0) {
+                container.innerHTML = `
+                    <div class="empty">
+                        <div class="empty-icon">📭</div>
+                        <h3>No hay mensajes</h3>
+                        <p>No se encontraron mensajes con el filtro seleccionado</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = messages.map(msg => `
+                <div class="message-item">
+                    <div class="message-header">
+                        <div class="message-meta">
+                            <span class="badge ${msg.role}">${msg.role === 'user' ? '👤 Usuario' : '🤖 Asistente'}</span>
+                            <span class="badge ${msg.status.replace('_', '-')}">${getStatusLabel(msg.status)}</span>
+                            <span class="timestamp">📅 ${formatDate(msg.captured_at)}</span>
+                            ${msg.confidence > 0 ? `<span class="confidence">🎯 ${(msg.confidence * 100).toFixed(0)}%</span>` : ''}
+                        </div>
+                    </div>
+                    
+                    <div class="message-content">
+                        ${escapeHtml(msg.content)}
+                    </div>
+                    
+                    ${msg.status === 'needs_review' ? `
+                        <div class="message-actions">
+                            <button class="btn btn-approve" onclick="approveMessage('${msg.id}')">
+                                ✅ Aprobar
+                            </button>
+                            <button class="btn btn-reject" onclick="rejectMessage('${msg.id}')">
+                                ❌ Rechazar
+                            </button>
+                        </div>
+                    ` : ''}
+                    
+                    ${msg.review_notes ? `
+                        <div style="margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 4px; font-size: 12px;">
+                            <strong>Notas:</strong> ${escapeHtml(msg.review_notes)}
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+        
+        function filterMessages(status) {
+            currentFilter = status;
+            
+            // Actualizar botones activos
+            document.querySelectorAll('.filters button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Filtrar mensajes
+            const filtered = status === 'all' 
+                ? allMessages 
+                : allMessages.filter(msg => msg.status === status);
+            
+            displayMessages(filtered);
+        }
+        
+        async function approveMessage(id) {
+            if (!confirm('¿Aprobar este mensaje para entrenamiento?')) return;
+            
+            try {
+                const response = await fetch(`/webhook/review/approve/${id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        reviewer: 'admin',
+                        notes: 'Aprobado desde dashboard'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ Mensaje aprobado');
+                    loadMessages();
+                } else {
+                    alert('❌ Error: ' + data.message);
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            }
+        }
+        
+        async function rejectMessage(id) {
+            const reason = prompt('¿Razón del rechazo?', 'No relevante para entrenamiento');
+            if (!reason) return;
+            
+            try {
+                const response = await fetch(`/webhook/review/reject/${id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        reviewer: 'admin',
+                        reason: reason
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ Mensaje rechazado');
+                    loadMessages();
+                } else {
+                    alert('❌ Error: ' + data.message);
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            }
+        }
+        
+        function updateStats() {
+            const stats = {
+                pending: allMessages.filter(m => m.status === 'needs_review').length,
+                approved: allMessages.filter(m => m.status === 'approved').length,
+                rejected: allMessages.filter(m => m.status === 'rejected').length,
+                total: allMessages.length
+            };
+            
+            document.getElementById('stat-pending').textContent = stats.pending;
+            document.getElementById('stat-approved').textContent = stats.approved;
+            document.getElementById('stat-rejected').textContent = stats.rejected;
+            document.getElementById('stat-total').textContent = stats.total;
+        }
+        
+        function getStatusLabel(status) {
+            const labels = {
+                'needs_review': '⏳ Pendiente',
+                'approved': '✅ Aprobado',
+                'rejected': '❌ Rechazado',
+                'pending': '📋 En cola'
+            };
+            return labels[status] || status;
+        }
+        
+        function formatDate(isoString) {
+            const date = new Date(isoString);
+            return date.toLocaleString('es-ES', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Cargar mensajes al inicio
+        loadMessages();
+        
+        // Auto-refresh cada 30 segundos
+        setInterval(loadMessages, 30000);
+    </script>
+</body>
+</html>
