@@ -131,6 +131,55 @@ async def get_pending_reviews(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@review_router.get("/messages")
+async def get_all_messages(
+    status: str = Query(default="all", description="Filtrar por status (all, needs_review, approved, rejected)"),
+    limit: int = Query(default=100, ge=1, le=500, description="Máximo de items"),
+    offset: int = Query(default=0, ge=0, description="Offset para paginación"),
+    sort_by: str = Query(default="captured_at", description="Campo para ordenar"),
+    sort_desc: bool = Query(default=True, description="Orden descendente")
+):
+    """
+    Lista todos los mensajes con filtros opcionales.
+
+    Returns:
+        Lista paginada de mensajes
+    """
+    try:
+        from app.services.training_capture_db import get_capture_service
+        
+        capture = get_capture_service()
+        
+        # Obtener mensajes según el filtro
+        if status == "all":
+            messages, total = capture.get_all_messages(
+                limit=limit,
+                offset=offset,
+                sort_by=sort_by,
+                sort_desc=sort_desc
+            )
+        else:
+            messages, total = capture.get_messages_by_status(
+                status=status,
+                limit=limit,
+                offset=offset,
+                sort_by=sort_by,
+                sort_desc=sort_desc
+            )
+
+        return {
+            "success": True,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "status_filter": status,
+            "items": messages
+        }
+    except Exception as e:
+        logger.error(f"❌ Error listando mensajes: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @review_router.get("/item/{item_id}")
 async def get_review_item(item_id: str):
     """
@@ -169,13 +218,35 @@ async def get_review_stats():
         Estadísticas completas del sistema de revisión
     """
     try:
-        review = get_review_service()
-        stats = review.get_stats()
-        summary = review.get_review_summary()
+        # 🆕 Usar el nuevo sistema de captura con base de datos
+        from app.services.training_capture_db import get_capture_service
+        
+        capture = get_capture_service()
+        stats = capture.get_stats()
+        
+        # Crear resumen
+        summary = f"""📊 RESUMEN DE REVISIÓN DE DATOS
+========================================
+📋 Pendientes de revisión: {stats['by_status'].get('needs_review', 0)}
+✅ Aprobados: {stats['by_status'].get('approved', 0)}
+❌ Rechazados: {stats['by_status'].get('rejected', 0)}
+📊 Total de mensajes: {stats['total_messages']}
+
+👤 Por rol:
+   Usuario: {stats['by_role'].get('user', 0)}
+   Asistente: {stats['by_role'].get('assistant', 0)}
+"""
 
         return {
             "success": True,
-            "stats": stats,
+            "stats": {
+                "pending_reviews": stats['by_status'].get('needs_review', 0),
+                "approved": stats['by_status'].get('approved', 0),
+                "rejected": stats['by_status'].get('rejected', 0),
+                "total_messages": stats['total_messages'],
+                "by_status": stats['by_status'],
+                "by_role": stats['by_role']
+            },
             "summary": summary
         }
     except Exception as e:

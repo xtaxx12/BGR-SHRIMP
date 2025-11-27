@@ -337,6 +337,128 @@ class TrainingCaptureDB:
             logger.error(f"❌ Error rechazando mensaje: {str(e)}")
             return False, str(e)
     
+    def get_all_messages(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        sort_by: str = "captured_at",
+        sort_desc: bool = True
+    ) -> Tuple[List[Dict], int]:
+        """
+        Obtiene todos los mensajes.
+        
+        Args:
+            limit: Máximo de items a retornar
+            offset: Offset para paginación
+            sort_by: Campo para ordenar
+            sort_desc: Orden descendente
+            
+        Returns:
+            Tupla (lista de mensajes, total)
+        """
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Contar total
+                cursor.execute("SELECT COUNT(*) as total FROM messages")
+                total = cursor.fetchone()['total']
+                
+                # Obtener mensajes
+                order = "DESC" if sort_desc else "ASC"
+                query = f"""
+                    SELECT * FROM messages 
+                    ORDER BY {sort_by} {order}
+                    LIMIT ? OFFSET ?
+                """
+                
+                cursor.execute(query, (limit, offset))
+                rows = cursor.fetchall()
+                
+                messages = []
+                for row in rows:
+                    messages.append(self._row_to_dict(row))
+                
+                return messages, total
+                
+        except Exception as e:
+            logger.error(f"❌ Error obteniendo todos los mensajes: {str(e)}")
+            return [], 0
+    
+    def get_messages_by_status(
+        self,
+        status: str,
+        limit: int = 100,
+        offset: int = 0,
+        sort_by: str = "captured_at",
+        sort_desc: bool = True
+    ) -> Tuple[List[Dict], int]:
+        """
+        Obtiene mensajes filtrados por status.
+        
+        Args:
+            status: Status a filtrar
+            limit: Máximo de items a retornar
+            offset: Offset para paginación
+            sort_by: Campo para ordenar
+            sort_desc: Orden descendente
+            
+        Returns:
+            Tupla (lista de mensajes, total)
+        """
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Contar total
+                cursor.execute("""
+                    SELECT COUNT(*) as total 
+                    FROM messages 
+                    WHERE status = ?
+                """, (status,))
+                total = cursor.fetchone()['total']
+                
+                # Obtener mensajes
+                order = "DESC" if sort_desc else "ASC"
+                query = f"""
+                    SELECT * FROM messages 
+                    WHERE status = ?
+                    ORDER BY {sort_by} {order}
+                    LIMIT ? OFFSET ?
+                """
+                
+                cursor.execute(query, (status, limit, offset))
+                rows = cursor.fetchall()
+                
+                messages = []
+                for row in rows:
+                    messages.append(self._row_to_dict(row))
+                
+                return messages, total
+                
+        except Exception as e:
+            logger.error(f"❌ Error obteniendo mensajes por status: {str(e)}")
+            return [], 0
+    
+    def _row_to_dict(self, row) -> Dict:
+        """Convierte una fila de la base de datos a diccionario."""
+        return {
+            'id': str(row['id']),
+            'user_id': row['user_id'],
+            'role': row['role'],
+            'content': row['content'],
+            'status': row['status'],
+            'confidence': row['confidence'],
+            'analysis': json.loads(row['analysis']) if row['analysis'] else {},
+            'qa_passed': bool(row['qa_passed']),
+            'qa_errors': json.loads(row['qa_errors']) if row['qa_errors'] else [],
+            'metadata': json.loads(row['metadata']) if row['metadata'] else {},
+            'captured_at': row['captured_at'],
+            'reviewed_at': row['reviewed_at'],
+            'reviewed_by': row['reviewed_by'],
+            'review_notes': row['review_notes'],
+        }
+    
     def get_stats(self) -> Dict:
         """Obtiene estadísticas de captura."""
         try:
