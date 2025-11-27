@@ -561,10 +561,11 @@ async def upload_to_openai():
     Returns:
         Información sobre la subida y el file ID
     """
+    import os
+    from pathlib import Path
+    
     try:
-        import os
-        import openai
-        from pathlib import Path
+        from openai import OpenAI
         
         # Verificar API key
         api_key = os.getenv("OPENAI_API_KEY")
@@ -594,14 +595,14 @@ async def upload_to_openai():
                 "can_upload": False
             }
         
-        # Configurar OpenAI
-        openai.api_key = api_key
+        # Crear cliente OpenAI
+        client = OpenAI(api_key=api_key)
         
         # Subir archivo
         logger.info(f"📤 Subiendo archivo a OpenAI: {file_path}")
         
         with open(file_path, 'rb') as f:
-            response = openai.files.create(
+            response = client.files.create(
                 file=f,
                 purpose='fine-tune'
             )
@@ -620,9 +621,6 @@ async def upload_to_openai():
             "next_steps": f"Ahora puedes crear un fine-tuning job con: openai api fine_tuning.jobs.create -t {file_id} -m gpt-3.5-turbo"
         }
         
-    except openai.OpenAIError as e:
-        logger.error(f"❌ Error de OpenAI: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error de OpenAI: {str(e)}")
     except Exception as e:
         logger.error(f"❌ Error subiendo a OpenAI: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -639,9 +637,10 @@ async def create_finetuning_job(file_id: str = None):
     Returns:
         Información sobre el job creado
     """
+    import os
+    
     try:
-        import os
-        import openai
+        from openai import OpenAI
         
         # Verificar API key
         api_key = os.getenv("OPENAI_API_KEY")
@@ -657,13 +656,13 @@ async def create_finetuning_job(file_id: str = None):
                 detail="Se requiere file_id. Primero sube el archivo a OpenAI."
             )
         
-        # Configurar OpenAI
-        openai.api_key = api_key
+        # Crear cliente OpenAI
+        client = OpenAI(api_key=api_key)
         
         # Crear job de fine-tuning
         logger.info(f"🚀 Creando job de fine-tuning con archivo {file_id}")
         
-        job = openai.fine_tuning.jobs.create(
+        job = client.fine_tuning.jobs.create(
             training_file=file_id,
             model="gpt-3.5-turbo"
         )
@@ -682,9 +681,6 @@ async def create_finetuning_job(file_id: str = None):
             "next_steps": "El entrenamiento tomará entre 10-30 minutos. Puedes monitorear el progreso en el dashboard de OpenAI."
         }
         
-    except openai.OpenAIError as e:
-        logger.error(f"❌ Error de OpenAI: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error de OpenAI: {str(e)}")
     except Exception as e:
         logger.error(f"❌ Error creando job: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
