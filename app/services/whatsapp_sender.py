@@ -41,43 +41,36 @@ class WhatsAppSender:
             if not message_text:
                 message_text = "📄 Aquí tienes tu cotización en PDF"
 
-            # Método 1: Intentar con URL pública si está disponible
-            base_url = os.getenv('BASE_URL')
-            if base_url and not base_url.startswith('http://localhost'):
-                filename = os.path.basename(pdf_path)
-                pdf_url = f"{base_url}/webhook/download-pdf/{filename}"
+            # Obtener URL base
+            base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
+            
+            # Validar que no sea localhost en producción
+            if 'localhost' in base_url or '127.0.0.1' in base_url:
+                logger.warning(f"⚠️ BASE_URL apunta a localhost: {base_url}")
+                logger.warning("⚠️ Twilio no podrá acceder al PDF. Usando URL de producción por defecto.")
+                base_url = 'https://bgr-shrimp.onrender.com'
 
-                try:
-                    message = self.client.messages.create(
-                        from_=self.whatsapp_number,
-                        to=to_number,
-                        body=message_text,
-                        media_url=[pdf_url]
-                    )
-                    logger.debug(f"✅ PDF enviado exitosamente via URL a {to_number}, SID: {message.sid}")
-                    return True
-                except Exception as url_error:
-                    logger.warning(f"⚠️ Error enviando via URL: {url_error}")
+            # Construir URL pública del PDF
+            filename = os.path.basename(pdf_path)
+            pdf_url = f"{base_url}/webhook/download-pdf/{filename}"
 
-            # Método 2: Subir archivo directamente (requiere servidor público)
+            logger.info(f"📤 Intentando enviar PDF a {to_number}")
+            logger.info(f"📎 URL del PDF: {pdf_url}")
+
             try:
-                # Para desarrollo local, necesitamos una URL pública temporal
-                # Usaremos el endpoint de descarga local como fallback
-                filename = os.path.basename(pdf_path)
-                local_url = f"http://localhost:8000/webhook/download-pdf/{filename}"
-
                 message = self.client.messages.create(
                     from_=self.whatsapp_number,
                     to=to_number,
                     body=message_text,
-                    media_url=[local_url]
+                    media_url=[pdf_url]
                 )
-
-                logger.debug(f"✅ PDF enviado exitosamente a {to_number}, SID: {message.sid}")
+                logger.info(f"✅ PDF enviado exitosamente a {to_number}, SID: {message.sid}")
                 return True
-
-            except Exception as e:
-                logger.error(f"❌ Error enviando PDF por WhatsApp: {str(e)}")
+            except Exception as send_error:
+                logger.error(f"❌ Error enviando PDF por WhatsApp: {str(send_error)}")
+                logger.error(f"   - From: {self.whatsapp_number}")
+                logger.error(f"   - To: {to_number}")
+                logger.error(f"   - Media URL: {pdf_url}")
                 return False
 
         except Exception as e:

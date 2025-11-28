@@ -629,64 +629,65 @@ async def whatsapp_webhook(request: Request,
                     # 🆕 VALIDACIÓN: Si hay productos que fallaron, rechazar la cotización
                     if validate_products_availability(failed_products, response, user_id):
                         return PlainTextResponse(str(response), media_type="application/xml")
-                        if products_info:
-                            # Detectar idioma y generar PDF consolidado automáticamente
-                            user_lang = session_manager.get_user_language(user_id) or 'es'
+                    
+                    if products_info:
+                        # Detectar idioma y generar PDF consolidado automáticamente
+                        user_lang = session_manager.get_user_language(user_id) or 'es'
 
-                            # Guardar como última cotización
-                            session_manager.set_last_quote(user_id, {
-                                'consolidated': True,
-                                'products_info': products_info,
-                                'glaseo_percentage': glaseo_percentage,
-                                'failed_products': failed_products,
-                                'flete': flete_value
-                            })
-                            session_manager.set_user_language(user_id, user_lang)
+                        # Guardar como última cotización
+                        session_manager.set_last_quote(user_id, {
+                            'consolidated': True,
+                            'products_info': products_info,
+                            'glaseo_percentage': glaseo_percentage,
+                            'failed_products': failed_products,
+                            'flete': flete_value
+                        })
+                        session_manager.set_user_language(user_id, user_lang)
 
-                            logger.info(f"📄 Generando PDF consolidado con flete ${flete_value:.2f}")
-                            pdf_path = pdf_generator.generate_consolidated_quote_pdf(
-                                products_info,
+                        logger.info(f"📄 Generando PDF consolidado con flete ${flete_value:.2f}")
+                        pdf_path = pdf_generator.generate_consolidated_quote_pdf(
+                            products_info,
+                            From,
+                            user_lang,
+                            glaseo_percentage
+                        )
+
+                        if pdf_path:
+                            pdf_sent = whatsapp_sender.send_pdf_document(
                                 From,
-                                user_lang,
-                                glaseo_percentage
+                                pdf_path,
+                                f"Cotización Consolidada BGR Export - {len(products_info)} productos"
                             )
-
-                            if pdf_path:
-                                pdf_sent = whatsapp_sender.send_pdf_document(
-                                    From,
-                                    pdf_path,
-                                    f"Cotización Consolidada BGR Export - {len(products_info)} productos"
-                                )
-                                if pdf_sent:
-                                    success_msg = f"✅ Cotización consolidada generada con flete ${flete_value:.2f} - {len(products_info)} productos 🚢"
-                                    response.message(success_msg)
-                                    # 🆕 Capturar respuesta antes de limpiar sesión
-                                    session_manager.add_to_conversation(user_id, 'assistant', success_msg)
-                                else:
-                                    filename = os.path.basename(pdf_path)
-                                    base_url = os.getenv('BASE_URL', 'https://e30f03031f5a.ngrok-free.app')
-                                    download_url = f"{base_url}/webhook/download-pdf/{filename}"
-                                    download_msg = f"✅ Cotización generada\n📄 Descarga: {download_url}"
-                                    response.message(download_msg)
-                                    # 🆕 Capturar respuesta antes de limpiar sesión
-                                    session_manager.add_to_conversation(user_id, 'assistant', download_msg)
-
-                                # Limpiar sesión
-                                session_manager.clear_session(user_id)
-                            else:
-                                error_msg = "❌ Error generando PDF consolidado. Intenta nuevamente."
-                                response.message(error_msg)
+                            if pdf_sent:
+                                success_msg = f"✅ Cotización consolidada generada con flete ${flete_value:.2f} - {len(products_info)} productos 🚢"
+                                response.message(success_msg)
                                 # 🆕 Capturar respuesta antes de limpiar sesión
-                                session_manager.add_to_conversation(user_id, 'assistant', error_msg)
-                                session_manager.clear_session(user_id)
+                                session_manager.add_to_conversation(user_id, 'assistant', success_msg)
+                            else:
+                                filename = os.path.basename(pdf_path)
+                                base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
+                                download_url = f"{base_url}/webhook/download-pdf/{filename}"
+                                download_msg = f"✅ Cotización generada\n📄 Descarga: {download_url}"
+                                response.message(download_msg)
+                                # 🆕 Capturar respuesta antes de limpiar sesión
+                                session_manager.add_to_conversation(user_id, 'assistant', download_msg)
+
+                            # Limpiar sesión
+                            session_manager.clear_session(user_id)
                         else:
-                            error_msg = "❌ No se pudieron calcular precios para ningún producto."
+                            error_msg = "❌ Error generando PDF consolidado. Intenta nuevamente."
                             response.message(error_msg)
                             # 🆕 Capturar respuesta antes de limpiar sesión
                             session_manager.add_to_conversation(user_id, 'assistant', error_msg)
                             session_manager.clear_session(user_id)
+                    else:
+                        error_msg = "❌ No se pudieron calcular precios para ningún producto."
+                        response.message(error_msg)
+                        # 🆕 Capturar respuesta antes de limpiar sesión
+                        session_manager.add_to_conversation(user_id, 'assistant', error_msg)
+                        session_manager.clear_session(user_id)
 
-                        return PlainTextResponse(str(response), media_type="application/xml")
+                    return PlainTextResponse(str(response), media_type="application/xml")
                     else:
                         # Flete no válido
                         response.message("🤔 Valor no válido. Por favor responde con el valor del flete:\n\n💡 **Ejemplos:**\n• **0.25** para $0.25/kg\n• **0.30** para $0.30/kg\n• **flete 0.22**\n\nO escribe 'menu' para volver al inicio")
@@ -2643,17 +2644,25 @@ Responde con el número o escribe:
                     pdf_path = pdf_generator.generate_quote_pdf(price_info, From, selected_language)
 
                     if pdf_path:
+                        logger.info(f"✅ PDF generado exitosamente: {pdf_path}")
+                        logger.info(f"📊 Tamaño del archivo: {os.path.getsize(pdf_path)} bytes")
+                        
                         # Crear URL pública del PDF para envío
                         filename = os.path.basename(pdf_path)
                         base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
                         download_url = f"{base_url}/webhook/download-pdf/{filename}"
+                        
+                        logger.info(f"🔗 URL de descarga: {download_url}")
 
                         # Intentar enviar el PDF por WhatsApp
+                        logger.info(f"📤 Iniciando envío de PDF por WhatsApp a {From}")
                         pdf_sent = whatsapp_sender.send_pdf_document(
                             From,
                             pdf_path,
                             f"Cotización BGR Export - {price_info.get('producto', 'Camarón')} {price_info.get('talla', '')}"
                         )
+                        
+                        logger.info(f"📬 Resultado del envío: {'✅ Exitoso' if pdf_sent else '❌ Fallido'}")
 
                         if pdf_sent:
                             lang_name = "Español 🇪🇸" if selected_language == 'es' else "English 🇺🇸"
