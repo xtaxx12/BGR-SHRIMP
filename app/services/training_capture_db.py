@@ -51,6 +51,10 @@ class TrainingCaptureDB:
         
         logger.info(f"📦 Training Capture DB inicializado")
     
+    def _placeholder(self):
+        """Retorna el placeholder correcto según la base de datos."""
+        return "?" if self.use_sqlite else "%s"
+    
     @contextmanager
     def _get_connection(self):
         """Context manager para conexiones a la base de datos."""
@@ -70,6 +74,7 @@ class TrainingCaptureDB:
             import psycopg2
             from psycopg2.extras import RealDictCursor
             conn = psycopg2.connect(self.database_url)
+            conn.cursor_factory = RealDictCursor
             try:
                 yield conn
                 conn.commit()
@@ -180,10 +185,11 @@ class TrainingCaptureDB:
             # Guardar en base de datos
             with self._get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("""
+                ph = self._placeholder()
+                cursor.execute(f"""
                     INSERT INTO messages 
                     (user_id, role, content, original_length, metadata, captured_at, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
                 """, (
                     anonymized_user_id,
                     role,
@@ -261,11 +267,12 @@ class TrainingCaptureDB:
                 
                 # Obtener mensajes
                 order = "DESC" if sort_desc else "ASC"
+                ph = self._placeholder()
                 query = f"""
                     SELECT * FROM messages 
                     WHERE status = 'needs_review'
                     ORDER BY {sort_by} {order}
-                    LIMIT ? OFFSET ?
+                    LIMIT {ph} OFFSET {ph}
                 """
                 
                 cursor.execute(query, (limit, offset))
@@ -316,13 +323,14 @@ class TrainingCaptureDB:
         try:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("""
+                ph = self._placeholder()
+                cursor.execute(f"""
                     UPDATE messages 
                     SET status = 'approved',
-                        reviewed_at = ?,
-                        reviewed_by = ?,
-                        review_notes = ?
-                    WHERE id = ?
+                        reviewed_at = {ph},
+                        reviewed_by = {ph},
+                        review_notes = {ph}
+                    WHERE id = {ph}
                 """, (
                     datetime.now().isoformat(),
                     reviewer,
@@ -360,13 +368,14 @@ class TrainingCaptureDB:
         try:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("""
+                ph = self._placeholder()
+                cursor.execute(f"""
                     UPDATE messages 
                     SET status = 'rejected',
-                        reviewed_at = ?,
-                        reviewed_by = ?,
-                        review_notes = ?
-                    WHERE id = ?
+                        reviewed_at = {ph},
+                        reviewed_by = {ph},
+                        review_notes = {ph}
+                    WHERE id = {ph}
                 """, (
                     datetime.now().isoformat(),
                     reviewer,
@@ -413,10 +422,11 @@ class TrainingCaptureDB:
                 
                 # Obtener mensajes
                 order = "DESC" if sort_desc else "ASC"
+                ph = self._placeholder()
                 query = f"""
                     SELECT * FROM messages 
                     ORDER BY {sort_by} {order}
-                    LIMIT ? OFFSET ?
+                    LIMIT {ph} OFFSET {ph}
                 """
                 
                 cursor.execute(query, (limit, offset))
@@ -458,20 +468,22 @@ class TrainingCaptureDB:
                 cursor = conn.cursor()
                 
                 # Contar total
-                cursor.execute("""
+                ph = self._placeholder()
+                cursor.execute(f"""
                     SELECT COUNT(*) as total 
                     FROM messages 
-                    WHERE status = ?
+                    WHERE status = {ph}
                 """, (status,))
-                total = cursor.fetchone()['total']
+                result = cursor.fetchone()
+                total = result['total'] if isinstance(result, dict) else result[0]
                 
                 # Obtener mensajes
                 order = "DESC" if sort_desc else "ASC"
                 query = f"""
                     SELECT * FROM messages 
-                    WHERE status = ?
+                    WHERE status = {ph}
                     ORDER BY {sort_by} {order}
-                    LIMIT ? OFFSET ?
+                    LIMIT {ph} OFFSET {ph}
                 """
                 
                 cursor.execute(query, (status, limit, offset))
@@ -636,17 +648,17 @@ class TrainingCaptureDB:
 _capture_service: Optional[TrainingCaptureDB] = None
 
 
-def get_capture_service(db_path: str = "data/training_messages.db") -> TrainingCaptureDB:
+def get_capture_service(database_url: str = None) -> TrainingCaptureDB:
     """
     Obtiene la instancia singleton del servicio de captura.
     
     Args:
-        db_path: Ruta a la base de datos
+        database_url: URL de conexión a PostgreSQL (opcional, usa variable de entorno si no se proporciona)
         
     Returns:
         Instancia de TrainingCaptureDB
     """
     global _capture_service
     if _capture_service is None:
-        _capture_service = TrainingCaptureDB(db_path)
+        _capture_service = TrainingCaptureDB(database_url)
     return _capture_service
