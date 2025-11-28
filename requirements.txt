@@ -13,4 +13,4 @@ pillow==11.3.0
 sentry-sdk[fastapi]==2.18.0
 prometheus-client==0.21.0
 numpy>=1.24.0
-psycopg2-binary==2.9.9
+psycopg2-binary>=2.9.10
