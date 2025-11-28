@@ -1,8 +1,8 @@
 """
-Sistema de captura de mensajes usando SQLite para persistencia.
+Sistema de captura de mensajes usando PostgreSQL para persistencia.
 
-Este módulo reemplaza el sistema basado en archivos JSON con una base de datos SQLite
-que persiste incluso cuando el contenedor se reinicia en Render.
+Este módulo usa PostgreSQL para garantizar persistencia completa de datos
+incluso cuando el contenedor se reinicia en Render.
 
 Uso:
     from app.services.training_capture_db import get_capture_service
@@ -12,9 +12,8 @@ Uso:
 """
 import json
 import logging
-import sqlite3
+import os
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from contextlib import contextmanager
 
@@ -25,65 +24,112 @@ logger = logging.getLogger(__name__)
 
 class TrainingCaptureDB:
     """
-    Servicio de captura de mensajes con persistencia en SQLite.
+    Servicio de captura de mensajes con persistencia en PostgreSQL.
     """
     
-    def __init__(self, db_path: str = "data/training_messages.db"):
+    def __init__(self, database_url: str = None):
         """
         Inicializa el servicio de captura.
         
         Args:
-            db_path: Ruta a la base de datos SQLite
+            database_url: URL de conexión a PostgreSQL (si no se proporciona, usa variable de entorno)
         """
-        self.db_path = Path(db_path)
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self.database_url = database_url or os.getenv("DATABASE_URL")
+        
+        if not self.database_url:
+            logger.warning("⚠️ DATABASE_URL no configurada, usando SQLite como fallback")
+            self.use_sqlite = True
+            from pathlib import Path
+            self.db_path = Path("data/training_messages.db")
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            self.use_sqlite = False
+            logger.info(f"📦 Usando PostgreSQL para persistencia")
         
         # Inicializar base de datos
         self._init_database()
         
-        logger.info(f"📦 Training Capture DB inicializado: {self.db_path}")
+        logger.info(f"📦 Training Capture DB inicializado")
     
     @contextmanager
     def _get_connection(self):
         """Context manager para conexiones a la base de datos."""
-        conn = sqlite3.connect(str(self.db_path))
-        conn.row_factory = sqlite3.Row  # Para acceder por nombre de columna
-        try:
-            yield conn
-            conn.commit()
-        except Exception as e:
-            conn.rollback()
-            raise e
-        finally:
-            conn.close()
+        if self.use_sqlite:
+            import sqlite3
+            conn = sqlite3.connect(str(self.db_path))
+            conn.row_factory = sqlite3.Row
+            try:
+                yield conn
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                raise e
+            finally:
+                conn.close()
+        else:
+            import psycopg2
+            from psycopg2.extras import RealDictCursor
+            conn = psycopg2.connect(self.database_url)
+            try:
+                yield conn
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                raise e
+            finally:
+                conn.close()
     
     def _init_database(self):
         """Crea las tablas si no existen."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             
-            # Tabla principal de mensajes
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS messages (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id TEXT NOT NULL,
-                    role TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    original_length INTEGER,
-                    status TEXT DEFAULT 'pending',
-                    confidence REAL DEFAULT 0.0,
-                    analysis TEXT,
-                    qa_passed BOOLEAN DEFAULT 0,
-                    qa_errors TEXT,
-                    metadata TEXT,
-                    captured_at TEXT NOT NULL,
-                    processed_at TEXT,
-                    reviewed_at TEXT,
-                    reviewed_by TEXT,
-                    review_notes TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
+            if self.use_sqlite:
+                # SQLite syntax
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS messages (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT NOT NULL,
+                        role TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        original_length INTEGER,
+                        status TEXT DEFAULT 'pending',
+                        confidence REAL DEFAULT 0.0,
+                        analysis TEXT,
+                        qa_passed BOOLEAN DEFAULT 0,
+                        qa_errors TEXT,
+                        metadata TEXT,
+                        captured_at TEXT NOT NULL,
+                        processed_at TEXT,
+                        reviewed_at TEXT,
+                        reviewed_by TEXT,
+                        review_notes TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+            else:
+                # PostgreSQL syntax
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS messages (
+                        id SERIAL PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        role TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        original_length INTEGER,
+                        status TEXT DEFAULT 'pending',
+                        confidence REAL DEFAULT 0.0,
+                        analysis TEXT,
+                        qa_passed BOOLEAN DEFAULT FALSE,
+                        qa_errors TEXT,
+                        metadata TEXT,
+                        captured_at TEXT NOT NULL,
+                        processed_at TEXT,
+                        reviewed_at TEXT,
+                        reviewed_by TEXT,
+                        review_notes TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
             
             # Índices para búsquedas rápidas
             cursor.execute("""
@@ -210,7 +256,8 @@ class TrainingCaptureDB:
                     FROM messages 
                     WHERE status = 'needs_review'
                 """)
-                total = cursor.fetchone()['total']
+                result = cursor.fetchone()
+                total = result['total'] if isinstance(result, dict) else result[0]
                 
                 # Obtener mensajes
                 order = "DESC" if sort_desc else "ASC"
@@ -442,21 +489,29 @@ class TrainingCaptureDB:
     
     def _row_to_dict(self, row) -> Dict:
         """Convierte una fila de la base de datos a diccionario."""
+        # Soporta tanto sqlite3.Row como psycopg2 RealDictRow
+        if isinstance(row, dict):
+            # PostgreSQL RealDictRow ya es un dict
+            row_dict = row
+        else:
+            # SQLite Row - convertir a dict
+            row_dict = dict(row)
+        
         return {
-            'id': str(row['id']),
-            'user_id': row['user_id'],
-            'role': row['role'],
-            'content': row['content'],
-            'status': row['status'],
-            'confidence': row['confidence'],
-            'analysis': json.loads(row['analysis']) if row['analysis'] else {},
-            'qa_passed': bool(row['qa_passed']),
-            'qa_errors': json.loads(row['qa_errors']) if row['qa_errors'] else [],
-            'metadata': json.loads(row['metadata']) if row['metadata'] else {},
-            'captured_at': row['captured_at'],
-            'reviewed_at': row['reviewed_at'],
-            'reviewed_by': row['reviewed_by'],
-            'review_notes': row['review_notes'],
+            'id': str(row_dict['id']),
+            'user_id': row_dict['user_id'],
+            'role': row_dict['role'],
+            'content': row_dict['content'],
+            'status': row_dict['status'],
+            'confidence': row_dict['confidence'],
+            'analysis': json.loads(row_dict['analysis']) if row_dict['analysis'] else {},
+            'qa_passed': bool(row_dict['qa_passed']),
+            'qa_errors': json.loads(row_dict['qa_errors']) if row_dict['qa_errors'] else [],
+            'metadata': json.loads(row_dict['metadata']) if row_dict['metadata'] else {},
+            'captured_at': row_dict['captured_at'],
+            'reviewed_at': row_dict['reviewed_at'],
+            'reviewed_by': row_dict['reviewed_by'],
+            'review_notes': row_dict['review_notes'],
         }
     
     def get_stats(self) -> Dict:
