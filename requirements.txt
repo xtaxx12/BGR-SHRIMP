@@ -12,5 +12,5 @@ reportlab==4.4.4
 pillow==11.3.0
 sentry-sdk[fastapi]==2.18.0
 prometheus-client==0.21.0
-numpy>=1.24.0ps
-ycopg2-binary==2.9.9
+numpy>=1.24.0
+psycopg2-binary==2.9.9
