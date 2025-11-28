@@ -626,9 +626,10 @@ async def whatsapp_webhook(request: Request,
                                 logger.error(f"❌ Error calculando precio para {product_data['product']} {product_data['size']}: {str(e)}")
                                 failed_products.append(f"{product_data['product']} {product_data['size']}")
 
-                    # 🆕 VALIDACIÓN: Si hay productos que fallaron, rechazar la cotización
-                    if validate_products_availability(failed_products, response, user_id):
-                        return PlainTextResponse(str(response), media_type="application/xml")
+                        # 🆕 VALIDACIÓN: Si hay productos que fallaron, rechazar la cotización
+                        if validate_products_availability(failed_products, response, user_id):
+                            return PlainTextResponse(str(response), media_type="application/xml")
+                        
                         if products_info:
                             # Detectar idioma y generar PDF consolidado automáticamente
                             user_lang = session_manager.get_user_language(user_id) or 'es'
@@ -664,7 +665,7 @@ async def whatsapp_webhook(request: Request,
                                     session_manager.add_to_conversation(user_id, 'assistant', success_msg)
                                 else:
                                     filename = os.path.basename(pdf_path)
-                                    base_url = os.getenv('BASE_URL', 'https://e30f03031f5a.ngrok-free.app')
+                                    base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
                                     download_url = f"{base_url}/webhook/download-pdf/{filename}"
                                     download_msg = f"✅ Cotización generada\n📄 Descarga: {download_url}"
                                     response.message(download_msg)
@@ -1577,7 +1578,7 @@ async def whatsapp_webhook(request: Request,
                     # Solicitar producto
                     response.message(f"🦐 Detecté {len(sizes_list)} tallas: {', '.join(sizes_list)}\n\n¿Qué producto necesitas?\n\nEjemplo: 'HLSO' o 'HOSO' o 'COOKED'")
                     return PlainTextResponse(str(response), media_type="application/xml")
-            else:
+            elif glaseo_percentage is None:
                 # No especificó glaseo, pedirlo
                 response.message(f"🦐 Detecté {len(sizes_list)} tallas: {', '.join(sizes_list)}\n\n❄️ ¿Qué glaseo necesitas?\n• 0% (sin glaseo)\n• 10%\n• 20%\n• 30%")
                 return PlainTextResponse(str(response), media_type="application/xml")
@@ -2643,17 +2644,25 @@ Responde con el número o escribe:
                     pdf_path = pdf_generator.generate_quote_pdf(price_info, From, selected_language)
 
                     if pdf_path:
+                        logger.info(f"✅ PDF generado exitosamente: {pdf_path}")
+                        logger.info(f"📊 Tamaño del archivo: {os.path.getsize(pdf_path)} bytes")
+                        
                         # Crear URL pública del PDF para envío
                         filename = os.path.basename(pdf_path)
                         base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
                         download_url = f"{base_url}/webhook/download-pdf/{filename}"
+                        
+                        logger.info(f"🔗 URL de descarga: {download_url}")
 
                         # Intentar enviar el PDF por WhatsApp
+                        logger.info(f"📤 Iniciando envío de PDF por WhatsApp a {From}")
                         pdf_sent = whatsapp_sender.send_pdf_document(
                             From,
                             pdf_path,
                             f"Cotización BGR Export - {price_info.get('producto', 'Camarón')} {price_info.get('talla', '')}"
                         )
+                        
+                        logger.info(f"📬 Resultado del envío: {'✅ Exitoso' if pdf_sent else '❌ Fallido'}")
 
                         if pdf_sent:
                             lang_name = "Español 🇪🇸" if selected_language == 'es' else "English 🇺🇸"
