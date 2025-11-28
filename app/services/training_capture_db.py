@@ -14,6 +14,7 @@ import json
 import logging
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from contextlib import contextmanager
 
@@ -39,7 +40,6 @@ class TrainingCaptureDB:
         if not self.database_url:
             logger.warning("⚠️ DATABASE_URL no configurada, usando SQLite como fallback")
             self.use_sqlite = True
-            from pathlib import Path
             self.db_path = Path("data/training_messages.db")
             self.db_path.parent.mkdir(parents=True, exist_ok=True)
         else:
