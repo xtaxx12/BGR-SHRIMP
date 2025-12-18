@@ -1252,10 +1252,86 @@ async def whatsapp_webhook(request: Request,
                     processing_type = ai_analysis.get('processing_type') if ai_analysis else None
                     net_weight = ai_analysis.get('net_weight_percentage') if ai_analysis else None
                     cantidad = ai_analysis.get('cantidad') if ai_analysis else None
+                    flete_custom = ai_analysis.get('flete_custom') if ai_analysis else None  # 🆕 Extraer flete del mensaje
                     
-                    # Si glaseo = 0%, solicitar flete para CFR
+                    # Si glaseo = 0%, verificar si ya tiene flete o solicitar
                     if glaseo_percentage == 0:
-                        logger.info(f"🚢 Glaseo 0% detectado → Solicitando flete para cálculo CFR")
+                        # 🆕 PRIMERO: Verificar si el usuario ya especificó el flete
+                        if flete_custom is not None:
+                            logger.info(f"🚢 Glaseo 0% con flete especificado ${flete_custom:.2f} → Generando cotización directamente")
+                            
+                            # Calcular precios para todos los productos con el flete especificado
+                            products_info = []
+                            failed_products = []
+                            
+                            for product_data in multiple_products:
+                                try:
+                                    query = {
+                                        'product': product_data['product'],
+                                        'size': product_data['size'],
+                                        'glaseo_factor': None,  # Sin glaseo
+                                        'glaseo_percentage': 0,
+                                        'flete_custom': flete_custom,
+                                        'flete_solicitado': True,
+                                        'custom_calculation': True
+                                    }
+                                    
+                                    price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(query,))
+                                    
+                                    if price_info and not price_info.get('error'):
+                                        products_info.append(price_info)
+                                    else:
+                                        failed_products.append(f"{product_data['product']} {product_data['size']}")
+                                except Exception as e:
+                                    logger.error(f"❌ Error calculando precio para {product_data['product']} {product_data['size']}: {str(e)}")
+                                    failed_products.append(f"{product_data['product']} {product_data['size']}")
+                            
+                            if products_info:
+                                # Guardar y generar PDF automáticamente
+                                user_lang = session_manager.get_user_language(user_id) or 'es'
+                                
+                                session_manager.set_last_quote(user_id, {
+                                    'consolidated': True,
+                                    'products_info': products_info,
+                                    'glaseo_percentage': 0,
+                                    'failed_products': failed_products,
+                                    'flete': flete_custom
+                                })
+                                session_manager.set_user_language(user_id, user_lang)
+                                
+                                logger.info(f"📄 Generando PDF consolidado con flete ${flete_custom:.2f}")
+                                pdf_path = pdf_generator.generate_consolidated_quote_pdf(
+                                    products_info,
+                                    From,
+                                    user_lang,
+                                    0  # glaseo_percentage
+                                )
+                                
+                                if pdf_path:
+                                    pdf_sent = whatsapp_sender.send_pdf_document(
+                                        From,
+                                        pdf_path,
+                                        f"Cotización Consolidada BGR Export - {len(products_info)} productos"
+                                    )
+                                    if pdf_sent:
+                                        response.message(f"✅ Cotización consolidada generada con flete ${flete_custom:.2f} - {len(products_info)} productos 🚢")
+                                    else:
+                                        filename = os.path.basename(pdf_path)
+                                        base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
+                                        download_url = f"{base_url}/webhook/download-pdf/{filename}"
+                                        response.message(f"✅ Cotización generada\n📄 Descarga: {download_url}")
+                                    
+                                    session_manager.clear_session(user_id)
+                                else:
+                                    response.message("❌ Error generando PDF consolidado. Intenta nuevamente.")
+                                    session_manager.clear_session(user_id)
+                            else:
+                                response.message("❌ No se pudieron calcular precios para ningún producto.")
+                                session_manager.clear_session(user_id)
+                            
+                            return PlainTextResponse(str(response), media_type="application/xml")
+                        
+                        logger.info(f"🚢 Glaseo 0% detectado sin flete → Solicitando flete para cálculo CFR")
                         
                         # Construir mensaje agrupado por producto
                         products_list = ""
@@ -1487,10 +1563,87 @@ async def whatsapp_webhook(request: Request,
                         session_manager.clear_session(user_id)
                         return PlainTextResponse(str(response), media_type="application/xml")
                     
-                    # IMPORTANTE: Si glaseo = 0% (100% NET), solicitar flete para calcular CFR
+                    # IMPORTANTE: Si glaseo = 0% (100% NET), verificar si ya tiene flete o solicitar
                     # CFR = FOB + Flete (sin aplicar factor de glaseo)
                     if glaseo_percentage == 0:
-                        logger.info(f"🚢 Glaseo 0% detectado → Solicitando flete para cálculo CFR")
+                        flete_custom = ai_analysis.get('flete_custom') if ai_analysis else None  # 🆕 Extraer flete
+                        
+                        # 🆕 PRIMERO: Verificar si el usuario ya especificó el flete
+                        if flete_custom is not None:
+                            logger.info(f"🚢 Glaseo 0% con flete especificado ${flete_custom:.2f} → Generando cotización directamente")
+                            
+                            # Calcular precios para todos los productos con el flete especificado
+                            products_info = []
+                            failed_products = []
+                            
+                            for product_data in multiple_products:
+                                try:
+                                    query = {
+                                        'product': product_data['product'],
+                                        'size': product_data['size'],
+                                        'glaseo_factor': None,  # Sin glaseo
+                                        'glaseo_percentage': 0,
+                                        'flete_custom': flete_custom,
+                                        'flete_solicitado': True,
+                                        'custom_calculation': True
+                                    }
+                                    
+                                    price_info = retry(pricing_service.get_shrimp_price, retries=3, delay=0.5, args=(query,))
+                                    
+                                    if price_info and not price_info.get('error'):
+                                        products_info.append(price_info)
+                                    else:
+                                        failed_products.append(f"{product_data['product']} {product_data['size']}")
+                                except Exception as e:
+                                    logger.error(f"❌ Error calculando precio para {product_data['product']} {product_data['size']}: {str(e)}")
+                                    failed_products.append(f"{product_data['product']} {product_data['size']}")
+                            
+                            if products_info:
+                                # Guardar y generar PDF automáticamente
+                                user_lang = session_manager.get_user_language(user_id) or 'es'
+                                
+                                session_manager.set_last_quote(user_id, {
+                                    'consolidated': True,
+                                    'products_info': products_info,
+                                    'glaseo_percentage': 0,
+                                    'failed_products': failed_products,
+                                    'flete': flete_custom
+                                })
+                                session_manager.set_user_language(user_id, user_lang)
+                                
+                                logger.info(f"📄 Generando PDF consolidado con flete ${flete_custom:.2f}")
+                                pdf_path = pdf_generator.generate_consolidated_quote_pdf(
+                                    products_info,
+                                    From,
+                                    user_lang,
+                                    0  # glaseo_percentage
+                                )
+                                
+                                if pdf_path:
+                                    pdf_sent = whatsapp_sender.send_pdf_document(
+                                        From,
+                                        pdf_path,
+                                        f"Cotización Consolidada BGR Export - {len(products_info)} productos"
+                                    )
+                                    if pdf_sent:
+                                        response.message(f"✅ Cotización consolidada generada con flete ${flete_custom:.2f} - {len(products_info)} productos 🚢")
+                                    else:
+                                        filename = os.path.basename(pdf_path)
+                                        base_url = os.getenv('BASE_URL', 'https://bgr-shrimp.onrender.com')
+                                        download_url = f"{base_url}/webhook/download-pdf/{filename}"
+                                        response.message(f"✅ Cotización generada\n📄 Descarga: {download_url}")
+                                    
+                                    session_manager.clear_session(user_id)
+                                else:
+                                    response.message("❌ Error generando PDF consolidado. Intenta nuevamente.")
+                                    session_manager.clear_session(user_id)
+                            else:
+                                response.message("❌ No se pudieron calcular precios para ningún producto.")
+                                session_manager.clear_session(user_id)
+                            
+                            return PlainTextResponse(str(response), media_type="application/xml")
+                        
+                        logger.info(f"🚢 Glaseo 0% detectado sin flete → Solicitando flete para cálculo CFR")
                         
                         destination = ai_analysis.get('destination') if ai_analysis else "destino"
                         processing_type = ai_analysis.get('processing_type') if ai_analysis else None
