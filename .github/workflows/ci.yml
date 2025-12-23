@@ -125,6 +125,7 @@ jobs:
         pytest tests/integration/ -v
       env:
         ENVIRONMENT: testing
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4

@@ -11,9 +11,16 @@ import pytest
 from app.services.openai_service import OpenAIService
 
 
+def _has_valid_openai_key():
+    """Verifica si hay una API key válida de OpenAI (no una key de test)."""
+    key = os.getenv('OPENAI_API_KEY', '')
+    # Las keys reales de OpenAI empiezan con 'sk-'
+    return key.startswith('sk-')
+
+
 @pytest.mark.skipif(
-    not os.getenv('OPENAI_API_KEY'),
-    reason="Requiere OPENAI_API_KEY configurada"
+    not _has_valid_openai_key(),
+    reason="Requiere OPENAI_API_KEY válida (no test_key)"
 )
 def test_deteccion_completa():
     """Test para verificar que se detectan todos los elementos del mensaje"""
