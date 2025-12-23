@@ -59,7 +59,7 @@ def patch_services(monkeypatch):
     # Patch get_services to use dummies
     def dummy_get_services():
         return (DummyPricing(), None, DummyPDF(), DummyWhatsApp(), DummyOpenAI())
-    monkeypatch.setattr('app.routes.get_services', lambda: dummy_get_services())
+    monkeypatch.setattr('app.utils.service_utils.get_services', dummy_get_services)
 
     # Patch session_manager to start clean
     from app.services.session import session_manager

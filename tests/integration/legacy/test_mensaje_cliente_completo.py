@@ -3,9 +3,18 @@ Test para verificar que el bot detecta correctamente todos los casos de uso del 
 Mensaje de prueba: "Hola Erick, como estas? podras ofertar otros tamaños de camaron? 
 HLSO 16-20/ 21-25/26-30/31-35/36-40/41-50/51-60 HOSO 20-30/30-40/40-50 BRINE 100% NET 20k/caja"
 """
+import os
 import re
+
+import pytest
+
 from app.services.openai_service import OpenAIService
 
+
+@pytest.mark.skipif(
+    not os.getenv('OPENAI_API_KEY'),
+    reason="Requiere OPENAI_API_KEY configurada"
+)
 def test_deteccion_completa():
     """Test para verificar que se detectan todos los elementos del mensaje"""
     

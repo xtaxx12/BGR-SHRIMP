@@ -79,7 +79,7 @@ DDP LA or Houston
     def dummy_get_services():
         return (DummyPricing(), None, None, None, DummyOpenAI())
 
-    monkeypatch.setattr('app.routes.get_services', lambda: dummy_get_services())
+    monkeypatch.setattr('app.utils.service_utils.get_services', dummy_get_services)
 
     payload = {
         'Body': body,
