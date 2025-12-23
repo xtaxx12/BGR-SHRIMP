@@ -2,7 +2,9 @@ import base64
 import hashlib
 import hmac
 import logging
+import os
 import secrets
+import tempfile
 import time
 from collections import defaultdict
 from collections.abc import Callable
@@ -180,8 +182,6 @@ def validate_phone_number(phone: str) -> bool:
     return True
 
 # Manejador seguro de archivos temporales
-import os
-import tempfile
 
 
 class SecureTempFile:
