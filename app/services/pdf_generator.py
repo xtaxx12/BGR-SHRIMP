@@ -122,7 +122,13 @@ class PDFGenerator:
                     "concepto": "Concepto",
                     "detalle": "Detalle",
                     "glaseo_aplicado": "Glaseo Aplicado",
-                    "especificacion": "Especificación"
+                    "especificacion": "Especificación",
+                    "contacto": "Contacto: BGR Export | amerino@bgrexport.com | +593 98-805-7425",
+                    "notas": "NOTAS IMPORTANTES:",
+                    "nota1": "• Precios sujetos a disponibilidad y confirmación.",
+                    "nota2": "• Validez de la cotización: 7 días.",
+                    "nota3": "• Condiciones de pago: Según acuerdo comercial.",
+                    "ref": "Ref"
                 },
                 "en": {
                     "cotizacion": f"{tipo_cotizacion} QUOTATION",
@@ -136,7 +142,13 @@ class PDFGenerator:
                     "concepto": "Concept",
                     "detalle": "Detail",
                     "glaseo_aplicado": "Applied Glazing",
-                    "especificacion": "Specification"
+                    "especificacion": "Specification",
+                    "contacto": "Contact: BGR Export | amerino@bgrexport.com | +593 98-805-7425",
+                    "notas": "IMPORTANT NOTES:",
+                    "nota1": "• Prices subject to availability and confirmation.",
+                    "nota2": "• Quote validity: 7 days.",
+                    "nota3": "• Payment terms: According to commercial agreement.",
+                    "ref": "Ref"
                 }
             }
 
@@ -164,7 +176,10 @@ class PDFGenerator:
             # Extraer datos del price_info
             producto = price_info.get('producto', 'N/A')
             talla = price_info.get('talla', 'N/A')
-            cliente = price_info.get('cliente_nombre', 'Cliente')
+            cliente = price_info.get('cliente_nombre', '')
+            # Fallback: si no hay nombre, usar teléfono
+            if not cliente and user_phone:
+                cliente = user_phone
             # Usar solo el país para el destino en el PDF (ya calculado arriba)
             destino = destino_pais if destino_pais else 'N/A'
             glaseo_factor = price_info.get('factor_glaseo') if price_info.get('factor_glaseo') is not None else price_info.get('glaseo_factor')
@@ -190,10 +205,12 @@ class PDFGenerator:
                 [t["fecha_cotizacion"], fecha_actual],
                 [t["producto"], producto],
                 [t["talla"], talla],
-                [t["cliente"], cliente],
-                [t["destino"], destino],
-                [t["glaseo_solicitado"], glaseo_display]
             ]
+            # Solo mostrar fila de cliente si tiene valor
+            if cliente:
+                info_data.append([t["cliente"], cliente])
+            info_data.append([t["destino"], destino])
+            info_data.append([t["glaseo_solicitado"], glaseo_display])
 
             # Nota: Información de flete eliminada por solicitud del usuario
 
@@ -291,7 +308,47 @@ class PDFGenerator:
             ]))
 
             story.append(precio_centered)
-            # === TABLA DE DETALLES ELIMINADA (según solicitud) ===
+            story.append(Spacer(1, 20))
+
+            # === NÚMERO DE REFERENCIA / FOLIO ===
+            ref_style = ParagraphStyle(
+                'RefStyle',
+                parent=styles['Normal'],
+                fontSize=8,
+                textColor=colors.grey,
+                alignment=TA_CENTER
+            )
+            story.append(Paragraph(
+                f"{t['ref']}: {quote_number}",
+                ref_style
+            ))
+            story.append(Spacer(1, 15))
+
+            # === NOTAS IMPORTANTES ===
+            notes_style = ParagraphStyle(
+                'Notes',
+                parent=styles['Normal'],
+                fontSize=9,
+                textColor=colors.black,
+                spaceAfter=5
+            )
+            story.append(Paragraph(
+                f"<b>{t['notas']}</b>", notes_style
+            ))
+            story.append(Paragraph(t['nota1'], notes_style))
+            story.append(Paragraph(t['nota2'], notes_style))
+            story.append(Paragraph(t['nota3'], notes_style))
+            story.append(Spacer(1, 15))
+
+            # === CONTACTO ===
+            contact_style = ParagraphStyle(
+                'Contact',
+                parent=styles['Normal'],
+                fontSize=8,
+                textColor=colors.grey,
+                alignment=TA_CENTER
+            )
+            story.append(Paragraph(t['contacto'], contact_style))
 
             # Generar PDF
             doc.build(story)
@@ -310,7 +367,7 @@ class PDFGenerator:
             logger.error(f"❌ Error generando PDF: {str(e)}")
             return None
 
-    def generate_consolidated_quote_pdf(self, products_info: list, user_phone: str = None, language: str = "es", glaseo_percentage: int = 20, destination: str = None) -> str:
+    def generate_consolidated_quote_pdf(self, products_info: list, user_phone: str = None, language: str = "es", glaseo_percentage: int = 20, destination: str = None, cliente_nombre: str = None) -> str:
         """
         Genera un PDF consolidado con múltiples productos
         
@@ -384,7 +441,9 @@ class PDFGenerator:
                     "notas": "NOTAS IMPORTANTES:",
                     "nota1": "• Precios sujetos a disponibilidad y confirmación.",
                     "nota2": "• Validez de la cotización: 7 días.",
-                    "nota3": "• Condiciones de pago: Según acuerdo comercial."
+                    "nota3": "• Condiciones de pago: Según acuerdo comercial.",
+                    "cliente": "Cliente",
+                    "ref": "Ref"
                 },
                 "en": {
                     "titulo": "CONSOLIDATED QUOTATION",
@@ -399,7 +458,9 @@ class PDFGenerator:
                     "notas": "IMPORTANT NOTES:",
                     "nota1": "• Prices subject to availability and confirmation.",
                     "nota2": "• Quote validity: 7 days.",
-                    "nota3": "• Payment terms: According to commercial agreement."
+                    "nota3": "• Payment terms: According to commercial agreement.",
+                    "cliente": "Client",
+                    "ref": "Ref"
                 }
             }
 
@@ -425,6 +486,13 @@ class PDFGenerator:
                 [nro_label, quote_number],
                 [t["fecha"], fecha_actual],
             ]
+
+            # Mostrar cliente si hay nombre o teléfono
+            cliente_display = cliente_nombre
+            if not cliente_display and user_phone:
+                cliente_display = user_phone
+            if cliente_display:
+                info_data.append([t["cliente"], cliente_display])
 
             if destination:
                 info_data.append([t["destino"], destination])
@@ -520,7 +588,21 @@ class PDFGenerator:
             story.append(Paragraph(t['nota1'], notes_style))
             story.append(Paragraph(t['nota2'], notes_style))
             story.append(Paragraph(t['nota3'], notes_style))
-            story.append(Spacer(1, 0.2*inch))
+            story.append(Spacer(1, 0.15*inch))
+
+            # === REFERENCIA / FOLIO ===
+            ref_style = ParagraphStyle(
+                'RefStyle',
+                parent=styles['Normal'],
+                fontSize=8,
+                textColor=colors.grey,
+                alignment=TA_CENTER
+            )
+            story.append(Paragraph(
+                f"{t['ref']}: {quote_number}",
+                ref_style
+            ))
+            story.append(Spacer(1, 0.1*inch))
 
             # === CONTACTO ===
             contact_style = ParagraphStyle(
