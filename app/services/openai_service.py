@@ -573,135 +573,72 @@ Usuario: "Lagostino Cocedero CFR Lisboa: Inteiro 20/30, 30/40. Colas 21/25, 31/3
             return self._basic_intent_analysis(message)
 
         try:
-            system_prompt = """
-Analiza solicitudes de exportación de camarón/langostino y extrae información estructurada.
+            system_prompt = """Extrae información estructurada de solicitudes de camarón/langostino.
 
-PRODUCTOS VÁLIDOS: HOSO, HLSO, P&D IQF, P&D BLOQUE, EZ PEEL, PuD-EUROPA, PuD-EEUU, COOKED, PRE-COCIDO, COCIDO SIN TRATAR
-TALLAS VÁLIDAS: U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60, 60/70, 61/70, 70/80, 71/90
+PRODUCTOS: HOSO, HLSO, P&D IQF, P&D BLOQUE, EZ PEEL, PuD-EUROPA, PuD-EEUU, COOKED, PRE-COCIDO, COCIDO SIN TRATAR
+TALLAS: U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60, 60/70, 61/70, 70/80, 71/90
 
-RECONOCIMIENTO DE TÉRMINOS (español/portugués/inglés):
-IMPORTANTE: "Cocedero"/"Cocido" es la CALIDAD/PROCESAMIENTO, NO el producto final.
+MAPEO DE TÉRMINOS:
+- "Colas"/"Cola" (sin cocedero) → HLSO | "Colas Cocedero"/"Cocidas" → COOKED
+- "Inteiro"/"Entero" (sin cocedero) → HOSO | "Inteiro Cocedero" → needs_product_type: true
+- Solo "Cocedero" → needs_product_type: true (preguntar COOKED/PRE-COCIDO/COCIDO SIN TRATAR)
+- "CFR/CIF [ciudad]" → destination + flete_solicitado: true
+- "Cola X/X con flete Y" → product: HLSO, flete_custom: Y
+- Normalizar tallas: "16-20" → "16/20", "16 20" → "16/20"
+- "BRINE/Salmuera" → processing_type | "100% NET" → net_weight_percentage: 100
 
-COMBINACIONES VÁLIDAS:
-- "Inteiro Cocedero" / "Entero Cocido" → Solicitar aclaración (¿HOSO cocido? ¿COOKED entero?)
-- "Colas Cocedero" / "Colas Cocidas" → COOKED (colas peladas cocidas)
-- Solo "Cocedero" sin especificar → Solicitar tipo: COOKED, PRE-COCIDO, COCIDO SIN TRATAR
-- "Inteiro" solo (sin cocedero) → HOSO (camarón entero crudo)
-- "Colas" / "Cola" solo (sin cocedero) → HLSO (camarón sin cabeza, con cáscara)
-- "Precio CFR de cola 20/30" → HLSO 20/30 con flete (NO es COOKED ni P&D IQF)
-
-OTROS TÉRMINOS:
-- "Lagostino", "Vannamei", "Camarón", "Shrimp" → Todos válidos
-- "CFR [ciudad]", "CIF [ciudad]" → Detectar destino y marcar flete_solicitado: true
-- "Contenedor" → Solicitud de cotización grande
-- "BRINE", "Salmuera" → Tipo de procesamiento (extraer como processing_type)
-- "NET", "Neto" → Peso neto (extraer porcentaje si está presente, ej: "100% NET")
-- Cantidades con formato: "20k/caja", "10kg/caja", "5000kg", "10000lb"
-
-FORMATOS DE TALLAS A RECONOCER:
-- Con guión: "16-20", "21-25", "26-30" → Normalizar a "16/20", "21/25", "26/30"
-- Con barra: "16/20", "21/25" → Mantener formato
-- Separadas por espacios: "16 20" → Normalizar a "16/20"
-
-EXTRAE (valores exactos o null):
-- Intent: pricing|proforma|product_info|greeting|help|other
-- Product: nombre exacto del producto (o null si necesita especificar entre COOKED/PRE-COCIDO/COCIDO SIN TRATAR)
-- Size: talla exacta (o array de tallas si menciona múltiples)
-- Sizes: array con TODAS las tallas detectadas (normalizar formato a X/X)
-- Sizes_by_product: objeto agrupando tallas por producto {"HLSO": ["16/20", "21/25"], "HOSO": ["20/30"]}
-- Glaseo: porcentaje (0, 10, 20, 30) → convertir a factor decimal
-  * 0% = null (sin glaseo, CFR simple)
-  * 10% = 0.90
-  * 20% = 0.80
-  * 30% = 0.70
-- Destination: ciudad/país si menciona "CFR [lugar]", "CIF [lugar]", "flete a [lugar]", "envío a [lugar]"
-- Flete: valor numérico si menciona "flete 0.30", "freight $0.25", etc.
-- Cantidad: número + unidad (ej: "5000 kg", "10000 lb", "20k/caja")
-- Processing_type: "BRINE", "SALMUERA", u otro tipo de procesamiento mencionado
-- Net_weight_percentage: porcentaje de peso neto si menciona (ej: "100% NET" → 100)
-- Cliente: nombre si menciona "cliente [nombre]", "para [nombre]"
-- Language: "es" (español) o "en" (inglés)
-- Multiple_sizes: true si detecta múltiples tallas en el mensaje
-- Multiple_products: true si detecta múltiples productos diferentes
-
-REGLAS IMPORTANTES:
-1. Si menciona tallas (ej: 20/30, 21/25) → intent: "proforma" (incluso si empieza con saludo)
-2. NORMALIZAR TODAS LAS TALLAS: "16-20" → "16/20", "21-25" → "21/25"
-3. EXTRAER TODAS LAS TALLAS sin excepción, incluso si hay 10+ tallas
-4. Si menciona CFR/CIF sin glaseo → flete_solicitado: true, glaseo_factor: null (cálculo CFR simple: FOB + Flete)
-5. Si menciona CFR/CIF con glaseo (ej: "CFR con 15%") → flete_solicitado: true, glaseo_factor: 0.85
-6. Si menciona "Cocedero" + "Inteiro" → multiple_presentations: true, needs_product_type: true, clarification_needed
-7. Si menciona "Cocedero" + "Colas" → product: "COOKED" (colas cocidas)
-8. Si menciona solo "Cocedero" → product: null, needs_product_type: true
-9. Si menciona "Cola" o "Colas" SIN "Cocedero" → product: "HLSO" (camarón sin cabeza, con cáscara)
-10. Si detecta múltiples tallas → multiple_sizes: true, listar TODAS en array
-11. Si detecta "Inteiro" y "Colas" en el mismo mensaje → separar tallas: sizes_inteiro y sizes_colas
-12. NO asumir valores por defecto - extraer solo lo que el usuario dice explícitamente
-13. CFR sin glaseo = Precio FOB + Flete (simple, sin aplicar factor de glaseo)
-14. CFR con glaseo = Precio FOB + Glaseo + Flete (completo)
-15. "Precio CFR de cola 20/30 con 0.25 de flete" → product: "HLSO", size: "20/30", flete_custom: 0.25, glaseo_factor: null
-16. Extraer "BRINE" como processing_type si está presente
-17. Extraer "100% NET" como net_weight_percentage: 100
-18. Extraer cantidades como "20k/caja" → cantidad: "20000 kg/caja"
+REGLAS:
+1. Si menciona tallas → intent: "proforma" (incluso con saludo)
+2. Extraer TODAS las tallas, normalizar a formato X/X
+3. Si "Inteiro" + "Colas" → separar en sizes_inteiro y sizes_colas
+4. CFR sin glaseo → glaseo_factor: null | CFR con glaseo X% → glaseo_factor: (100-X)/100
+5. NO asumir valores por defecto, extraer solo lo explícito
+6. Glaseo: 0%=null, 10%=0.90, 20%=0.80, 30%=0.70
 
 EJEMPLOS:
 Input: "HLSO 16/20 con 20% glaseo"
-Output: {intent: "proforma", product: "HLSO", size: "16/20", sizes: ["16/20"], glaseo_factor: 0.80, destination: null, confidence: 0.9}
+Output: {"intent":"proforma","product":"HLSO","size":"16/20","sizes":["16/20"],"glaseo_factor":0.80,"confidence":0.9}
 
-Input: "Hola Erick, como estas? podras ofertar otros tamaños de camaron? HLSO 16-20/ 21-25/26-30/31-35/36-40/41-50/51-60 HOSO 20-30/30-40/40-50 BRINE 100% NET 20k/caja"
-Output: {intent: "proforma", product: null, multiple_products: true, multiple_sizes: true, sizes: ["16/20", "21/25", "26/30", "31/35", "36/40", "41/50", "51/60", "20/30", "30/40", "40/50"], sizes_by_product: {"HLSO": ["16/20", "21/25", "26/30", "31/35", "36/40", "41/50", "51/60"], "HOSO": ["20/30", "30/40", "40/50"]}, processing_type: "BRINE", net_weight_percentage: 100, cantidad: "20000 kg/caja", glaseo_factor: null, glaseo_percentage: null, confidence: 0.95}
+Input: "HLSO 16-20/21-25/26-30 HOSO 20-30/30-40 BRINE 100% NET 20k/caja"
+Output: {"intent":"proforma","multiple_products":true,"multiple_sizes":true,"sizes":["16/20","21/25","26/30","20/30","30/40"],"sizes_by_product":{"HLSO":["16/20","21/25","26/30"],"HOSO":["20/30","30/40"]},"processing_type":"BRINE","net_weight_percentage":100,"cantidad":"20000 kg/caja","confidence":0.95}
 
-Input: "Buenas Tardes. Necesito precios Lagostino Cocedero CFR Lisboa: Inteiro 0% 20/30, 30/40, 40/50. Colas 21/25, 31/35, 36/40, 41/50"
-Output: {intent: "proforma", product: null, needs_product_type: true, product_category: "cocido", sizes_inteiro: ["20/30", "30/40", "40/50"], sizes_colas: ["21/25", "31/35", "36/40", "41/50"], sizes: ["20/30", "30/40", "40/50", "21/25", "31/35", "36/40", "41/50"], destination: "Lisboa", flete_solicitado: true, glaseo_factor: null, glaseo_percentage: 0, multiple_sizes: true, multiple_presentations: true, clarification_needed: "Cliente solicita 'Inteiro Cocedero' y 'Colas Cocedero'. Confirmar productos específicos.", confidence: 0.95}
-
-Input: "Precio CFR Houston HLSO 16/20"
-Output: {intent: "proforma", product: "HLSO", size: "16/20", sizes: ["16/20"], destination: "Houston", flete_solicitado: true, glaseo_factor: null, confidence: 0.9}
-
-Input: "Precio CFR Houston HLSO 16/20 con 15% glaseo"
-Output: {intent: "proforma", product: "HLSO", size: "16/20", sizes: ["16/20"], destination: "Houston", flete_solicitado: true, glaseo_factor: 0.85, glaseo_percentage: 15, confidence: 0.95}
+Input: "Cocedero CFR Lisboa: Inteiro 20/30, 30/40. Colas 21/25, 31/35"
+Output: {"intent":"proforma","needs_product_type":true,"product_category":"cocido","sizes_inteiro":["20/30","30/40"],"sizes_colas":["21/25","31/35"],"sizes":["20/30","30/40","21/25","31/35"],"destination":"Lisboa","flete_solicitado":true,"glaseo_percentage":0,"multiple_sizes":true,"multiple_presentations":true,"confidence":0.95}
 
 Input: "Precio cfr de cola 20/30 con 0.25 de flete"
-Output: {intent: "proforma", product: "HLSO", size: "20/30", sizes: ["20/30"], flete_custom: 0.25, flete_solicitado: true, glaseo_factor: null, glaseo_percentage: 0, confidence: 0.95}
-
-Input: "Necesito precios CFR Lisboa Inteiro 0% 20/30, 30/40"
-Output: {intent: "proforma", product: null, needs_product_type: true, sizes: ["20/30", "30/40"], destination: "Lisboa", flete_solicitado: true, glaseo_factor: null, glaseo_percentage: 0, confidence: 0.9}
-
-Input: "Precio DDP Houston con flete 0.30"
-Output: {intent: "proforma", destination: "Houston", flete_custom: 0.30, is_ddp: true, usar_libras: false, confidence: 0.9}
+Output: {"intent":"proforma","product":"HLSO","size":"20/30","sizes":["20/30"],"flete_custom":0.25,"flete_solicitado":true,"confidence":0.95}
 
 Input: "Hola, necesito cotización"
-Output: {intent: "greeting", product: null, wants_proforma: true, confidence: 0.8}
+Output: {"intent":"greeting","wants_proforma":true,"confidence":0.8}
 
-Responde SOLO en JSON:
+Responde SOLO JSON. Incluye solo campos con valor (omite null/false):
 {
-  "intent": "...",
-  "product": null | "...",
-  "size": null | "...",
-  "sizes": null | [...],
-  "sizes_by_product": null | {...},
-  "sizes_inteiro": null | [...],
-  "sizes_colas": null | [...],
-  "multiple_sizes": false,
-  "multiple_products": false,
-  "multiple_presentations": false,
-  "needs_product_type": false,
-  "product_category": null | "cocido",
-  "clarification_needed": null | "...",
-  "glaseo_factor": null | number,
-  "glaseo_percentage": null | number,
-  "destination": null | "...",
-  "flete_custom": null | number,
-  "precio_base_custom": null | number,
-  "flete_solicitado": false,
-  "is_ddp": false,
-  "usar_libras": false,
-  "cantidad": null | "...",
-  "processing_type": null | "...",
-  "net_weight_percentage": null | number,
-  "cliente_nombre": null | "...",
-  "wants_proforma": false,
+  "intent": "proforma|pricing|product_info|greeting|help|other",
+  "product": "HLSO",
+  "size": "16/20",
+  "sizes": ["16/20","21/25"],
+  "sizes_by_product": {"HLSO":["16/20"]},
+  "sizes_inteiro": ["20/30"],
+  "sizes_colas": ["21/25"],
+  "multiple_sizes": true,
+  "multiple_products": true,
+  "multiple_presentations": true,
+  "needs_product_type": true,
+  "product_category": "cocido",
+  "clarification_needed": "...",
+  "glaseo_factor": 0.80,
+  "glaseo_percentage": 20,
+  "destination": "Houston",
+  "flete_custom": 0.25,
+  "flete_solicitado": true,
+  "is_ddp": true,
+  "cantidad": "20000 kg/caja",
+  "processing_type": "BRINE",
+  "net_weight_percentage": 100,
+  "cliente_nombre": "...",
+  "wants_proforma": true,
   "language": "es",
-  "confidence": 0.0-1.0
+  "confidence": 0.9
 }
 """
 
@@ -710,8 +647,8 @@ Responde SOLO en JSON:
                 {"role": "user", "content": f"Mensaje: '{message}'"}
             ]
 
-            # 🆕 Forzar modelo base para análisis JSON (el fine-tuned responde en texto)
-            result = self._make_request(messages, max_tokens=300, temperature=0.3, force_base_model=True)
+            # Forzar modelo base para análisis JSON (el fine-tuned responde en texto)
+            result = self._make_request(messages, max_tokens=400, temperature=0.3, force_base_model=True)
 
             if result:
                 # Intentar parsear como JSON
