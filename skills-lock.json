@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "copywriting": {
+      "source": "coreyhaines31/marketingskills",
+      "sourceType": "github",
+      "computedHash": "c008c80aff1eec1aba190edf421772a3f350e91405d4207575092b663c3702a7"
+    },
+    "xlsx": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "computedHash": "cb7fba2177d0d35d14b3244272b25d1b05246e99b3468a087fe06c84193dbd20"
+    }
+  }
+}
