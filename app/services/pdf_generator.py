@@ -11,6 +11,28 @@ from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Tabl
 
 logger = logging.getLogger(__name__)
 
+# Contador de cotizaciones persistente en archivo
+QUOTE_COUNTER_FILE = "data/quote_counter.txt"
+
+
+def _next_quote_number() -> str:
+    """Genera el siguiente número de cotización secuencial: BGR-YYYY-NNNN"""
+    counter = 1
+    if os.path.exists(QUOTE_COUNTER_FILE):
+        try:
+            with open(QUOTE_COUNTER_FILE, "r") as f:
+                counter = int(f.read().strip()) + 1
+        except (ValueError, OSError):
+            counter = 1
+
+    os.makedirs(os.path.dirname(QUOTE_COUNTER_FILE), exist_ok=True)
+    with open(QUOTE_COUNTER_FILE, "w") as f:
+        f.write(str(counter))
+
+    year = datetime.now().year
+    return f"BGR-{year}-{counter:04d}"
+
+
 class PDFGenerator:
     def __init__(self):
         self.output_dir = "generated_pdfs"
@@ -58,10 +80,12 @@ class PDFGenerator:
             story = []
             styles = getSampleStyleSheet()
 
+            # Número de cotización
+            quote_number = _next_quote_number()
+
             # Colores corporativos BGR Export
-            azul_marino = colors.HexColor('#1e3a8a')  # Azul marino
-            naranja = colors.HexColor('#ea580c')      # Naranja
-            gris_claro = colors.HexColor('#f8fafc')   # Gris muy claro
+            azul_marino = colors.HexColor('#1e3a8a')
+            naranja = colors.HexColor('#ea580c')
 
             # === REGLAS DE NEGOCIO ===
             # Determinar si es FOB o CFR basado en si se solicitó flete
@@ -159,7 +183,10 @@ class PDFGenerator:
                 glaseo_display = "N/A"
 
             # Tabla de información general (multiidioma)
+            nro_label = "N° Cotización" if language == "es" \
+                else "Quote #"
             info_data = [
+                [nro_label, quote_number],
                 [t["fecha_cotizacion"], fecha_actual],
                 [t["producto"], producto],
                 [t["talla"], talla],
@@ -324,10 +351,17 @@ class PDFGenerator:
             azul_marino = colors.HexColor('#1e3a8a')
             naranja = colors.HexColor('#f97316')
 
+            # Número de cotización
+            quote_number = _next_quote_number()
+
             # === LOGO ===
-            logo_path = "app/static/logo_bgr.png"
+            logo_path = os.path.join("data", "logoBGR.png")
             if os.path.exists(logo_path):
-                logo = Image(logo_path, width=3*inch, height=0.8*inch)
+                logo = Image(
+                    logo_path,
+                    width=4.9*inch,
+                    height=1*inch
+                )
                 logo.hAlign = 'CENTER'
                 story.append(logo)
                 story.append(Spacer(1, 0.3*inch))
@@ -385,7 +419,10 @@ class PDFGenerator:
 
             # Información general
             fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
+            nro_label = "N° Cotización" if language == "es" \
+                else "Quote #"
             info_data = [
+                [nro_label, quote_number],
                 [t["fecha"], fecha_actual],
             ]
 
@@ -419,12 +456,18 @@ class PDFGenerator:
                 t["precio_cfr"]
             ]]
 
-            # Agregar cada producto
+            # Agregar cada producto (filtrar inválidos)
             for product_info in products_info:
                 producto = product_info.get('producto', 'N/A')
                 talla = product_info.get('talla', 'N/A')
                 precio_fob = product_info.get('precio_fob_kg', 0)
                 precio_cfr = product_info.get('precio_final_kg', 0)
+
+                # Filtrar filas sin datos válidos
+                if producto in ('N/A', '', None):
+                    continue
+                if precio_fob == 0 and precio_cfr == 0:
+                    continue
 
                 table_data.append([
                     producto,
