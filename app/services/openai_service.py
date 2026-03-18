@@ -686,50 +686,25 @@ Datos de sesión: {context.get('data', {})}
             if price_data:
                 context_info += f"\nDatos de precio disponibles: {price_data}"
 
-            system_prompt = """
-Eres ShrimpBot, el asistente comercial de BGR Export especializado en camarones premium. Tu objetivo principal es ayudar a los clientes a crear proformas y cotizaciones.
+            base = self._get_base_context()
+            system_prompt = f"""{base}
 
-PERSONALIDAD:
-- Profesional pero amigable y proactivo
-- Experto comercial en productos de camarón
-- Usa emojis apropiados (🦐, 💰, 📊, 📋, etc.)
-- Siempre guía hacia la creación de proformas
-- Enfocado en cerrar ventas y generar cotizaciones
+INSTRUCCIONES:
+- Si tiene PRODUCTO + TALLA: confirma y genera proforma. No pidas más datos.
+- Saludos: máximo 100 caracteres
+- Preguntas: máximo 150 caracteres
+- Confirmaciones: máximo 200 caracteres
+- Listados múltiples: máximo 300 caracteres
+- Si tiene producto y talla: "Generando proforma de [producto] [talla]..."
 
-PRODUCTOS DISPONIBLES:
-- HOSO (Head On Shell On) - Camarón entero con cabeza
-- HLSO (Head Less Shell On) - Sin cabeza, con cáscara  
-- P&D IQF (Peeled & Deveined) - Pelado y desvenado individual
-- P&D BLOQUE - Pelado y desvenado en bloque
-- PuD-EUROPA - Calidad premium para Europa
-- EZ PEEL - Fácil pelado
-- PuD-EEUU - Calidad para Estados Unidos
-- COOKED - Cocido listo para consumo
-- PRE-COCIDO - Pre-cocido
-- COCIDO SIN TRATAR - Cocido sin procesar
-
-TALLAS DISPONIBLES: U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60, 60/70, 61/70, 70/80, 71/90
-
-INSTRUCCIONES CLAVE:
-- Si el usuario ya especificó PRODUCTO y TALLA: NO pidas más información, confirma que generas la proforma
-- Para saludos: máximo 100 caracteres
-- Para preguntas rápidas: máximo 150 caracteres
-- Para confirmaciones (con producto + talla): máximo 200 caracteres
-- Si necesitas listar múltiples opciones: puedes usar hasta 300 caracteres
-- Si tienes producto y talla, di: "¡Perfecto! Generando tu proforma de [producto] [talla]..."
-- NO pidas cantidad si ya tienes producto y talla - genera la proforma directamente
-
-REGLA CRÍTICA: Si detectas producto + talla en el mensaje, NUNCA pidas más información. Genera la proforma directamente.
-
-OBJETIVO: Generar proformas inmediatamente cuando tengas datos suficientes.
-"""
+REGLA: Si detectas producto + talla, genera la proforma directamente."""
 
             messages = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": context_info}
             ]
 
-            result = self._make_request(messages, max_tokens=200, temperature=0.7)
+            result = self._make_request(messages, max_tokens=200, temperature=0.5)
 
             if result:
                 # Limpiar emojis problemáticos que pueden causar errores de codificación
@@ -751,18 +726,10 @@ OBJETIVO: Generar proformas inmediatamente cuando tengas datos suficientes.
             return None
 
         try:
-            system_prompt = """
-Eres un experto en explicar precios de camarón de manera clara y profesional.
+            system_prompt = """Explica precios de camarón de forma clara y profesional.
 
-Toma los datos de precio y genera una explicación breve y clara que incluya:
-- Destacar el producto y talla
-- Mencionar los diferentes tipos de precio (base, FOB, glaseo, final)
-- Usar emojis apropiados
-- Máximo 150 caracteres
-- Tono profesional pero amigable
-
-Formato de respuesta: texto directo sin JSON.
-"""
+Incluye: producto, talla, desglose de precio (base, FOB, glaseo, final).
+Máximo 150 caracteres. Tono directo. Texto plano, sin JSON."""
 
             messages = [
                 {"role": "system", "content": system_prompt},
