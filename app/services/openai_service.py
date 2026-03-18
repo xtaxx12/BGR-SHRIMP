@@ -776,19 +776,15 @@ TONO: Profesional y directo. Respuestas concisas sin emojis excesivos. Máximo u
 
             system_prompt = f"""{base}
 
-TAREA: Responder a un saludo de forma amigable y directa.
-LÍMITE: Máximo 100 caracteres.
-OBJETIVO: Saludar Y preguntar qué producto necesita.
-
-{user_context}
-"""
+TAREA: Saluda y pregunta qué producto necesita cotizar.
+LÍMITE: Máximo 100 caracteres. {user_context}"""
 
             messages = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": "Saluda al usuario"}
             ]
 
-            result = self._make_request(messages, max_tokens=50, temperature=0.8)
+            result = self._make_request(messages, max_tokens=50, temperature=0.5)
 
             if result:
                 logger.info(f"💬 Saludo generado: {result[:50]}...")
@@ -820,20 +816,15 @@ OBJETIVO: Saludar Y preguntar qué producto necesita.
 
             system_prompt = f"""{base}
 
-TAREA: Confirmar que vas a generar la proforma.
-LÍMITE: Máximo 200 caracteres.
-TONO: Entusiasta y profesional.
-FORMATO: "¡Perfecto! Generando tu proforma de [producto] [talla]..."
-
-Datos detectados: {context}
-"""
+TAREA: Confirmar generación de proforma. Formato: "Generando proforma de [producto] [talla]..."
+LÍMITE: Máximo 200 caracteres. Datos: {context}"""
 
             messages = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": "Confirma generación de proforma"}
             ]
 
-            result = self._make_request(messages, max_tokens=80, temperature=0.7)
+            result = self._make_request(messages, max_tokens=80, temperature=0.3)
 
             if result:
                 logger.info(f"✅ Confirmación generada para {product} {size}")
@@ -896,18 +887,15 @@ Datos detectados: {context}
 
             system_prompt = f"""{base}
 
-TAREA: {q_config['task']}
-{q_config['options']}
-LÍMITE: Máximo {q_config['limit']} caracteres.
-TONO: Amigable y directo.{context_str}
-"""
+TAREA: {q_config['task']}. {q_config['options']}
+LÍMITE: Máximo {q_config['limit']} caracteres.{context_str}"""
 
             messages = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Pregunta sobre {question_type}"}
             ]
 
-            result = self._make_request(messages, max_tokens=60, temperature=0.7)
+            result = self._make_request(messages, max_tokens=60, temperature=0.5)
 
             if result:
                 logger.info(f"❓ Pregunta generada: tipo={question_type}")
