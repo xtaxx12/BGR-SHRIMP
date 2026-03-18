@@ -153,9 +153,8 @@ jobs:
         run: |
           if [ -n "$RENDER_API_KEY" ] && [ -n "$RENDER_SERVICE_ID_STAGING" ]; then
             curl -X POST "https://api.render.com/v1/services/$RENDER_SERVICE_ID_STAGING/deploys" \
-              -H "Authorization: Bearer $RENDER_API_KEY" \
-              -H "Content-Type: application/json" \
-              -d '{"clearCache": false}'
+              -H "Accept: application/json" \
+              -H "Authorization: Bearer $RENDER_API_KEY"
             echo "✅ Deployment triggered for staging"
           else
             echo "⚠️ Render credentials not configured, skipping deployment"
@@ -196,9 +195,8 @@ jobs:
           # Trigger deploy en Render
           response=$(curl -s -w "\n%{http_code}" -X POST \
             "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" \
-            -H "Authorization: Bearer $RENDER_API_KEY" \
-            -H "Content-Type: application/json" \
-            -d '{"clearCache": false}')
+            -H "Accept: application/json" \
+            -H "Authorization: Bearer $RENDER_API_KEY")
           
           http_code=$(echo "$response" | tail -n1)
           body=$(echo "$response" | head -n-1)
