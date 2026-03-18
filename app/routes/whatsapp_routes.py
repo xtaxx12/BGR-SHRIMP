@@ -66,7 +66,7 @@ def validate_products_availability(failed_products: list, response: MessagingRes
         error_msg += "• Verifica que las tallas existan para cada producto\n"
         error_msg += "• Solicita solo productos y tallas disponibles\n"
         error_msg += "• Puedes pedir el menú de productos disponibles\n\n"
-        error_msg += "¿En qué más puedo ayudarte? 🦐"
+        error_msg += "¿Necesitas otra talla o producto? Escribe 'menu' para ver opciones."
         
         response.message(error_msg)
         session_manager.add_to_conversation(user_id, 'assistant', error_msg)
@@ -221,9 +221,10 @@ async def whatsapp_webhook(request: Request,
                     session['consent_timestamp'] = session_manager.sessions[user_id].get('consent_timestamp')
                     
                     consent_response = (
-                        "✅ ¡Gracias! Tus mensajes nos ayudarán a mejorar el servicio.\n\n"
-                        "🔒 Toda tu información será anonimizada y protegida.\n\n"
-                        "Ahora, ¿en qué puedo ayudarte? 🦐"
+                        "✅ Gracias, tus mensajes nos ayudarán a mejorar.\n\n"
+                        "Toda tu información será anonimizada.\n\n"
+                        "Escribe producto + talla para cotizar.\n"
+                        "Ejemplo: \"HLSO 16/20\""
                     )
                     response.message(consent_response)
                     return capture_and_return(user_id, consent_response, response)
@@ -236,16 +237,15 @@ async def whatsapp_webhook(request: Request,
                     session['consent_timestamp'] = session_manager.sessions[user_id].get('consent_timestamp')
                     
                     reject_response = (
-                        "👍 Entendido. No usaremos tus mensajes para entrenamiento.\n\n"
-                        "Ahora, ¿en qué puedo ayudarte? 🦐"
+                        "👍 Entendido, no usaremos tus mensajes.\n\n"
+                        "Escribe producto + talla para cotizar.\n"
+                        "Ejemplo: \"HLSO 16/20\""
                     )
                     response.message(reject_response)
                     return capture_and_return(user_id, reject_response, response)
                 else:
                     clarify_response = (
-                        "🤔 Por favor responde:\n\n"
-                        "• **Sí** o **1** para aceptar\n"
-                        "• **No** o **2** para rechazar"
+                        "Responde *Sí* o *No* para continuar."
                     )
                     response.message(clarify_response)
                     return capture_and_return(user_id, clarify_response, response)
@@ -256,16 +256,13 @@ async def whatsapp_webhook(request: Request,
                 
                 consent_message = (
                     "👋 ¡Bienvenido a BGR Export!\n\n"
-                    "🤖 Soy tu asistente para cotizaciones de camarón.\n\n"
-                    "📊 **Solicitud de Consentimiento:**\n"
-                    "Para mejorar nuestro servicio, ¿autorizas que usemos tus mensajes de forma anonimizada para entrenar nuestra IA?\n\n"
-                    "🔒 **Garantizamos:**\n"
-                    "• Toda información personal será anonimizada\n"
-                    "• Cumplimos con GDPR y leyes de privacidad\n"
-                    "• Puedes revocar el consentimiento cuando quieras\n\n"
-                    "**Responde:**\n"
-                    "• **Sí** o **1** para aceptar\n"
-                    "• **No** o **2** para rechazar"
+                    "Soy tu asistente de cotizaciones de camarón. "
+                    "Puedo generar proformas con precios FOB y CFR actualizados en segundos.\n\n"
+                    "Ejemplo: \"HLSO 16/20 a Houston\"\n\n"
+                    "---\n"
+                    "Antes de continuar: ¿nos autorizas a usar tus mensajes "
+                    "(anonimizados) para mejorar el servicio?\n\n"
+                    "Responde *Sí* o *No*"
                 )
                 
                 response.message(consent_message)
@@ -349,13 +346,13 @@ async def whatsapp_webhook(request: Request,
                                 pdf_message = response.message()
                                 pdf_message.body(f"✅ Proforma generada. Descarga: {download_url}")
                         else:
-                            response.message("❌ Error generando la proforma. Intenta nuevamente.")
+                            response.message("❌ No pude generar la proforma. Escribe 'menu' para reiniciar o repite tu solicitud.")
 
 
                         return PlainTextResponse(str(response), media_type="application/xml")
                     else:
                         logger.error(f"❌ Error calculando precio con glaseo {glaseo_percentage}%")
-                        response.message("❌ Error procesando la solicitud. Intenta nuevamente.")
+                        response.message("❌ No pude procesar la solicitud. Escribe 'menu' para reiniciar o repite tu consulta.")
                         session_manager.clear_session(user_id)
                         return PlainTextResponse(str(response), media_type="application/xml")
                 else:
@@ -366,7 +363,7 @@ async def whatsapp_webhook(request: Request,
                     response.message("🤔 Porcentaje no válido. Por favor responde con:\n\n• **10** para 10% glaseo\n• **20** para 20% glaseo\n• **30** para 30% glaseo\n\nO escribe 'menu' para volver al inicio")
                     return PlainTextResponse(str(response), media_type="application/xml")
             else:
-                response.message("❌ Error: No se encontraron datos de la solicitud. Por favor intenta nuevamente.")
+                response.message("❌ Se perdieron los datos de tu solicitud. Por favor repite tu consulta.")
                 session_manager.clear_session(user_id)
                 return PlainTextResponse(str(response), media_type="application/xml")
 
@@ -507,7 +504,7 @@ async def whatsapp_webhook(request: Request,
                             # Limpiar sesión
                             session_manager.clear_session(user_id)
                         else:
-                            error_msg = "❌ Error generando PDF consolidado. Intenta nuevamente."
+                            error_msg = "❌ No pude generar el PDF consolidado. Escribe 'menu' para reiniciar."
                             response.message(error_msg)
                             # 🆕 Capturar respuesta antes de limpiar sesión
                             session_manager.add_to_conversation(user_id, 'assistant', error_msg)
@@ -524,21 +521,14 @@ async def whatsapp_webhook(request: Request,
                     # Si no hay flete, solicitarlo
                     products_list = "\n".join([f"   {i+1}. {p['product']} {p['size']}" for i, p in enumerate(all_products)])
                     
-                    flete_message = f"""✅ **Productos confirmados: {len(all_products)} tallas**
+                    flete_message = f"""✅ Productos confirmados: {len(all_products)} tallas
 
 {products_list}
 
-🌍 **Destino:** {destination}
-❄️ **Glaseo:** {glaseo_percentage}%
+Destino: {destination} | Glaseo: {glaseo_percentage}%
 
-🚢 **Para calcular el precio CFR necesito el valor del flete a {destination}:**
-
-💡 **Ejemplos:**
-• "flete 0.20"
-• "0.25 de flete"
-• "con flete de 0.22"
-
-¿Cuál es el valor del flete por kilo? 💰"""
+Para calcular el precio CFR, indica el flete por kilo.
+Ejemplo: "flete 0.22\""""
                     
                     response.message(flete_message)
                     # 🆕 Capturar respuesta del asistente
@@ -558,7 +548,7 @@ async def whatsapp_webhook(request: Request,
                 logger.error(f"❌ Error procesando aclaración de productos: {str(e)}")
                 import traceback
                 logger.error(f"Traceback: {traceback.format_exc()}")
-                response.message("❌ Error procesando tu respuesta. Por favor intenta nuevamente.")
+                response.message("❌ No pude procesar tu respuesta. Escribe 'menu' para reiniciar.")
                 session_manager.clear_session(user_id)
                 return PlainTextResponse(str(response), media_type="application/xml")
 
@@ -675,7 +665,7 @@ async def whatsapp_webhook(request: Request,
                                 # Limpiar sesión
                                 session_manager.clear_session(user_id)
                             else:
-                                error_msg = "❌ Error generando PDF consolidado. Intenta nuevamente."
+                                error_msg = "❌ No pude generar el PDF consolidado. Escribe 'menu' para reiniciar."
                                 response.message(error_msg)
                                 # 🆕 Capturar respuesta antes de limpiar sesión
                                 session_manager.add_to_conversation(user_id, 'assistant', error_msg)
@@ -693,7 +683,7 @@ async def whatsapp_webhook(request: Request,
                         response.message("🤔 Valor no válido. Por favor responde con el valor del flete:\n\n💡 **Ejemplos:**\n• **0.25** para $0.25/kg\n• **0.30** para $0.30/kg\n• **flete 0.22**\n\nO escribe 'menu' para volver al inicio")
                         return PlainTextResponse(str(response), media_type="application/xml")
                 else:
-                    response.message("❌ Error: No se encontraron datos de la solicitud. Por favor intenta nuevamente.")
+                    response.message("❌ Se perdieron los datos de tu solicitud. Por favor repite tu consulta.")
                     session_manager.clear_session(user_id)
                     return PlainTextResponse(str(response), media_type="application/xml")
 
@@ -701,7 +691,7 @@ async def whatsapp_webhook(request: Request,
                 logger.error(f"❌ Error procesando respuesta de flete para múltiples productos: {str(e)}")
                 import traceback
                 logger.error(f"Traceback: {traceback.format_exc()}")
-                response.message("❌ Error procesando el valor del flete. Intenta nuevamente.")
+                response.message("❌ No pude procesar el flete. Indica el valor por kilo (ej: 0.22).")
                 session_manager.clear_session(user_id)
                 return PlainTextResponse(str(response), media_type="application/xml")
 
@@ -827,7 +817,7 @@ async def whatsapp_webhook(request: Request,
                             # Limpiar sesión
                             session_manager.clear_session(user_id)
                         else:
-                            error_msg = "❌ Error generando PDF consolidado. Intenta nuevamente."
+                            error_msg = "❌ No pude generar el PDF consolidado. Escribe 'menu' para reiniciar."
                             response.message(error_msg)
                             # 🆕 Capturar respuesta antes de limpiar sesión
                             session_manager.add_to_conversation(user_id, 'assistant', error_msg)
@@ -849,7 +839,7 @@ async def whatsapp_webhook(request: Request,
                 logger.error(f"❌ Error procesando respuesta de flete mixto: {str(e)}")
                 import traceback
                 logger.error(f"Traceback: {traceback.format_exc()}")
-                response.message("❌ Error procesando el valor del flete. Intenta nuevamente.")
+                response.message("❌ No pude procesar el flete. Indica el valor por kilo (ej: 0.22).")
                 session_manager.clear_session(user_id)
                 return PlainTextResponse(str(response), media_type="application/xml")
 
@@ -929,13 +919,13 @@ async def whatsapp_webhook(request: Request,
                                 # Limpiar sesión después de generar exitosamente
                                 session_manager.clear_session(user_id)
                             else:
-                                response.message("❌ Error generando la proforma. Intenta nuevamente.")
+                                response.message("❌ No pude generar la proforma. Escribe 'menu' para reiniciar o repite tu solicitud.")
                                 session_manager.clear_session(user_id)
 
                             return PlainTextResponse(str(response), media_type="application/xml")
                         else:
                             logger.error(f"❌ Error calculando precio con flete ${flete_value:.2f}")
-                            response.message("❌ Error procesando la solicitud. Intenta nuevamente.")
+                            response.message("❌ No pude procesar la solicitud. Escribe 'menu' para reiniciar o repite tu consulta.")
                             session_manager.clear_session(user_id)
                             return PlainTextResponse(str(response), media_type="application/xml")
                     else:
@@ -947,7 +937,7 @@ async def whatsapp_webhook(request: Request,
                         response.message("🤔 Valor no válido. Por favor responde con el valor del flete:\n\n💡 **Ejemplos:**\n• **0.25** para $0.25/kg\n• **0.30** para $0.30/kg\n• **flete 0.22**\n\nO escribe 'menu' para volver al inicio")
                         return PlainTextResponse(str(response), media_type="application/xml")
                 else:
-                    response.message("❌ Error: No se encontraron datos de la solicitud. Por favor intenta nuevamente.")
+                    response.message("❌ Se perdieron los datos de tu solicitud. Por favor repite tu consulta.")
                     session_manager.clear_session(user_id)
                     return PlainTextResponse(str(response), media_type="application/xml")
 
@@ -955,7 +945,7 @@ async def whatsapp_webhook(request: Request,
                 logger.error(f"❌ Error procesando respuesta de flete: {str(e)}")
                 import traceback
                 logger.error(f"Traceback: {traceback.format_exc()}")
-                response.message("❌ Error procesando el valor del flete. Intenta nuevamente.")
+                response.message("❌ No pude procesar el flete. Indica el valor por kilo (ej: 0.22).")
                 session_manager.clear_session(user_id)
                 return PlainTextResponse(str(response), media_type="application/xml")
 
@@ -1092,7 +1082,7 @@ async def whatsapp_webhook(request: Request,
 
                                 return PlainTextResponse(str(response), media_type="application/xml")
                             else:
-                                response.message("❌ Error generando el PDF consolidado actualizado. Intenta nuevamente.")
+                                response.message("❌ No pude actualizar el PDF consolidado. Escribe 'menu' para reiniciar.")
                                 return PlainTextResponse(str(response), media_type="application/xml")
                         else:
                             response.message("❌ No se pudieron recalcular precios para los productos con el nuevo flete.")
@@ -1126,10 +1116,10 @@ async def whatsapp_webhook(request: Request,
                                 pdf_message.media(download_url)
                             return PlainTextResponse(str(response), media_type="application/xml")
                         else:
-                            response.message("❌ Error generando el PDF actualizado. Intenta nuevamente.")
+                            response.message("❌ No pude generar el PDF actualizado. Escribe 'menu' para reiniciar.")
                             return PlainTextResponse(str(response), media_type="application/xml")
                     else:
-                        response.message("❌ Error recalculando la proforma. Intenta nuevamente.")
+                        response.message("❌ No pude recalcular la proforma. Escribe 'menu' para reiniciar.")
                         return PlainTextResponse(str(response), media_type="application/xml")
                 else:
                     response.message("🤔 Por favor especifica el nuevo valor del flete.\n\n💡 Ejemplo: 'modifica el flete a 0.30' o 'cambiar flete 0.25'")
@@ -1241,7 +1231,7 @@ async def whatsapp_webhook(request: Request,
                         error_msg += "• Verifica que las tallas existan para cada producto\n"
                         error_msg += "• Solicita solo productos y tallas disponibles\n"
                         error_msg += "• Puedes pedir el menú de productos disponibles\n\n"
-                        error_msg += "¿En qué más puedo ayudarte? 🦐"
+                        error_msg += "¿Necesitas otra talla o producto? Escribe 'menu' para ver opciones."
                         
                         response.message(error_msg)
                         session_manager.add_to_conversation(user_id, 'assistant', error_msg)
@@ -1323,7 +1313,7 @@ async def whatsapp_webhook(request: Request,
                                     
                                     session_manager.clear_session(user_id)
                                 else:
-                                    response.message("❌ Error generando PDF consolidado. Intenta nuevamente.")
+                                    response.message("❌ No pude generar el PDF consolidado. Escribe 'menu' para reiniciar.")
                                     session_manager.clear_session(user_id)
                             else:
                                 response.message("❌ No se pudieron calcular precios para ningún producto.")
@@ -1497,7 +1487,7 @@ async def whatsapp_webhook(request: Request,
                             error_msg += "• Verifica que las tallas existan para cada producto\n"
                             error_msg += "• Solicita solo productos y tallas disponibles\n"
                             error_msg += "• Puedes pedir el menú de productos disponibles\n\n"
-                            error_msg += "¿En qué más puedo ayudarte? 🦐"
+                            error_msg += "¿Necesitas otra talla o producto? Escribe 'menu' para ver opciones."
                             
                             response.message(error_msg)
                             session_manager.add_to_conversation(user_id, 'assistant', error_msg)
@@ -1556,7 +1546,7 @@ async def whatsapp_webhook(request: Request,
                         error_msg += "• Verifica que las tallas existan para cada producto\n"
                         error_msg += "• Solicita solo productos y tallas disponibles\n"
                         error_msg += "• Puedes pedir el menú de productos disponibles\n\n"
-                        error_msg += "¿En qué más puedo ayudarte? 🦐"
+                        error_msg += "¿Necesitas otra talla o producto? Escribe 'menu' para ver opciones."
                         
                         response.message(error_msg)
                         session_manager.add_to_conversation(user_id, 'assistant', error_msg)
@@ -1635,7 +1625,7 @@ async def whatsapp_webhook(request: Request,
                                     
                                     session_manager.clear_session(user_id)
                                 else:
-                                    response.message("❌ Error generando PDF consolidado. Intenta nuevamente.")
+                                    response.message("❌ No pude generar el PDF consolidado. Escribe 'menu' para reiniciar.")
                                     session_manager.clear_session(user_id)
                             else:
                                 response.message("❌ No se pudieron calcular precios para ningún producto.")
@@ -2086,7 +2076,7 @@ U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60
                             pdf_message = response.message()
                             pdf_message.body(f"✅ Proforma generada. Descarga: {download_url}")
                     else:
-                        response.message("❌ Error generando la proforma. Intenta nuevamente.")
+                        response.message("❌ No pude generar la proforma. Escribe 'menu' para reiniciar o repite tu solicitud.")
 
                     return PlainTextResponse(str(response), media_type="application/xml")
                 else:
@@ -2158,7 +2148,7 @@ U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60
                         return PlainTextResponse(str(response), media_type="application/xml")
                     else:
                         logger.error(f"❌ Error validando datos de proforma: {ai_query}")
-                        response.message("❌ Error procesando la solicitud. Intenta nuevamente.")
+                        response.message("❌ No pude procesar la solicitud. Escribe 'menu' para reiniciar o repite tu consulta.")
                         return PlainTextResponse(str(response), media_type="application/xml")
 
         # Comandos globales que funcionan desde cualquier estado
@@ -2310,7 +2300,7 @@ U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60
 
                                 return PlainTextResponse(str(response), media_type="application/xml")
                             else:
-                                response.message("❌ Error generando el PDF consolidado actualizado. Intenta nuevamente.")
+                                response.message("❌ No pude actualizar el PDF consolidado. Escribe 'menu' para reiniciar.")
                                 return PlainTextResponse(str(response), media_type="application/xml")
                         else:
                             response.message("❌ No se pudieron recalcular precios para los productos con el nuevo flete.")
@@ -2362,10 +2352,10 @@ U15, 16/20, 20/30, 21/25, 26/30, 30/40, 31/35, 36/40, 40/50, 41/50, 50/60, 51/60
 
                             return PlainTextResponse(str(response), media_type="application/xml")
                         else:
-                            response.message("❌ Error generando el PDF actualizado. Intenta nuevamente.")
+                            response.message("❌ No pude generar el PDF actualizado. Escribe 'menu' para reiniciar.")
                             return PlainTextResponse(str(response), media_type="application/xml")
                     else:
-                        response.message("❌ Error recalculando la proforma. Intenta nuevamente.")
+                        response.message("❌ No pude recalcular la proforma. Escribe 'menu' para reiniciar.")
                         return PlainTextResponse(str(response), media_type="application/xml")
                 else:
                     response.message("🤔 Por favor especifica el nuevo valor del flete.\n\n💡 Ejemplo: 'modifica el flete a 0.30' o 'cambiar flete 0.25'")
@@ -2520,7 +2510,7 @@ Responde con el número o escribe:
                 products = session['data'].get('products', [])
 
                 if not products:
-                    response.message("❌ Error: No se encontraron productos. Intenta nuevamente.")
+                    response.message("❌ No se encontraron productos. Escribe 'menu' para ver opciones.")
                     session_manager.clear_session(user_id)
                     return PlainTextResponse(str(response), media_type="application/xml")
 
@@ -2642,7 +2632,7 @@ Responde con el número o escribe:
                             # Limpiar sesión después de generar exitosamente
                             session_manager.clear_session(user_id)
                         else:
-                            response.message("❌ Error generando PDF consolidado. Intenta nuevamente.")
+                            response.message("❌ No pude generar el PDF consolidado. Escribe 'menu' para reiniciar.")
                             session_manager.clear_session(user_id)
                     else:
                         response.message("❌ No se pudieron calcular precios para ningún producto. Verifica los productos y tallas.")
@@ -2657,7 +2647,7 @@ Responde con el número o escribe:
                 logger.error(f"❌ Error procesando glaseo para múltiples productos: {str(e)}")
                 import traceback
                 traceback.print_exc()
-                response.message("❌ Ocurrió un error procesando tu consulta. Intenta nuevamente.")
+                response.message("❌ Ocurrió un error. Escribe 'menu' para reiniciar o repite tu consulta.")
                 session_manager.clear_session(user_id)
                 return PlainTextResponse(str(response), media_type="application/xml")
 
@@ -2718,7 +2708,7 @@ Responde con el número o escribe:
                             download_url = f"{base_url}/webhook/download-pdf/{filename}"
                             response.message(f"✅ Cotización generada\n📄 Descarga: {download_url}")
                     else:
-                        response.message("❌ Error generando PDF. Intenta nuevamente.")
+                        response.message("❌ No pude generar el PDF. Escribe 'menu' para reiniciar.")
 
                     session_manager.clear_session(user_id)
                 else:
@@ -2858,7 +2848,7 @@ Responde con el número o escribe:
                             response.message(f"✅ Proforma generada\n📄 Descarga tu PDF: {download_url}")
                     else:
                         logger.error("❌ Error generando PDF")
-                        response.message("❌ Error generando la proforma. Intenta nuevamente.")
+                        response.message("❌ No pude generar la proforma. Escribe 'menu' para reiniciar o repite tu solicitud.")
 
                 # Limpiar sesión
                 session_manager.clear_session(user_id)
@@ -3098,7 +3088,7 @@ Responde con el número o escribe:
         import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
         response = MessagingResponse()
-        response.message("❌ Ocurrió un error procesando tu consulta. Intenta nuevamente.")
+        response.message("❌ Ocurrió un error. Escribe 'menu' para reiniciar o repite tu consulta.")
         response_xml = str(response)
         logger.info(f"Enviando respuesta de error XML: {response_xml}")
         return add_security_headers(PlainTextResponse(response_xml, media_type="application/xml"))

@@ -15,13 +15,13 @@ class InteractiveMessageService:
         """
         Crea el mensaje de bienvenida inicial
         """
-        return "🦐 ¡Hola! Bienvenido a *ShrimpBot* 🤖\n\n✨ Tu asistente virtual especializado en precios de camarón de BGR Export\n\n🌊 Estoy aquí para ayudarte con consultas de precios, productos y más información sobre nuestros camarones de alta calidad."
+        return "👋 Bienvenido a BGR Export.\n\nSoy tu asistente de cotizaciones de camarón. Escribe producto + talla para cotizar.\n\nEjemplo: \"HLSO 16/20\""
 
     def create_main_menu(self):
         """
         Crea el menú principal simplificado
         """
-        message = "🦐 ¿En qué podemos ayudarte?\n\n1️⃣ 💰 Consultar Precios\n2️⃣ 📋 Información de Productos\n3️⃣ 📞 Contacto Comercial"
+        message = "¿En qué puedo ayudarte?\n\n1. Consultar precios\n2. Productos disponibles\n3. Contacto comercial"
         options = ["Consultar Precios", "Información de Productos", "Contacto Comercial"]
         return message, options
 
@@ -169,8 +169,8 @@ class InteractiveMessageService:
             if "consultar precios" in user_input or "precios" in user_input or user_input == "1":
                 return "pricing", *self.create_size_selection_message()
             elif "información" in user_input or "informacion" in user_input or "productos" in user_input or user_input == "2":
-                return "product_info", "🦐 **BGR Export - Productos Premium**\n\n🌟 Ofrecemos camarones de la más alta calidad en diferentes presentaciones:\n\n🔸 **HLSO** (Head Less Shell On) - Sin cabeza, con cáscara\n🔸 **P&D IQF** (Peeled Deveined) - Pelado y desvenado\n🔸 **P&D BLOQUE** (Peeled Deveined Block) - Pelado, desvenado, en bloque\n🔸 **PuD-EUROPA** - Pelado, desvenado, calidad europea\n🔸 **EZ PEEL** - Fácil pelado\n\n🌊 Todos nuestros productos cumplen con los más altos estándares de calidad internacional.\n\n💡 Escribe 'precios' para consultar cotizaciones o 'menu' para volver al inicio.", []
+                return "product_info", "Productos disponibles:\n\n• HLSO - Sin cabeza, con cáscara\n• HOSO - Entero (con cabeza)\n• P&D IQF - Pelado y desvenado\n• P&D Bloque - Pelado en bloque\n• PuD-Europa - Calidad europea\n• EZ Peel - Fácil pelado\n\nEscribe producto + talla para cotizar.\nEjemplo: \"HLSO 16/20\"", []
             elif "contacto" in user_input or user_input == "3":
-                return "contact", "📞 **Contacto Comercial BGR Export**\n\n🏢 **Oficina Principal:**\nPuerto Jeli, Santa Rosa\n\n📧 **Email:**\namerino@bgrexport.com\n\n📱 **WhatsApp Comercial:**\n+593 98-805-7425\n\n🌐 **Horarios de Atención:**\nLunes a Viernes: 8:00 AM - 6:00 PM (GMT-5)\nSábados: 9:00 AM - 1:00 PM\n\n🚀 ¡Nuestro equipo comercial está listo para atenderte!\n\n💡 Escribe 'precios' para consultar cotizaciones o 'menu' para volver al inicio.", []
+                return "contact", "Contacto BGR Export\n\nOficina: Puerto Jeli, Santa Rosa\nEmail: amerino@bgrexport.com\nWhatsApp: +593 98-805-7425\n\nHorario: Lun-Vie 8:00-18:00 | Sab 9:00-13:00 (GMT-5)\n\nEscribe 'precios' para cotizar.", []
 
-        return current_state, "🤔 No entendí tu selección. Por favor elige una opción válida:\n\n1️⃣ Consultar Precios\n2️⃣ Información de Productos\n3️⃣ Contacto Comercial\n\n💡 O escribe 'menu' para volver al inicio.", []
+        return current_state, "No entendí tu selección. Elige una opción:\n\n1. Consultar precios\n2. Productos disponibles\n3. Contacto comercial\n\nO escribe 'menu' para reiniciar.", []

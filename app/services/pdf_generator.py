@@ -634,7 +634,7 @@ class PDFGenerator:
         """
         Retorna las opciones de idioma para el PDF
         """
-        return "🌐 **Seleccione idioma del PDF:**\n\n1️⃣ 🇪🇸 Español\n2️⃣ 🇺🇸 English\n\n💡 Responda con el número de su opción"
+        return "Selecciona el idioma del PDF:\n\n1. Español\n2. English"
 
     def parse_language_selection(self, user_input: str) -> str:
         """
