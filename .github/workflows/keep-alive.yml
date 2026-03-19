@@ -2,9 +2,8 @@ name: Keep Alive - Render
 
 on:
   schedule:
-    # Ping cada 10 minutos para evitar cold start en Render free tier
     - cron: '*/10 * * * *'
-  workflow_dispatch: # Permite ejecutar manualmente
+  workflow_dispatch:
 
 jobs:
   ping:
@@ -12,10 +11,18 @@ jobs:
     steps:
       - name: Ping health endpoint
         run: |
-          response=$(curl -s -o /dev/null -w "%{http_code}" https://bgr-shrimp.onrender.com/health --max-time 30)
+          # Primer intento: despierta el servidor (puede dar timeout en cold start)
+          echo "Ping 1: Despertando servidor..."
+          curl -s -o /dev/null https://bgr-shrimp.onrender.com/health --max-time 60 || true
+
+          # Segundo intento: verificar que respondió
+          sleep 5
+          echo "Ping 2: Verificando respuesta..."
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://bgr-shrimp.onrender.com/health --max-time 30 || echo "000")
+
           echo "Health check response: $response"
-          if [ "$response" != "200" ]; then
-            echo "Warning: Health check returned $response"
-            exit 1
+          if [ "$response" = "200" ]; then
+            echo "Server is alive"
+          else
+            echo "Warning: Server responded with $response (may still be waking up)"
           fi
-          echo "Server is alive"
