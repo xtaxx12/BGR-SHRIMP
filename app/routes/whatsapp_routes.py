@@ -1723,7 +1723,33 @@ Ejemplo: "flete 0.22\""""
                     return PlainTextResponse(str(response), media_type="application/xml")
             elif glaseo_percentage is None:
                 # No especificó glaseo, pedirlo
-                response.message(f"🦐 Detecté {len(sizes_list)} tallas: {', '.join(sizes_list)}\n\n❄️ ¿Qué glaseo necesitas?\n• 0% (sin glaseo)\n• 10%\n• 20%\n• 30%")
+                # Construir lista de productos para guardar en sesión
+                sizes_by_product = ai_analysis.get('sizes_by_product') if ai_analysis else None
+                product = ai_analysis.get('product') if ai_analysis else None
+
+                if sizes_by_product and len(sizes_by_product) >= 1:
+                    # OpenAI detectó productos con sus tallas
+                    multi_products_for_session = []
+                    for prod_type, prod_sizes in sizes_by_product.items():
+                        for size in prod_sizes:
+                            multi_products_for_session.append({'product': prod_type, 'size': size})
+                elif product:
+                    # Un solo producto con múltiples tallas
+                    multi_products_for_session = [{'product': product, 'size': s} for s in sizes_list]
+                else:
+                    # Solo tenemos las tallas, sin producto identificado
+                    multi_products_for_session = [{'size': s} for s in sizes_list]
+
+                glaseo_msg = f"🦐 Detecté {len(sizes_list)} tallas: {', '.join(sizes_list)}\n\n❄️ ¿Qué glaseo necesitas?\n• 0% (sin glaseo)\n• 10%\n• 20%\n• 30%"
+                response.message(glaseo_msg)
+                session_manager.add_to_conversation(user_id, 'assistant', glaseo_msg)
+
+                # Guardar estado para esperar respuesta de glaseo
+                session_manager.set_session_state(user_id, 'waiting_for_multi_glaseo', {
+                    'products': multi_products_for_session,
+                    'message': Body
+                })
+
                 return PlainTextResponse(str(response), media_type="application/xml")
         
         # Si no hay múltiples tallas, intentar detección normal
