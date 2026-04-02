@@ -582,6 +582,8 @@ MAPEO DE TÉRMINOS:
 - "Colas"/"Cola" (sin cocedero) → HLSO | "Colas Cocedero"/"Cocidas" → COOKED
 - "Inteiro"/"Entero" (sin cocedero) → HOSO | "Inteiro Cocedero" → needs_product_type: true
 - Solo "Cocedero" → needs_product_type: true (preguntar COOKED/PRE-COCIDO/COCIDO SIN TRATAR)
+- "PYD TAIL OFF" / "PYD" / "TAIL OFF" → P&D IQF
+- "EZPEEL" / "EZ PEEL" / "EZ-PEEL" / "EASY PEEL" → EZ PEEL
 - "CFR/CIF [ciudad]" → destination + flete_solicitado: true
 - "Cola X/X con flete Y" → product: HLSO, flete_custom: Y
 - Normalizar tallas: "16-20" → "16/20", "16 20" → "16/20"
@@ -607,6 +609,9 @@ Output: {"intent":"proforma","needs_product_type":true,"product_category":"cocid
 
 Input: "Precio cfr de cola 20/30 con 0.25 de flete"
 Output: {"intent":"proforma","product":"HLSO","size":"20/30","sizes":["20/30"],"flete_custom":0.25,"flete_solicitado":true,"confidence":0.95}
+
+Input: "PYD TAIL OFF 61-70 IQF 5X2, 16-20 EZPEEL IQF 10X2, 26-30 EZPEEL IQF 10X2"
+Output: {"intent":"proforma","multiple_products":true,"multiple_sizes":true,"sizes":["61/70","16/20","26/30"],"sizes_by_product":{"P&D IQF":["61/70"],"EZ PEEL":["16/20","26/30"]},"confidence":0.95}
 
 Input: "Hola, necesito cotización"
 Output: {"intent":"greeting","wants_proforma":true,"confidence":0.8}
@@ -1123,14 +1128,16 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
                 return [{'special': 'inteiro_colas', 'count': len(all_sizes)}]
 
         # Patrones para productos específicos
-        product_patterns = {
-            'HOSO': r'\bHOSO\b',
-            'HLSO': r'\bHLSO\b',
-            'P&D IQF': r'\b(?:P&D|PYD|P\s*&\s*D)\s*(?:IQF|TAIL\s*OFF)?\b',
-            'P&D BLOQUE': r'\b(?:P&D|PYD)\s*(?:BLOQUE|BLOCK)\b',
-            'EZ PEEL': r'\b(?:EZ\s*PEEL|EZPEEL)\b',
-            'COOKED': r'\b(?:COOKED|COCIDO|COCEDERO)\b',
-        }
+        # IMPORTANTE: Usar OrderedDict o lista de tuplas para que EZ PEEL se evalúe ANTES que P&D
+        # ya que "PYD" sin contexto podría capturar líneas de EZPEEL
+        product_patterns = [
+            ('HOSO', r'\bHOSO\b'),
+            ('HLSO', r'\bHLSO\b'),
+            ('EZ PEEL', r'\b(?:EZ[\s-]*PEEL|EZPEEL|EASY\s*PEEL)\b'),
+            ('P&D BLOQUE', r'\b(?:P&D|PYD|P\s*&\s*D)\s*(?:BLOQUE|BLOCK)\b'),
+            ('P&D IQF', r'\b(?:P&D|PYD|P\s*&\s*D)\s*(?:IQF|TAIL\s*OFF)?\b'),
+            ('COOKED', r'\b(?:COOKED|COCIDO|COCEDERO)\b'),
+        ]
 
         # Buscar todas las líneas del mensaje
         lines = message_upper.split('\n')
@@ -1149,7 +1156,7 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
 
             # Buscar producto en la línea
             product_found = None
-            for product_name, pattern in product_patterns.items():
+            for product_name, pattern in product_patterns:
                 if re.search(pattern, line):
                     product_found = product_name
                     break
@@ -1187,8 +1194,13 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
             products_found.append('HLSO')
         if 'HOSO' in message_upper:
             products_found.append('HOSO')
+        if re.search(r'\b(?:EZ[\s-]*PEEL|EZPEEL|EASY\s*PEEL)\b', message_upper):
+            products_found.append('EZ PEEL')
         if 'P&D IQF' in message_upper or 'PD IQF' in message_upper:
             products_found.append('P&D IQF')
+        if re.search(r'\b(?:PYD|P&D|P\s*&\s*D)\s*(?:TAIL\s*OFF)\b', message_upper):
+            if 'P&D IQF' not in products_found:
+                products_found.append('P&D IQF')
         if 'COOKED' in message_upper:
             products_found.append('COOKED')
         
@@ -1417,7 +1429,7 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
                     'P&D IQF': [
                         'p&d iqf', 'pd iqf', 'p&d', 'pelado', 'peeled', 'deveined',
                         'limpio', 'procesado', 'pd', 'p d', 'pelado y desvenado',
-                        
+                        'pyd', 'pyd tail off', 'tail off', 'pyd iqf',
                     ],
                     'P&D BLOQUE': [
                         'p&d bloque', 'pd bloque', 'bloque', 'block', 'p&d block',
@@ -1427,7 +1439,7 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
                         'pud europa', 'pud-europa', 'europa', 'european', 'europeo'
                     ],
                     'EZ PEEL': [
-                        'ez peel', 'ez', 'easy peel', 'facil pelado', 'fácil pelado'
+                        'ez peel', 'ezpeel', 'ez-peel', 'easy peel', 'facil pelado', 'fácil pelado'
                     ],
                     'PuD-EEUU': [
                         'pud eeuu', 'pud-eeuu', 'eeuu', 'usa', 'estados unidos'
@@ -1446,7 +1458,7 @@ APLICA EL MISMO ESTILO Y TONO QUE EN LOS EJEMPLOS."""
 
                 # Buscar coincidencias de productos (orden específico para evitar conflictos)
                 # IMPORTANTE: P&D IQF debe ir ANTES que COOKED para detectar "cola" correctamente
-                specific_order = ['COCIDO SIN TRATAR', 'PRE-COCIDO', 'P&D IQF', 'P&D BLOQUE', 'PuD-EUROPA', 'PuD-EEUU', 'EZ PEEL', 'HLSO', 'HOSO', 'COOKED']
+                specific_order = ['COCIDO SIN TRATAR', 'PRE-COCIDO', 'EZ PEEL', 'P&D IQF', 'P&D BLOQUE', 'PuD-EUROPA', 'PuD-EEUU', 'HLSO', 'HOSO', 'COOKED']
 
                 for prod_name in specific_order:
                     if prod_name in product_patterns:
